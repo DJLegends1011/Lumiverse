@@ -129,6 +129,24 @@ const EPHEMERAL_MAX_FILES = 250;
 
 type TokenModelSource = "main" | "sidecar" | "explicit";
 
+type ChatAppendGenerationOptions = {
+  connection_id?: string;
+  persona_id?: string;
+  persona_addon_states?: Record<string, boolean>;
+  preset_id?: string;
+  force_preset_id?: boolean;
+  parameters?: Record<string, unknown>;
+  target_character_id?: string;
+  retain_council?: boolean;
+};
+
+type ChatAppendMessageOptions =
+  | boolean
+  | {
+      triggerGeneration?: boolean;
+      generation?: ChatAppendGenerationOptions;
+    };
+
 type TokenCountResult = {
   total_tokens: number;
   model: string;
@@ -2108,7 +2126,12 @@ export class WorkerHost {
         this.handleChatGetMessages(msg.requestId, msg.chatId);
         break;
       case "chat_append_message":
-        this.handleChatAppendMessage(msg.requestId, msg.chatId, msg.message);
+        void this.handleChatAppendMessage(
+          msg.requestId,
+          msg.chatId,
+          msg.message,
+          (msg as any).options,
+        );
         break;
       case "chat_update_message":
         this.handleChatUpdateMessage(
@@ -4718,18 +4741,26 @@ export class WorkerHost {
     }
   }
 
-  private handleChatAppendMessage(
+  private async handleChatAppendMessage(
     requestId: string,
     chatId: string,
     message: {
       role: "system" | "user" | "assistant";
       content: string;
       metadata?: Record<string, unknown>;
-    }
-  ): void {
+    },
+    options?: ChatAppendMessageOptions,
+  ): Promise<void> {
     try {
       if (!managerSvc.hasPermission(this.manifest.identifier, "chat_mutation")) {
         throw new Error(`${PERMISSION_DENIED_PREFIX} chat_mutation — Chat mutation permission not granted`);
+      }
+
+      const triggerGeneration =
+        options === true ||
+        (typeof options === "object" && options !== null && options.triggerGeneration === true);
+      if (triggerGeneration && !managerSvc.hasPermission(this.manifest.identifier, "generation")) {
+        throw new Error(`${PERMISSION_DENIED_PREFIX} generation — Generation permission not granted`);
       }
 
       const userId = this.getChatOwnerId(chatId);
@@ -4757,10 +4788,35 @@ export class WorkerHost {
         userId
       );
 
+      let generationId: string | undefined;
+      if (triggerGeneration) {
+        const generationOptions =
+          typeof options === "object" &&
+          options !== null &&
+          typeof options.generation === "object" &&
+          options.generation !== null
+            ? options.generation
+            : undefined;
+        const generation = await generateSvc.startGeneration({
+          userId,
+          chat_id: chatId,
+          generation_type: "normal",
+          connection_id: generationOptions?.connection_id,
+          persona_id: generationOptions?.persona_id,
+          persona_addon_states: generationOptions?.persona_addon_states,
+          preset_id: generationOptions?.preset_id,
+          force_preset_id: generationOptions?.force_preset_id,
+          parameters: generationOptions?.parameters,
+          target_character_id: generationOptions?.target_character_id,
+          retain_council: generationOptions?.retain_council,
+        });
+        generationId = generation.generationId;
+      }
+
       this.postToWorker({
         type: "response",
         requestId,
-        result: { id: created.id },
+        result: generationId ? { id: created.id, generationId } : { id: created.id },
       });
     } catch (err: any) {
       this.postToWorker({ type: "response", requestId, error: err.message });

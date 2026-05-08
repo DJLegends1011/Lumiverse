@@ -166,8 +166,37 @@ type MacroInvocationState = {
   commit: boolean;
 };
 
+type ChatAppendGenerationOptions = {
+  connection_id?: string;
+  persona_id?: string;
+  persona_addon_states?: Record<string, boolean>;
+  preset_id?: string;
+  force_preset_id?: boolean;
+  parameters?: Record<string, unknown>;
+  target_character_id?: string;
+  retain_council?: boolean;
+};
+
+type ChatAppendMessageOptions =
+  | boolean
+  | {
+      triggerGeneration?: boolean;
+      generation?: ChatAppendGenerationOptions;
+    };
+
 type RuntimeWorkerToHost =
   | WorkerToHost
+  | {
+      type: "chat_append_message";
+      requestId: string;
+      chatId: string;
+      message: {
+        role: "system" | "user" | "assistant";
+        content: string;
+        metadata?: Record<string, unknown>;
+      };
+      options?: ChatAppendMessageOptions;
+    }
   | { type: "rpc_pool_sync"; endpoint: string; value: unknown }
   | { type: "rpc_pool_register_handler"; endpoint: string }
   | { type: "rpc_pool_unregister"; endpoint: string }
@@ -1408,7 +1437,7 @@ const spindleApi: RuntimeSpindleAPI = {
         swipe_dates: number[];
       }>;
     },
-    async appendMessage(chatId: string, message) {
+    async appendMessage(chatId: string, message, options?: ChatAppendMessageOptions) {
       assertMutationAllowed("spindle.chat.appendMessage()");
       const requestId = crypto.randomUUID();
       const result = await request({
@@ -1416,8 +1445,9 @@ const spindleApi: RuntimeSpindleAPI = {
         requestId,
         chatId,
         message,
+        options,
       });
-      return result as { id: string };
+      return result as { id: string; generationId?: string };
     },
     async updateMessage(chatId: string, messageId: string, patch): Promise<void> {
       assertMutationAllowed("spindle.chat.updateMessage()");
