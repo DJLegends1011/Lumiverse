@@ -207,14 +207,23 @@ export default function InputArea({ chatId }: InputAreaProps) {
   const activeAltSelectionCount = isGroupChat
     ? Object.values(groupAltFieldSelections).reduce((total, selections) => total + Object.keys(selections || {}).length, 0)
     : Object.keys(altFieldSelections).length
+  const groupCharacterKey = useMemo(() => groupCharacterIds.join('\0'), [groupCharacterIds])
+  const groupAltFieldsKey = useMemo(() => {
+    if (!isGroupChat) return ''
+    return groupCharacterIds.map((id) => {
+      const altFields = characters.find((c) => c.id === id)?.extensions?.alternate_fields
+      return `${id}:${altFields ? JSON.stringify(altFields) : ''}`
+    }).join('\0')
+  }, [characters, groupCharacterIds, isGroupChat])
 
   useEffect(() => {
     if (isGroupChat) {
       setAltFieldsData({})
       if (groupCharacterIds.length === 0) { setGroupAltFieldsData({}); return }
       let cancelled = false
+      const characterSnapshot = useStore.getState().characters
       Promise.all(groupCharacterIds.map(async (id) => {
-        const cached = characters.find((c) => c.id === id)
+        const cached = characterSnapshot.find((c) => c.id === id)
         if (cached?.extensions?.alternate_fields) {
           return { id, altFields: cached.extensions.alternate_fields as Record<string, AltFieldVariant[]> }
         }
@@ -242,7 +251,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
         setAltFieldsData(af && typeof af === 'object' ? af : {})
       })
       .catch(() => setAltFieldsData({}))
-  }, [activeCharacterId, isGroupChat, groupCharacterIds, characters])
+  }, [activeCharacterId, isGroupChat, groupCharacterKey, groupAltFieldsKey])
 
   // Load per-chat alternate field selections
   useEffect(() => {
