@@ -11,7 +11,7 @@ const APPLY_MAX_SCRIPT_COUNT = 500;
 const APPLY_MAX_PATTERN_LENGTH = 10_000;
 const APPLY_MAX_RESOLVED_TEMPLATE_LENGTH = 100_000;
 const APPLY_VALID_PLACEMENTS = new Set<RegexPlacement>(["user_input", "ai_output", "world_info", "reasoning"]);
-const APPLY_VALID_FLAGS = new Set(["g", "i", "m", "s", "u"]);
+const APPLY_VALID_FLAGS = new Set(["d", "g", "i", "m", "s", "u", "v", "y"]);
 const APPLY_VALID_MACRO_MODES = new Set<RegexMacroMode>(["none", "raw", "escaped", "after"]);
 
 function isStringRecord(value: unknown): value is Record<string, unknown> {

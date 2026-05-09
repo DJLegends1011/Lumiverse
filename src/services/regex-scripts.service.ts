@@ -64,7 +64,7 @@ interface ApplyRegexScriptOptions {
 const VALID_PLACEMENTS = new Set(["user_input", "ai_output", "world_info", "reasoning"]);
 const VALID_SCOPES = new Set(["global", "character", "chat"]);
 const VALID_TARGETS = new Set(["prompt", "response", "display"]);
-const VALID_FLAGS = new Set(["g", "i", "m", "s", "u"]);
+const VALID_FLAGS = new Set(["d", "g", "i", "m", "s", "u", "v", "y"]);
 const VALID_MACRO_MODES = new Set(["none", "raw", "escaped", "after"]);
 const MAX_PATTERN_LENGTH = 10_000;
 const PRESET_REGEX_ENABLED_SETTING_PREFIX = "presetRegexEnabled:";
@@ -327,7 +327,7 @@ function validateRegex(
   substituteMacros: RegexScript["substitute_macros"] = "none",
 ): string | null {
   if (pattern.length > MAX_PATTERN_LENGTH) return "find_regex exceeds maximum length";
-  if (!validateFlags(flags)) return "Invalid flags — allowed: g, i, m, s, u";
+  if (!validateFlags(flags)) return "Invalid flags — allowed: d, g, i, m, s, u, v, y";
   try {
     const compilePattern = substituteMacros !== "none" && hasMacroSyntax(pattern)
       ? sanitizeRegexPatternForValidation(pattern)
@@ -350,7 +350,7 @@ function validateInput(input: CreateRegexScriptInput | UpdateRegexScriptInput, i
     return "find_regex exceeds maximum length";
   }
   if (input.flags !== undefined && !validateFlags(input.flags)) {
-    return "Invalid flags — allowed: g, i, m, s, u";
+    return "Invalid flags — allowed: d, g, i, m, s, u, v, y";
   }
   if (input.placement !== undefined) {
     if (!Array.isArray(input.placement)) return "placement must be an array";
@@ -1309,7 +1309,7 @@ const ST_SUBSTITUTE_MAP: Record<number, "none" | "raw" | "escaped"> = {
  * Falls back to treating the whole string as the pattern if it's not in literal form.
  */
 function parseRegexLiteral(findRegex: string): { pattern: string; flags: string } {
-  const match = findRegex.match(/^\/(.+)\/([gimsuy]*)$/s);
+  const match = findRegex.match(/^\/(.+)\/([dgimsuvy]*)$/s);
   if (match) {
     return { pattern: match[1], flags: match[2] || "gi" };
   }

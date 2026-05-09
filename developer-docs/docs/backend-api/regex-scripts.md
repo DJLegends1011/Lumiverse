@@ -93,7 +93,7 @@ const active = await spindle.regex_scripts.getActive({
 | `name` | `string` | Yes | Display name shown in the regex panel. |
 | `find_regex` | `string` | Yes | Pattern compiled with the JavaScript regex engine. Validated at create time. |
 | `replace_string` | `string` | No | Replacement template. Supports `$1` / `$&` / `$<name>` capture references. Default `""`. |
-| `flags` | `string` | No | Any subset of `gimsu`. Default `"gi"`. |
+| `flags` | `string` | No | Any subset of `dgimsuvy` (full JS regex flag set: `d` hasIndices, `g` global, `i` ignore-case, `m` multiline, `s` dotAll, `u` unicode, `v` unicodeSets, `y` sticky). No duplicates. Default `"gi"`. |
 | `placement` | `RegexPlacementDTO[]` | No | Which message roles the rule applies to. Default `["ai_output"]`. |
 | `scope` | `"global" \| "character" \| "chat"` | No | Default `"global"`. |
 | `scope_id` | `string \| null` | No | Required when `scope` is non-global. |
@@ -123,7 +123,7 @@ Same fields as `RegexScriptCreateDTO`, all optional.
   script_id: string             // stable, normalized identifier (lowercase, _-only)
   find_regex: string
   replace_string: string
-  flags: string                 // any subset of "gimsu"
+  flags: string                 // any subset of "dgimsuvy" (full JS regex flag set)
   placement: ("user_input" | "ai_output" | "world_info" | "reasoning")[]
   scope: "global" | "character" | "chat"
   scope_id: string | null       // character ID or chat ID when scoped

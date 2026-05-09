@@ -264,4 +264,35 @@ describe("regex performance reporting", () => {
     const updated = updateRegexScript(USER_ID, script.id, { find_regex: "two" });
     expect(updated && typeof updated !== "string" ? updated.metadata.regex_performance : undefined).toBeUndefined();
   });
+
+  test("accepts the full JS regex flag set d/g/i/m/s/u/v/y", () => {
+    for (const flag of ["d", "g", "i", "m", "s", "u", "v", "y"]) {
+      const created = createRegexScript(USER_ID, {
+        name: `Flag ${flag}`,
+        find_regex: "abc",
+        flags: flag,
+      });
+      expect(typeof created).not.toBe("string");
+    }
+  });
+
+  test("rejects flags outside d/g/i/m/s/u/v/y", () => {
+    for (const bad of ["x", "z", "a", "gx", "gd!"]) {
+      const result = createRegexScript(USER_ID, {
+        name: `Bad ${bad}`,
+        find_regex: "abc",
+        flags: bad,
+      });
+      expect(typeof result).toBe("string");
+    }
+  });
+
+  test("rejects duplicate flag chars", () => {
+    const result = createRegexScript(USER_ID, {
+      name: "Dup",
+      find_regex: "abc",
+      flags: "gg",
+    });
+    expect(typeof result).toBe("string");
+  });
 });

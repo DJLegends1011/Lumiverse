@@ -656,6 +656,10 @@ function ScriptRow({
                   { f: 'i', hint: 'Case insensitive' },
                   { f: 'm', hint: 'Multiline' },
                   { f: 's', hint: 'Dotall — . matches newlines' },
+                  { f: 'u', hint: 'Unicode' },
+                  { f: 'v', hint: 'Unicode sets (ES2024) — superset of u' },
+                  { f: 'd', hint: 'Has indices' },
+                  { f: 'y', hint: 'Sticky' },
                 ].map(({ f, hint }) => (
                   <label key={f} className={styles.flagCheck} title={hint}>
                     <input
