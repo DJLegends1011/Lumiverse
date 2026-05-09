@@ -250,6 +250,10 @@ export default function RegexEditorModal() {
                     { f: 'i', hint: 'Case insensitive' },
                     { f: 'm', hint: 'Multiline' },
                     { f: 's', hint: 'Dotall' },
+                    { f: 'u', hint: 'Unicode' },
+                    { f: 'v', hint: 'Unicode sets (ES2024)' },
+                    { f: 'd', hint: 'Has indices' },
+                    { f: 'y', hint: 'Sticky' },
                   ].map(({ f, hint }) => (
                     <button
                       key={f}
