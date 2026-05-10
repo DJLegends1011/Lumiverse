@@ -1312,6 +1312,9 @@ export default function InputArea({ chatId }: InputAreaProps) {
         generation_type: 'normal',
         retain_council: retainCouncilForRegens || undefined,
       }
+      if (isGroupChat && typeof lastMsg?.extra?.character_id === 'string') {
+        genOpts.target_character_id = lastMsg.extra.character_id
+      }
       if (feedback) {
         genOpts.regen_feedback = feedback
         genOpts.regen_feedback_position = regenFeedback.position
@@ -1329,7 +1332,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
       setStreamingError(msg)
       toast.error(msg, { title: 'Regeneration Failed' })
     }
-  }, [chatId, isStreaming, messages, activeProfileId, activePersonaId, activeGenerationAddonStates, getActivePresetForGeneration, regenFeedback.position, retainCouncilForRegens, addMessage, beginStreaming, startStreaming, setStreamingError, consumeOneshotGuides])
+  }, [chatId, isStreaming, messages, isGroupChat, activeProfileId, activePersonaId, activeGenerationAddonStates, getActivePresetForGeneration, regenFeedback.position, retainCouncilForRegens, addMessage, beginStreaming, startStreaming, setStreamingError, consumeOneshotGuides])
 
   const handleRegenerate = useCallback(() => {
     if (isStreaming) return
@@ -1348,12 +1351,17 @@ export default function InputArea({ chatId }: InputAreaProps) {
     const nonce = ++generationNonceRef.current
     beginStreaming(undefined, 'continue')
     try {
+      const lastAssistant = [...messages].reverse().find((msg) => !msg.is_user)
+      const targetCharacterId = isGroupChat && typeof lastAssistant?.extra?.character_id === 'string'
+        ? lastAssistant.extra.character_id
+        : undefined
       const res = await generateApi.continueGeneration({
         chat_id: chatId,
         connection_id: activeProfileId || undefined,
         persona_id: activePersonaId || undefined,
         persona_addon_states: activeGenerationAddonStates,
         preset_id: getActivePresetForGeneration() || undefined,
+        target_character_id: targetCharacterId,
         retain_council: retainCouncilForRegens || undefined,
       })
       if (generationNonceRef.current !== nonce) return
@@ -1366,7 +1374,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
       setStreamingError(msg)
       toast.error(msg, { title: 'Continue Failed' })
     }
-  }, [chatId, isStreaming, activeProfileId, activePersonaId, activeGenerationAddonStates, getActivePresetForGeneration, beginStreaming, startStreaming, setStreamingError, consumeOneshotGuides])
+  }, [chatId, isStreaming, messages, isGroupChat, activeProfileId, activePersonaId, activeGenerationAddonStates, getActivePresetForGeneration, retainCouncilForRegens, beginStreaming, startStreaming, setStreamingError, consumeOneshotGuides])
 
   const handleImpersonate = useCallback(async (mode: import('@/api/generate').ImpersonateMode) => {
     if (isStreaming) return

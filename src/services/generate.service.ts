@@ -33,6 +33,7 @@ import {
   type ToolDefinition,
   type ToolCallResult,
 } from "../llm/types";
+import type { Message } from "../types/message";
 import {
   interceptorPipeline,
   type InterceptorBreakdownEntry,
@@ -1464,8 +1465,27 @@ export async function startGeneration(
       connection.id,
     );
 
-    // Resolve character name for saved messages — prefer target_character_id for group chats
+    // Resolve the assistant message being modified before choosing a character.
+    // Group retries/continues are tied to the message's speaker, not the chat's
+    // primary/greeting character.
     const chat = chatsSvc.getChat(input.userId, input.chat_id);
+    const isGroupChat = chat?.metadata?.group === true;
+    const groupCharacterIds =
+      isGroupChat && Array.isArray(chat?.metadata?.character_ids)
+        ? (chat.metadata.character_ids as string[])
+        : [];
+    let targetAssistantMessage: Message | null = null;
+    if (genType === "regenerate") {
+      targetAssistantMessage = input.message_id
+        ? chatsSvc.getMessage(input.userId, input.message_id)
+        : chatsSvc.getLastAssistantMessage(input.userId, input.chat_id);
+    } else if (genType === "continue") {
+      targetAssistantMessage = input.message_id
+        ? chatsSvc.getMessage(input.userId, input.message_id)
+        : chatsSvc.getLastAssistantMessage(input.userId, input.chat_id);
+    }
+    if (targetAssistantMessage?.is_user) targetAssistantMessage = null;
+
     if (genType === "normal") {
       const lastMessage = chatsSvc.getLastMessage(input.userId, input.chat_id);
       const attachments = Array.isArray(lastMessage?.extra?.attachments)
@@ -1481,7 +1501,28 @@ export async function startGeneration(
       }
     }
     let characterName = "Assistant";
-    const targetCharId = input.target_character_id || chat?.character_id;
+    const requestedTargetCharId =
+      input.target_character_id &&
+      (!isGroupChat || groupCharacterIds.includes(input.target_character_id))
+        ? input.target_character_id
+        : undefined;
+    const messageTargetCharId =
+      typeof targetAssistantMessage?.extra?.character_id === "string"
+        ? targetAssistantMessage.extra.character_id
+        : undefined;
+    const inferredGroupTargetCharId =
+      isGroupChat &&
+      messageTargetCharId &&
+      groupCharacterIds.includes(messageTargetCharId)
+        ? messageTargetCharId
+        : undefined;
+    const targetExistingAssistant =
+      genType === "regenerate" || genType === "continue";
+    const resolvedTargetCharId = targetExistingAssistant
+      ? inferredGroupTargetCharId || requestedTargetCharId
+      : requestedTargetCharId || inferredGroupTargetCharId;
+    const targetCharId = resolvedTargetCharId || chat?.character_id;
+    const pipelineTargetCharId = resolvedTargetCharId;
     if (targetCharId) {
       const character = charactersSvc.getCharacter(input.userId, targetCharId);
       if (character) characterName = getEffectiveCharacterName(character);
@@ -1537,9 +1578,7 @@ export async function startGeneration(
     let excludeMessageId: string | undefined;
 
     if (genType === "regenerate") {
-      const targetMsg = input.message_id
-        ? chatsSvc.getMessage(input.userId, input.message_id)
-        : chatsSvc.getLastAssistantMessage(input.userId, input.chat_id);
+      const targetMsg = targetAssistantMessage;
       if (targetMsg) {
         lifecycle.targetMessageId = targetMsg.id;
         excludeMessageId = targetMsg.id;
@@ -1571,10 +1610,7 @@ export async function startGeneration(
         }
       }
     } else if (genType === "continue") {
-      const lastMsg = chatsSvc.getLastAssistantMessage(
-        input.userId,
-        input.chat_id,
-      );
+      const lastMsg = targetAssistantMessage;
       if (lastMsg) {
         lifecycle.continueMessageId = lastMsg.id;
         lifecycle.continueOriginalContent = lastMsg.content;
@@ -1595,8 +1631,7 @@ export async function startGeneration(
     // on the message card, matching the regenerate/swipe UX.
     if (genType === "normal") {
       const extra: Record<string, any> = {};
-      if (input.target_character_id)
-        extra.character_id = input.target_character_id;
+      if (targetCharId) extra.character_id = targetCharId;
       const stagedMsg = chatsSvc.createMessage(
         input.chat_id,
         {
@@ -1800,8 +1835,7 @@ export async function startGeneration(
                 (genType === "normal" || genType === "swipe")
               ) {
                 const extra: Record<string, any> = {};
-                if (input.target_character_id)
-                  extra.character_id = input.target_character_id;
+                if (targetCharId) extra.character_id = targetCharId;
                 const stagedMsg = chatsSvc.createMessage(
                   input.chat_id,
                   {
@@ -2188,7 +2222,7 @@ export async function startGeneration(
             inputMessages: input.messages,
             inputParameters: input.parameters,
             excludeMessageId,
-            targetCharacterId: input.target_character_id,
+            targetCharacterId: pipelineTargetCharId,
             councilToolResults,
             councilNamedResults,
             precomputedVectorEntries,
