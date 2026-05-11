@@ -327,6 +327,15 @@ export default function VoiceSettings() {
           />
         </div>
 
+        <div className={styles.toggleRow}>
+          <Toggle.Checkbox
+            checked={voiceSettings.sttShowMicButton}
+            onChange={(v) => setVoiceSettings({ sttShowMicButton: v })}
+            label="Show mic button in input bar"
+            hint="Display the speech-to-text shortcut beside the message input"
+          />
+        </div>
+
         {voiceSettings.sttProvider === 'webspeech' && !isWebSpeechAvailable() && (
           <div className={styles.infoBox}>
             Web Speech API is not available in this browser. Try Chrome or Edge, or switch to an STT connection.

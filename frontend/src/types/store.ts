@@ -1088,6 +1088,7 @@ export interface VoiceSettings {
   sttContinuous: boolean
   sttInterimResults: boolean
   sttAutoSubmitOnSilence: boolean
+  sttShowMicButton: boolean
   sttConnectionId: string | null
   ttsEnabled: boolean
   ttsConnectionId: string | null

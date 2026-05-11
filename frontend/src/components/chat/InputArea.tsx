@@ -2853,7 +2853,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
             </button>
           )}
 
-          {!isStreaming && (
+          {!isStreaming && voiceSettings.sttShowMicButton && (
             <button
               type="button"
               className={clsx(styles.attachBtn, styles.sttBtn)}

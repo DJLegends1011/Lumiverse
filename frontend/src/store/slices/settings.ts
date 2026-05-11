@@ -334,6 +334,7 @@ export const createSettingsSlice: StateCreator<SettingsSlice> = (set, get) => ({
     sttContinuous: false,
     sttInterimResults: true,
     sttAutoSubmitOnSilence: false,
+    sttShowMicButton: true,
     sttConnectionId: null,
     ttsEnabled: false,
     ttsConnectionId: null,
