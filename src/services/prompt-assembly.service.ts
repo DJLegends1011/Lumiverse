@@ -1669,7 +1669,7 @@ export async function assemblePrompt(
   let hasWiBefore = false;
   let hasWiAfter = false;
   let firstChatIdx = -1;
-  let jailbreakBlockResolved = false;
+  let phiMacroReferenced = false;
   let blockYieldCounter = 0;
   phaseStartedAt = performance.now();
 
@@ -2002,6 +2002,14 @@ export async function assemblePrompt(
 
     // Content-bearing markers and regular blocks → resolve block.content
     const content = block.content || "";
+    if (
+      !phiMacroReferenced &&
+      /\{\{\s*(?:jailbreak|charJailbreak|charInstruction|charPostHistoryInstructions)\s*(?:\}\}|::)/i.test(
+        content,
+      )
+    ) {
+      phiMacroReferenced = true;
+    }
     const rawResolved = (await evaluate(content, macroEnv, registry)).text;
 
     // Append roles: collect for deferred application after full assembly.
@@ -2022,8 +2030,6 @@ export async function assemblePrompt(
 
     const resolved = rawResolved.trim();
     if (resolved) {
-      if (block.marker === "jailbreak") jailbreakBlockResolved = true;
-
       const role: LlmMessage["role"] =
         (block.role as LlmMessage["role"]) || "system";
 
@@ -2053,14 +2059,9 @@ export async function assemblePrompt(
   }
   profiler.addPhase("assembly-loop", performance.now() - phaseStartedAt);
 
-  // ---- Post-history instructions fallback ----
+  // ---- Post-history instructions ----
   phaseStartedAt = performance.now();
-  // If the character has post_history_instructions but no jailbreak block resolved
-  // it (e.g. the preset's jailbreak block is empty or missing the {{jailbreak}} macro),
-  // inject the character's post_history_instructions as a system message at the end.
-  // This ensures imported cards (especially Risu cards with image command rules in
-  // post_history_instructions) work out of the box without manual preset configuration.
-  if (!jailbreakBlockResolved && effectiveCharacter.post_history_instructions) {
+  if (!phiMacroReferenced && effectiveCharacter.post_history_instructions) {
     const resolved = (
       await evaluate(
         effectiveCharacter.post_history_instructions,
@@ -2072,7 +2073,7 @@ export async function assemblePrompt(
       result.push({ role: "system", content: resolved });
       breakdown.push({
         type: "block",
-        name: "Post-History Instructions (auto)",
+        name: "Post-History Instructions",
         role: "system",
         content: resolved,
         marker: "jailbreak",
