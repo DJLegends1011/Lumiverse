@@ -2878,13 +2878,10 @@ async function runGeneration(
           })();
 
       // Drive the iterator manually so each `.next()` can be raced against the
-      // abort signal. Providers intentionally don't pass the signal into
-      // `fetch()` (a Bun-Windows stream-cancel workaround), which means a stop
-      // clicked during the initial fetch wait — before any chunk arrives —
-      // would otherwise stall until the upstream LLM responds. Racing at this
-      // level unwinds immediately on abort; the in-flight fetch completes
-      // silently in the background and the generator's own finally cancels
-      // the reader.
+      // abort signal. Streaming providers forward aborts only until response
+      // headers arrive (so preflight stops cancel the upstream request), then
+      // switch to user-space read cancellation to avoid Bun's mid-stream abort
+      // crash on Windows.
       const iter = stream[Symbol.asyncIterator]();
       const maybeYieldDuringStream = createCooperativeYielder(32, signal);
       while (true) {

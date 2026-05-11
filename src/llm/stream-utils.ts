@@ -1,9 +1,32 @@
-// Workaround for Bun v1.3.x on Windows: passing an AbortSignal to fetch()
-// and letting Bun cancel the resulting ReadableStream mid-read triggers an
-// internal assertion failure on the main thread, crashing the process. Instead
-// of wiring the signal through fetch(), streaming providers omit the signal
-// from the fetch call and poll for abort via this helper. Teardown stays in
-// user-space through an explicit reader.cancel() in the caller's finally.
+// Workaround for Bun v1.3.x on Windows: passing the user AbortSignal directly
+// to a streaming fetch and letting Bun cancel the resulting ReadableStream
+// mid-read can trigger an internal assertion failure on the main thread,
+// crashing the process. Streaming providers therefore use a short-lived fetch
+// signal only until response headers arrive, then handle mid-stream aborts in
+// user-space through readWithAbort() and reader.cancel().
+export async function fetchWithPreflightAbort(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  signal: AbortSignal | undefined,
+): Promise<Response> {
+  if (!signal) return fetch(input, init);
+  if (signal.aborted) {
+    throw signal.reason ?? new DOMException("Aborted", "AbortError");
+  }
+
+  const controller = new AbortController();
+  const onAbort = () => {
+    controller.abort(signal.reason ?? new DOMException("Aborted", "AbortError"));
+  };
+
+  signal.addEventListener("abort", onAbort, { once: true });
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
+}
+
 export async function readWithAbort<T>(
   reader: ReadableStreamDefaultReader<T>,
   signal: AbortSignal | undefined

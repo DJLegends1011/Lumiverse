@@ -1,6 +1,6 @@
 import { OpenAICompatibleProvider } from "./openai-compatible";
 import { COMMON_PARAMS, type ProviderCapabilities } from "../param-schema";
-import { createCooperativeYielder, readWithAbort } from "../stream-utils";
+import { createCooperativeYielder, fetchWithPreflightAbort, readWithAbort } from "../stream-utils";
 
 export class PollinationsTextProvider extends OpenAICompatibleProvider {
   readonly name = "pollinations_text";
@@ -80,12 +80,11 @@ export class PollinationsTextProvider extends OpenAICompatibleProvider {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
-    // NOTE: signal intentionally NOT passed to fetch — see src/llm/stream-utils.ts.
-    const res = await fetch(url, {
+    const res = await fetchWithPreflightAbort(url, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
-    });
+    }, request.signal);
 
     if (!res.ok) {
       const err = await res.text();

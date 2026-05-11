@@ -1,6 +1,6 @@
 import type { LlmProvider } from "../provider";
 import { COMMON_PARAMS, type ProviderCapabilities } from "../param-schema";
-import { createCooperativeYielder, readWithAbort } from "../stream-utils";
+import { createCooperativeYielder, fetchWithPreflightAbort, readWithAbort } from "../stream-utils";
 import {
   getTextContent,
   type GenerationUsage,
@@ -231,13 +231,11 @@ export class AnthropicProvider implements LlmProvider {
     const body = this.buildBody(request, true);
     const suppressThinking = this.shouldSuppressThinking(request);
 
-    // NOTE: signal intentionally NOT passed to fetch — see src/llm/stream-utils.ts.
-    // Abort is handled in-loop via readWithAbort() and a reader.cancel() in finally.
-    const res = await fetch(url, {
+    const res = await fetchWithPreflightAbort(url, {
       method: "POST",
       headers: this.headers(apiKey),
       body: JSON.stringify(body),
-    });
+    }, request.signal);
 
     if (!res.ok) {
       const err = await res.text();

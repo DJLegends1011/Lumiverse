@@ -1,6 +1,6 @@
 import { OpenAICompatibleProvider } from "./openai-compatible";
 import { COMMON_PARAMS, type ProviderCapabilities } from "../param-schema";
-import { createCooperativeYielder, readWithAbort } from "../stream-utils";
+import { createCooperativeYielder, fetchWithPreflightAbort, readWithAbort } from "../stream-utils";
 import type {
   GenerationRequest,
   GenerationResponse,
@@ -252,12 +252,11 @@ export class OpenAIProvider extends OpenAICompatibleProvider {
     const body = this.buildResponsesBody(request);
     body.stream = true;
 
-    // NOTE: signal intentionally NOT passed to fetch — see src/llm/stream-utils.ts.
-    const res = await fetch(url, {
+    const res = await fetchWithPreflightAbort(url, {
       method: "POST",
       headers: this.headers(apiKey),
       body: JSON.stringify(body),
-    });
+    }, request.signal);
 
     if (!res.ok) {
       const err = await res.text();

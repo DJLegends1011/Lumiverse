@@ -1,6 +1,6 @@
 import type { LlmProvider } from "../provider";
 import { COMMON_PARAMS, type ProviderCapabilities } from "../param-schema";
-import { createCooperativeYielder, readWithAbort } from "../stream-utils";
+import { createCooperativeYielder, fetchWithPreflightAbort, readWithAbort } from "../stream-utils";
 import { getTextContent, type GenerationRequest, type GenerationResponse, type StreamChunk, type ToolCallResult, type LlmMessage, type LlmMessagePart } from "../types";
 import { fetchProviderJson, throwProviderResponseError } from "../../utils/provider-errors";
 
@@ -322,15 +322,14 @@ export class GoogleVertexProvider implements LlmProvider {
     const url = `${base}/${model}:streamGenerateContent?alt=sse`;
     const body = this.buildBody(request);
 
-    // NOTE: signal intentionally NOT passed to fetch — see src/llm/stream-utils.ts.
-    const res = await fetch(url, {
+    const res = await fetchWithPreflightAbort(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify(body),
-    });
+    }, request.signal);
 
     if (!res.ok) {
       const err = await res.text();
