@@ -197,3 +197,110 @@ describe("AnthropicProvider usage mapping", () => {
     }
   });
 });
+
+// Shapes per https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls
+//   assistant: { type:"tool_use", id, name, input }
+//   user:      { type:"tool_result", tool_use_id, content, is_error? }
+describe("AnthropicProvider tool_use / tool_result wire shape", () => {
+  test("assistant tool_use parts pass through verbatim", () => {
+    const provider = new AnthropicProvider();
+    const body = (provider as any).buildBody(
+      {
+        model: "claude-sonnet-4-6",
+        messages: [
+          { role: "user", content: "weather please" },
+          {
+            role: "assistant",
+            content: [
+              { type: "text", text: "Looking it up." },
+              { type: "tool_use", id: "toolu_01abc", name: "get_weather", input: { city: "SF" } },
+            ],
+          },
+          {
+            role: "user",
+            content: [
+              { type: "tool_result", tool_use_id: "toolu_01abc", content: "72F" },
+            ],
+          },
+        ],
+        parameters: { max_tokens: 256 },
+      },
+      false,
+    );
+
+    expect(body.messages[1]).toEqual({
+      role: "assistant",
+      content: [
+        { type: "text", text: "Looking it up." },
+        { type: "tool_use", id: "toolu_01abc", name: "get_weather", input: { city: "SF" } },
+      ],
+    });
+    expect(body.messages[2]).toEqual({
+      role: "user",
+      content: [
+        { type: "tool_result", tool_use_id: "toolu_01abc", content: "72F" },
+      ],
+    });
+  });
+
+  test("tool_result with is_error sets the flag", () => {
+    const provider = new AnthropicProvider();
+    const body = (provider as any).buildBody(
+      {
+        model: "claude-sonnet-4-6",
+        messages: [
+          { role: "user", content: "x" },
+          {
+            role: "assistant",
+            content: [{ type: "tool_use", id: "toolu_99", name: "ping", input: {} }],
+          },
+          {
+            role: "user",
+            content: [
+              { type: "tool_result", tool_use_id: "toolu_99", content: "boom", is_error: true },
+            ],
+          },
+        ],
+        parameters: { max_tokens: 16 },
+      },
+      false,
+    );
+
+    const trBlock = body.messages[2].content.find((b: any) => b.type === "tool_result");
+    expect(trBlock).toEqual({
+      type: "tool_result",
+      tool_use_id: "toolu_99",
+      content: "boom",
+      is_error: true,
+    });
+  });
+
+  test("tool_result without is_error omits the flag", () => {
+    const provider = new AnthropicProvider();
+    const body = (provider as any).buildBody(
+      {
+        model: "claude-sonnet-4-6",
+        messages: [
+          { role: "user", content: "x" },
+          {
+            role: "assistant",
+            content: [{ type: "tool_use", id: "toolu_99", name: "ping", input: {} }],
+          },
+          {
+            role: "user",
+            content: [
+              { type: "tool_result", tool_use_id: "toolu_99", content: "ok" },
+            ],
+          },
+        ],
+        parameters: { max_tokens: 16 },
+      },
+      false,
+    );
+
+    const trBlock = body.messages[2].content.find((b: any) => b.type === "tool_result");
+    expect(trBlock).toBeDefined();
+    expect(trBlock.tool_use_id).toBe("toolu_99");
+    expect(trBlock.is_error).toBeUndefined();
+  });
+});

@@ -200,7 +200,7 @@ export class GoogleProvider implements LlmProvider {
   }
 
   /** Format message content into Google Gemini parts array, handling multipart (vision/audio) content. */
-  private formatParts(m: LlmMessage): any[] {
+  private formatParts(m: LlmMessage, toolNameById: Map<string, string>): any[] {
     if (typeof m.content === "string") return [{ text: m.content }];
     return m.content.map((part: LlmMessagePart) => {
       switch (part.type) {
@@ -209,10 +209,31 @@ export class GoogleProvider implements LlmProvider {
         case "image":
         case "audio":
           return { inlineData: { mimeType: part.mime_type, data: part.data } };
+        case "tool_use":
+          return { functionCall: { name: part.name, args: part.input } };
+        case "tool_result": {
+          let payload: unknown = part.content;
+          try { payload = JSON.parse(part.content); } catch { /* keep as string */ }
+          const key = part.is_error ? "error" : "output";
+          const response: Record<string, unknown> = { [key]: payload };
+          const name = toolNameById.get(part.tool_use_id) ?? "tool";
+          return { functionResponse: { name, response } };
+        }
         default:
           return { text: "" };
       }
     });
+  }
+
+  private buildToolNameMap(messages: readonly LlmMessage[]): Map<string, string> {
+    const map = new Map<string, string>();
+    for (const m of messages) {
+      if (typeof m.content === "string") continue;
+      for (const p of m.content) {
+        if (p.type === "tool_use") map.set(p.id, p.name);
+      }
+    }
+    return map;
   }
 
   /** Keys that are internal to Lumiverse and should never be sent to any provider API. */
@@ -230,11 +251,12 @@ export class GoogleProvider implements LlmProvider {
     // Google uses a different message format
     const systemMessages = request.messages.filter((m) => m.role === "system");
     const otherMessages = request.messages.filter((m) => m.role !== "system");
+    const toolNameById = this.buildToolNameMap(request.messages);
 
     const body: any = {
       contents: otherMessages.map((m) => ({
         role: m.role === "assistant" ? "model" : "user",
-        parts: this.formatParts(m),
+        parts: this.formatParts(m, toolNameById),
       })),
     };
 

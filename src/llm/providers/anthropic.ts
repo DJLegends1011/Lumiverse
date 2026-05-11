@@ -317,18 +317,45 @@ export class AnthropicProvider implements LlmProvider {
 
               const stopReason = data.delta?.stop_reason;
               if (stopReason) {
-                // Emit accumulated tool calls when Anthropic signals tool_use stop
-                const toolCalls: ToolCallResult[] | undefined =
-                  pendingToolCalls.length > 0
-                    ? pendingToolCalls.map((tc) => ({
-                        name: tc.name,
-                        args: JSON.parse(tc.inputJson || "{}"),
-                        call_id: tc.id,
-                      }))
-                    : undefined;
+                // Build tool_calls defensively. If the model was cut off
+                // (e.g. stop_reason="max_tokens") mid-input_json, the
+                // accumulated partial_json will not be valid JSON. We MUST
+                // still yield the terminal chunk so the host sees
+                // finish_reason + usage; otherwise worker-host's for-await
+                // exits with finishReasonSeen=false and the generation
+                // silent-vanishes downstream.
+                let toolCalls: ToolCallResult[] | undefined;
+                let toolParseError: string | undefined;
+                if (pendingToolCalls.length > 0) {
+                  toolCalls = pendingToolCalls.map((tc) => {
+                    let parsedArgs: unknown = {};
+                    try {
+                      parsedArgs = JSON.parse(tc.inputJson || "{}");
+                    } catch (e) {
+                      toolParseError = `tool '${tc.name}' (call_id=${tc.id}) had unparseable inputJson (likely truncated by stop_reason=${stopReason}). Raw inputJson length=${tc.inputJson.length}, content=${JSON.stringify(tc.inputJson.slice(0, 200))}. Error: ${(e as Error).message}`;
+                      console.warn(`[lumiverse.anthropic.sse] ${toolParseError}`);
+                      parsedArgs = {
+                        _incomplete: true,
+                        _raw_partial_json: tc.inputJson,
+                        _parse_error: (e as Error).message,
+                      };
+                    }
+                    return {
+                      name: tc.name,
+                      args: parsedArgs as Record<string, unknown>,
+                      call_id: tc.id,
+                    };
+                  });
+                }
+                // When stop_reason=max_tokens with a partially-emitted tool
+                // call, "tool_calls" is misleading because the tool args are
+                // incomplete. Surface the real stop_reason so the agent can
+                // react (e.g. retry with higher max_tokens).
+                const finishReason =
+                  toolCalls && stopReason !== "max_tokens" ? "tool_calls" : stopReason;
                 yield {
                   token: "",
-                  finish_reason: toolCalls ? "tool_calls" : stopReason,
+                  finish_reason: finishReason,
                   tool_calls: toolCalls,
                   usage,
                 };
@@ -415,17 +442,26 @@ export class AnthropicProvider implements LlmProvider {
         case "image":
           return this.applyCacheControl({
             type: "image",
-            source: {
-              type: "base64",
-              media_type: part.mime_type,
-              data: part.data,
-            },
+            source: { type: "base64", media_type: part.mime_type, data: part.data },
           }, part.cache_control);
         case "audio":
-          // Anthropic doesn't support native audio content blocks — include as text note
           return this.applyCacheControl({
             type: "text",
             text: `[Audio attachment: ${part.mime_type}]`,
+          }, part.cache_control);
+        case "tool_use":
+          return this.applyCacheControl({
+            type: "tool_use",
+            id: part.id,
+            name: part.name,
+            input: part.input,
+          }, part.cache_control);
+        case "tool_result":
+          return this.applyCacheControl({
+            type: "tool_result",
+            tool_use_id: part.tool_use_id,
+            content: part.content,
+            ...(part.is_error ? { is_error: true } : {}),
           }, part.cache_control);
         default:
           return { type: "text", text: "" };

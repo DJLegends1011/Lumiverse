@@ -22,7 +22,28 @@ export interface LlmAudioPart {
   cache_control?: Record<string, unknown>;
 }
 
-export type LlmMessagePart = LlmTextPart | LlmImagePart | LlmAudioPart;
+export interface LlmToolUsePart {
+  type: "tool_use";
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+  cache_control?: Record<string, unknown>;
+}
+
+export interface LlmToolResultPart {
+  type: "tool_result";
+  tool_use_id: string;
+  content: string;
+  is_error?: boolean;
+  cache_control?: Record<string, unknown>;
+}
+
+export type LlmMessagePart =
+  | LlmTextPart
+  | LlmImagePart
+  | LlmAudioPart
+  | LlmToolUsePart
+  | LlmToolResultPart;
 
 export interface LlmMessage {
   role: "system" | "user" | "assistant";

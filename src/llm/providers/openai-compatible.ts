@@ -273,18 +273,64 @@ export abstract class OpenAICompatibleProvider implements LlmProvider {
   /** Format message content for the OpenAI API, handling multipart (vision/audio) content. */
   protected formatContent(m: LlmMessage): string | any[] {
     if (typeof m.content === "string") return m.content;
-    return m.content.map((part: LlmMessagePart) => {
+    const out: any[] = [];
+    for (const part of m.content as LlmMessagePart[]) {
       switch (part.type) {
         case "text":
-          return { type: "text", text: part.text };
+          out.push({ type: "text", text: part.text });
+          break;
         case "image":
-          return { type: "image_url", image_url: { url: `data:${part.mime_type};base64,${part.data}` } };
+          out.push({ type: "image_url", image_url: { url: `data:${part.mime_type};base64,${part.data}` } });
+          break;
         case "audio":
-          return { type: "input_audio", input_audio: { data: part.data, format: part.mime_type.split("/")[1] } };
-        default:
-          return { type: "text", text: "" };
+          out.push({ type: "input_audio", input_audio: { data: part.data, format: part.mime_type.split("/")[1] } });
+          break;
       }
-    });
+    }
+    return out;
+  }
+
+  // Flatten one LlmMessage into the sequence of OpenAI Chat Completions
+  // messages it maps to. tool_use parts become tool_calls on the assistant
+  // message, tool_result parts become separate role:tool messages.
+  protected flattenForChat(m: LlmMessage): any[] {
+    if (typeof m.content === "string") {
+      return [{ role: m.role, content: m.content }];
+    }
+    const parts = m.content as LlmMessagePart[];
+    const toolUses = parts.filter((p): p is Extract<LlmMessagePart, { type: "tool_use" }> => p.type === "tool_use");
+    const toolResults = parts.filter((p): p is Extract<LlmMessagePart, { type: "tool_result" }> => p.type === "tool_result");
+    const nonTool = parts.filter((p) => p.type !== "tool_use" && p.type !== "tool_result");
+
+    const out: any[] = [];
+
+    if (m.role === "assistant" && toolUses.length > 0) {
+      const text = nonTool
+        .filter((p): p is Extract<LlmMessagePart, { type: "text" }> => p.type === "text")
+        .map((p) => p.text)
+        .join("");
+      out.push({
+        role: "assistant",
+        content: text.length > 0 ? text : null,
+        tool_calls: toolUses.map((tc) => ({
+          id: tc.id,
+          type: "function",
+          function: { name: tc.name, arguments: JSON.stringify(tc.input ?? {}) },
+        })),
+      });
+    } else if (nonTool.length > 0) {
+      out.push({ role: m.role, content: this.formatContent({ ...m, content: nonTool }) });
+    }
+
+    for (const tr of toolResults) {
+      out.push({
+        role: "tool",
+        tool_call_id: tr.tool_use_id,
+        content: tr.content,
+      });
+    }
+
+    return out;
   }
 
   /** Keys that are internal to Lumiverse and should never be sent to any provider API. */
@@ -297,7 +343,7 @@ export abstract class OpenAICompatibleProvider implements LlmProvider {
 
     const body: any = {
       model: request.model,
-      messages: request.messages.map((m) => ({ role: m.role, content: this.formatContent(m) })),
+      messages: request.messages.flatMap((m) => this.flattenForChat(m)),
       stream,
     };
 

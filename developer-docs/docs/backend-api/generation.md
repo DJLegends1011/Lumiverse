@@ -54,7 +54,87 @@ const results = await spindle.generate.batch({
 | `messages` | `LlmMessageDTO[]` | The message array to send |
 | `parameters` | `Record<string, unknown>` | Optional LLM parameters (temperature, max_tokens, etc.) |
 | `connection_id` | `string` | Optional. Use a specific connection profile (see Connection Profiles below) |
+| `tools` | `ToolSchemaDTO[]` | Optional. Function/tool schemas exposed to the model (raw / quiet only). See Tool calling below |
 | `signal` | `AbortSignal` | Optional. Cancel the in-flight LLM request when the signal fires (see Cancellation below) |
+
+---
+
+## Tool calling
+
+Pass tool schemas via `tools` and the model can call them. Tool calls land in `response.tool_calls` (non-stream) or the terminal `done` chunk (stream) as `ToolCallDTO[]`. You execute the tool, then send the result back as a `tool_result` part on the next user message.
+
+```ts
+const result = await spindle.generate.raw({
+  type: 'raw',
+  messages: [{ role: 'user', content: 'What is the weather in SF?' }],
+  tools: [{
+    name: 'get_weather',
+    description: 'Look up current weather for a city.',
+    parameters: {
+      type: 'object',
+      properties: { city: { type: 'string' } },
+      required: ['city'],
+    },
+  }],
+})
+
+// result.tool_calls?.[0] = { name: 'get_weather', args: { city: 'SF' }, call_id: 'toolu_…' }
+```
+
+Round-trip the call by appending two messages: an `assistant` with a `tool_use` part carrying the same `call_id`, then a `user` with a `tool_result` part keyed back to it.
+
+```ts
+const followup = await spindle.generate.raw({
+  type: 'raw',
+  messages: [
+    { role: 'user', content: 'What is the weather in SF?' },
+    {
+      role: 'assistant',
+      content: [
+        { type: 'tool_use', id: 'toolu_abc', name: 'get_weather', input: { city: 'SF' } },
+      ],
+    },
+    {
+      role: 'user',
+      content: [
+        { type: 'tool_result', tool_use_id: 'toolu_abc', content: '72F, clear' },
+      ],
+    },
+  ],
+  tools: [/* same schema */],
+})
+```
+
+### Parts
+
+| Type | Fields | Used by |
+|---|---|---|
+| `text` | `text: string` | Any role |
+| `image` | `data: string` (base64), `mime_type: string` | `user` |
+| `audio` | `data: string` (base64), `mime_type: string` | `user` |
+| `tool_use` | `id`, `name`, `input: Record<string, unknown>` | `assistant` |
+| `tool_result` | `tool_use_id`, `content: string`, `is_error?: boolean` | `user` |
+
+Use the same `call_id` returned in `ToolCallDTO` as `tool_use.id` and `tool_result.tool_use_id`. Provider adapters translate to each upstream's native shape (Anthropic content blocks, OpenAI `tool_calls` / `role:"tool"`, Gemini `functionCall` / `functionResponse`, OpenAI Responses API `function_call` / `function_call_output`).
+
+!!! note "Tool result formatting"
+    Anthropic requires the `tool_result` parts to come first in the content array of the user message that follows an assistant `tool_use`. The host enforces this; you just need to put them in a dedicated user message that immediately follows.
+
+### ToolSchemaDTO
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Function name the model uses to invoke the tool |
+| `description` | `string` | Natural-language description shown to the model |
+| `parameters` | `JSONSchema` | JSON Schema for the call arguments |
+
+### ToolCallDTO
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Tool name matching one of your `ToolSchemaDTO` entries |
+| `args` | `Record<string, unknown>` | Parsed JSON arguments |
+| `call_id` | `string` | Provider call id (Anthropic `id`, OpenAI `id`, synthetic UUID for Gemini). Pass back as `tool_use.id` / `tool_result.tool_use_id` |
 
 ---
 
