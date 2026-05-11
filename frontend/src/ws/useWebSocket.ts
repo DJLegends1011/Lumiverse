@@ -442,9 +442,11 @@ export function useWebSocket() {
             // Impersonate draft: stash the streamed content for the input box
             // instead of reconciling messages (no message was created on the backend).
             if ((payload as any).impersonateDraft) {
-              const draftContent = state.streamingContent
+              const draftContent = typeof payload.content === 'string' ? payload.content : state.streamingContent
               state.endStreaming()
               state.setImpersonateDraftContent(draftContent)
+              state.deleteChatHead(payload.chatId)
+              generateApi.acknowledge(payload.chatId).catch(() => {})
               return
             }
 

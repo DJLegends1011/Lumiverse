@@ -233,7 +233,7 @@ export const createChatSlice: StateCreator<ChatSlice> = (set, get) => {
       set({ regeneratingMessageId: messageId })
     },
 
-    startStreaming: (generationId, regeneratingMessageId) => {
+    startStreaming: (generationId, regeneratingMessageId, generationType) => {
       // Guard: don't restart a generation that already completed (race condition
       // in sidecar-council mode where GENERATION_ENDED arrives before the HTTP
       // response that triggers this call from InputArea).
@@ -244,6 +244,7 @@ export const createChatSlice: StateCreator<ChatSlice> = (set, get) => {
 
       const current = get()
 
+      const resolvedGenerationType = generationType ?? current.streamingGenerationType
       const resolvedRegeneratingMessageId = regeneratingMessageId ?? current.regeneratingMessageId
 
       // If we're already in an optimistic streaming state (beginStreaming was
@@ -253,6 +254,7 @@ export const createChatSlice: StateCreator<ChatSlice> = (set, get) => {
         set({
           activeGenerationId: generationId,
           regeneratingMessageId: resolvedRegeneratingMessageId,
+          streamingGenerationType: resolvedGenerationType ?? null,
         })
         return
       }
@@ -266,7 +268,7 @@ export const createChatSlice: StateCreator<ChatSlice> = (set, get) => {
       let nextMessages = current.messages
       let nextTotalChatLength = current.totalChatLength
 
-      if (!nextRegeneratingMessageId && shouldUseLocalStreamPlaceholder(current.streamingGenerationType)) {
+      if (!nextRegeneratingMessageId && shouldUseLocalStreamPlaceholder(resolvedGenerationType)) {
         const placeholder = createLocalStreamPlaceholder(current)
         if (placeholder) {
           nextRegeneratingMessageId = placeholder.id
@@ -285,6 +287,7 @@ export const createChatSlice: StateCreator<ChatSlice> = (set, get) => {
         streamingError: null,
         activeGenerationId: generationId,
         regeneratingMessageId: nextRegeneratingMessageId,
+        streamingGenerationType: resolvedGenerationType ?? null,
       })
     },
 

@@ -2,6 +2,10 @@ import { generateApi } from '@/api/generate'
 import { messagesApi } from '@/api/chats'
 import { useStore } from '@/store'
 
+function getLocalStreamingType(generationType?: string) {
+  return generationType === 'impersonate' ? 'impersonate_draft' : generationType
+}
+
 /**
  * Poll the backend generation pool for a chat and re-sync local streaming
  * state. Safe to call repeatedly — the pool is authoritative and cumulative,
@@ -49,7 +53,7 @@ export async function recoverPooledGeneration(chatId: string): Promise<void> {
   }
 
   if (genStatus.active && genStatus.generationId && (genStatus.status === 'streaming' || genStatus.status === 'reasoning')) {
-    latest.startStreaming(genStatus.generationId, genStatus.targetMessageId)
+    latest.startStreaming(genStatus.generationId, genStatus.targetMessageId, getLocalStreamingType(genStatus.generationType))
     if (genStatus.content) latest.replaceStreamContent(genStatus.content)
     if (genStatus.reasoning) latest.replaceStreamReasoning(genStatus.reasoning)
     if (genStatus.tokenSeq != null) latest.setLastPooledSeq(genStatus.tokenSeq)
@@ -62,20 +66,32 @@ export async function recoverPooledGeneration(chatId: string): Promise<void> {
   }
 
   if (genStatus.active && genStatus.generationId) {
-    latest.startStreaming(genStatus.generationId, genStatus.targetMessageId)
+    latest.startStreaming(genStatus.generationId, genStatus.targetMessageId, getLocalStreamingType(genStatus.generationType))
     return
   }
 
   if (!genStatus.active) {
+    const completedImpersonateDraft =
+      genStatus.status === 'completed' &&
+      genStatus.generationType === 'impersonate' &&
+      !genStatus.completedMessageId
+
     const sameGeneration = !latest.activeGenerationId || latest.activeGenerationId === genStatus.generationId
     if (latest.isStreaming && sameGeneration) {
       if (genStatus.error) {
         latest.setStreamingError(genStatus.error)
+      } else if (completedImpersonateDraft) {
+        latest.endStreaming()
       } else if (genStatus.completedMessageId) {
         latest.endStreaming()
       } else {
         latest.stopStreaming()
       }
+    }
+
+    if (completedImpersonateDraft && typeof genStatus.content === 'string') {
+      latest.setImpersonateDraftContent(genStatus.content)
+      return
     }
 
     if (!genStatus.completedMessageId) return

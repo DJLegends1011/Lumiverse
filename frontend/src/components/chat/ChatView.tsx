@@ -384,14 +384,6 @@ export default function ChatView() {
         setActiveChat(chatId, chat.character_id)
         setMessages(msgPage.data, msgPage.total)
 
-        // Opening a chat acknowledges any terminal chat-head state globally so
-        // other devices stop showing a stale completed/stopped/error badge too.
-        const existingHead = useStore.getState().chatHeads.find((h) => h.chatId === chatId)
-        if (existingHead && (existingHead.status === 'completed' || existingHead.status === 'stopped' || existingHead.status === 'error')) {
-          useStore.getState().deleteChatHead(chatId)
-        }
-        generateApi.acknowledge(chatId).catch(() => {})
-
         // If there's a pending council tools failure for this chat, show the retry modal now
         const pendingFailure = useStore.getState().councilToolsFailure
         if (pendingFailure && pendingFailure.chatId === chatId) {
@@ -404,6 +396,15 @@ export default function ChatView() {
         // also invoked on visibilitychange and WS reconnect so that any path
         // back to this chat re-syncs pooled tokens.
         if (!cancelled) await recoverPooledGeneration(chatId)
+
+        // Opening a chat acknowledges any terminal chat-head state globally so
+        // other devices stop showing a stale completed/stopped/error badge too.
+        // Recover first so terminal impersonation drafts can still populate the input.
+        const existingHead = useStore.getState().chatHeads.find((h) => h.chatId === chatId)
+        if (existingHead && (existingHead.status === 'completed' || existingHead.status === 'stopped' || existingHead.status === 'error')) {
+          useStore.getState().deleteChatHead(chatId)
+        }
+        generateApi.acknowledge(chatId).catch(() => {})
 
         let openedCharacter: import('@/types/api').Character | null = null
         if (chat.character_id) {

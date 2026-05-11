@@ -32,7 +32,7 @@ export interface ChatSlice {
   updateMessage: (id: string, updates: Partial<Message>) => void
   removeMessage: (id: string) => void
   beginStreaming: (regeneratingMessageId?: string, generationType?: string) => void
-  startStreaming: (generationId: string, regeneratingMessageId?: string) => void
+  startStreaming: (generationId: string, regeneratingMessageId?: string, generationType?: string) => void
   appendStreamToken: (token: string) => void
   appendStreamReasoning: (token: string) => void
   replaceStreamContent: (content: string) => void
