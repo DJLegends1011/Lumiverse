@@ -28,8 +28,31 @@ describe("GoogleProvider tool calling wire shape", () => {
       role: "model",
       parts: [
         { text: "Looking it up." },
-        { functionCall: { name: "get_weather", args: { city: "SF" } } },
+        { functionCall: { name: "get_weather", args: { city: "SF" } }, thoughtSignature: "context_engineering_is_the_way_to_go" },
       ],
+    });
+  });
+
+  test("captured thought_signature is echoed verbatim on the functionCall", () => {
+    const provider = new GoogleProvider();
+    const body = (provider as any).buildBody({
+      model: "gemini-3-flash",
+      messages: [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "fc_1", name: "get_weather", input: { city: "SF" }, thought_signature: "REAL_SIG_A" },
+          ],
+        },
+      ],
+      parameters: {},
+      tools: [{ name: "get_weather", description: "weather", parameters: {} }],
+    });
+
+    expect(body.contents[1].parts[0]).toEqual({
+      functionCall: { name: "get_weather", args: { city: "SF" } },
+      thoughtSignature: "REAL_SIG_A",
     });
   });
 
