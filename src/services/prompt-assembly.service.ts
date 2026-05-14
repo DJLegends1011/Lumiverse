@@ -425,6 +425,82 @@ const ALTERNATE_FIELD_NAMES = [
   "scenario",
 ] as const;
 
+type GroupCardMode = "swap" | "merge_ignore_muted" | "merge";
+
+const GROUP_CARD_FIELDS = [
+  "description",
+  "personality",
+  "scenario",
+  "mes_example",
+  "system_prompt",
+  "post_history_instructions",
+  "creator_notes",
+] as const;
+
+function getGroupCardMode(chat: Chat): GroupCardMode {
+  const raw = chat.metadata?.group_card_mode;
+  return raw === "merge_ignore_muted" || raw === "merge" ? raw : "swap";
+}
+
+function replaceCharPlaceholders(text: string, character: Character): string {
+  if (!text) return "";
+  const name = getEffectiveCharacterName(character);
+  return text.replace(/{{\s*char(?:Name)?\s*}}/gi, name);
+}
+
+function joinCardFields(values: string[]): string {
+  return values.map((value) => value.trim()).filter(Boolean).join("\n\n");
+}
+
+function buildGroupMergedCharacter(
+  baseCharacter: Character,
+  chat: Chat,
+  userId: string,
+  groupCharacters?: Map<string, Character>,
+): Character {
+  if (chat.metadata?.group !== true) return baseCharacter;
+
+  const mode = getGroupCardMode(chat);
+  if (mode === "swap") return baseCharacter;
+
+  const characterIds = Array.isArray(chat.metadata.character_ids)
+    ? (chat.metadata.character_ids as string[])
+    : [];
+  if (characterIds.length === 0) return baseCharacter;
+
+  const mutedIds = mode === "merge_ignore_muted"
+    ? new Set(chatsSvc.getGroupMutedIds(chat))
+    : undefined;
+  const members = characterIds
+    .filter((id) => !mutedIds?.has(id))
+    .map((id) => groupCharacters?.get(id) ?? charactersSvc.getCharacter(userId, id))
+    .filter((character): character is Character => !!character)
+    .map((character) => resolveCharacterWithAlternateFields(character, chat));
+
+  if (members.length === 0) return baseCharacter;
+
+  const merged: Character = {
+    ...baseCharacter,
+    extensions: { ...(baseCharacter.extensions || {}) },
+  };
+
+  for (const field of GROUP_CARD_FIELDS) {
+    (merged as any)[field] = joinCardFields(
+      members.map((member) => replaceCharPlaceholders(String((member as any)[field] ?? ""), member)),
+    );
+  }
+
+  const depthPrompts = members.map((member) =>
+    replaceCharPlaceholders(String(member.extensions?.depth_prompt ?? ""), member),
+  );
+  merged.extensions = {
+    ...(merged.extensions || {}),
+    depth_prompt: joinCardFields(depthPrompts),
+  };
+
+  return merged;
+}
+
 function getAlternateFieldSelections(
   character: Character,
   chat: Chat,
@@ -1305,9 +1381,16 @@ export async function assemblePrompt(
           mutedIds.includes(cid) ? undefined : resolveCharName(cid),
         )
       : undefined;
-  // Resolve alternate field overrides from per-chat bindings, then group scenario override
+  // Resolve alternate field overrides, apply group card merge/swap mode, then
+  // group scenario override. This is done at assembly time so chat settings and
+  // mute state cannot be ignored by an older client payload.
   const effectiveCharacter = resolveGroupScenarioOverride(
-    resolveCharacterWithAlternateFields(character, chat),
+    buildGroupMergedCharacter(
+      resolveCharacterWithAlternateFields(character, chat),
+      chat,
+      ctx.userId,
+      groupCharsMap,
+    ),
     chat,
     ctx.userId,
   );
@@ -5364,10 +5447,15 @@ async function legacyAssembly(
             return char ? getEffectiveCharacterName(char) : undefined;
           })
         : undefined;
-    // Resolve alternate field overrides and group scenario override (legacy path)
+    // Resolve alternate field overrides, group card mode, and group scenario
+    // override (legacy path)
     const legacyEffectiveChar = userId
       ? resolveGroupScenarioOverride(
-          resolveCharacterWithAlternateFields(character as Character, chatObj),
+          buildGroupMergedCharacter(
+            resolveCharacterWithAlternateFields(character as Character, chatObj),
+            chatObj,
+            userId,
+          ),
           chatObj,
           userId,
         )
@@ -5412,7 +5500,8 @@ async function legacyAssembly(
     return text;
   };
 
-  // Build a system prompt from the character card (use effective character for alternate fields + group scenario)
+  // Build a system prompt from the character card (use effective character for
+  // alternate fields, group card mode, and group scenario)
   let legacyChar =
     character && chat
       ? resolveCharacterWithAlternateFields(
@@ -5421,6 +5510,11 @@ async function legacyAssembly(
         )
       : character;
   if (legacyChar && chat && userId) {
+    legacyChar = buildGroupMergedCharacter(
+      legacyChar as Character,
+      chat as Chat,
+      userId,
+    );
     legacyChar = resolveGroupScenarioOverride(
       legacyChar as Character,
       chat as Chat,

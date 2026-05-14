@@ -9,6 +9,8 @@ import { getCharacterAvatarThumbUrl } from '@/lib/avatarUrls'
 import type { Character, Chat, PresetRegistryItem } from '@/types/api'
 import styles from './GroupChatCreatorModal.module.css'
 
+type GroupCardMode = 'swap' | 'merge_ignore_muted' | 'merge'
+
 export default function GroupSettingsModal() {
   const closeModal = useStore((s) => s.closeModal)
   const modalProps = useStore((s) => s.modalProps) as {
@@ -37,6 +39,11 @@ export default function GroupSettingsModal() {
   )
   const [talkativenessOverrides, setTalkativenessOverrides] = useState<Record<string, number>>(
     metadata.talkativeness_overrides ?? {}
+  )
+  const [groupCardMode, setGroupCardMode] = useState<GroupCardMode>(
+    metadata.group_card_mode === 'merge_ignore_muted' || metadata.group_card_mode === 'merge'
+      ? metadata.group_card_mode
+      : 'swap'
   )
 
   const existingOverride = metadata.group_scenario_override ?? {}
@@ -79,6 +86,7 @@ export default function GroupSettingsModal() {
 
       if (isGroup) {
         metadataPatch.talkativeness_overrides = talkativenessOverrides
+        metadataPatch.group_card_mode = groupCardMode === 'swap' ? null : groupCardMode
         metadataPatch.group_scenario_override = scenarioMode !== 'individual'
           ? {
               mode: scenarioMode,
@@ -97,7 +105,7 @@ export default function GroupSettingsModal() {
     } finally {
       setSaving(false)
     }
-  }, [saving, chatId, groupName, impersonationPresetId, isGroup, talkativenessOverrides, scenarioMode, scenarioMemberId, scenarioCustom, modalProps, closeModal])
+  }, [saving, chatId, groupName, impersonationPresetId, isGroup, talkativenessOverrides, groupCardMode, scenarioMode, scenarioMemberId, scenarioCustom, modalProps, closeModal])
 
   return (
     <ModalShell isOpen={true} onClose={closeModal} maxWidth={520}>
@@ -147,6 +155,22 @@ export default function GroupSettingsModal() {
 
           {isGroup && (
             <>
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>Character Card Macros</label>
+                <select
+                  className={styles.fieldInput}
+                  value={groupCardMode}
+                  onChange={(e) => setGroupCardMode(e.target.value as GroupCardMode)}
+                >
+                  <option value="swap">Swap to active character card</option>
+                  <option value="merge_ignore_muted">Merge all unmuted member cards</option>
+                  <option value="merge">Merge all member cards</option>
+                </select>
+                <div style={{ fontSize: 'calc(11px * var(--lumiverse-font-scale, 1))', color: 'var(--lumiverse-text-dim)', lineHeight: 1.45 }}>
+                  Controls how character-card macros like {'{{description}}'}, {'{{personality}}'}, and {'{{scenario}}'} resolve during generation.
+                </div>
+              </div>
+
               <div className={styles.fieldGroup}>
                 <label className={styles.fieldLabel}>Group Scenario</label>
                 <select
