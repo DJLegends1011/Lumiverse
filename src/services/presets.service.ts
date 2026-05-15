@@ -48,6 +48,17 @@ export interface PresetRegistryRow {
   updated_at: number;
 }
 
+export interface PromptBlockCategoryGroup {
+  categoryBlock: PromptBlock | null;
+  children: PromptBlock[];
+}
+
+export interface CreatePromptBlockInput extends Partial<PromptBlock> {
+  name?: string;
+}
+
+export type UpdatePromptBlockInput = Partial<Omit<PromptBlock, "id">>;
+
 function rowToPreset(row: any): Preset {
   const preset: Preset = {
     ...row,
@@ -265,4 +276,118 @@ export function deletePreset(userId: string, id: string): boolean {
 
   eventBus.emit(EventType.PRESET_DELETED, { id }, userId);
   return true;
+}
+
+function normalizePromptBlock(input: CreatePromptBlockInput): PromptBlock {
+  const marker = typeof input.marker === "string" ? input.marker : null;
+  const role = input.role === "system" || input.role === "user" || input.role === "assistant" || input.role === "user_append" || input.role === "assistant_append"
+    ? input.role
+    : "system";
+  const position = input.position === "pre_history" || input.position === "post_history" || input.position === "in_history"
+    ? input.position
+    : "pre_history";
+  return {
+    id: typeof input.id === "string" && input.id.trim() ? input.id : crypto.randomUUID(),
+    name: typeof input.name === "string" && input.name.trim() ? input.name : "New Chat",
+    content: typeof input.content === "string" ? input.content : "",
+    role,
+    enabled: input.enabled !== undefined ? !!input.enabled : true,
+    position,
+    depth: typeof input.depth === "number" ? input.depth : 0,
+    marker,
+    isLocked: input.isLocked !== undefined ? !!input.isLocked : false,
+    color: typeof input.color === "string" ? input.color : null,
+    injectionTrigger: Array.isArray(input.injectionTrigger) ? input.injectionTrigger.filter((v): v is string => typeof v === "string") : [],
+    group: typeof input.group === "string" ? input.group : null,
+    categoryMode: marker === "category" && (input.categoryMode === "radio" || input.categoryMode === "checkbox")
+      ? input.categoryMode
+      : null,
+    ...(Array.isArray(input.variables) ? { variables: input.variables } : {}),
+  };
+}
+
+function normalizePromptBlocks(blocks: PromptBlock[]): PromptBlock[] {
+  return blocks.map((block) => normalizePromptBlock(block));
+}
+
+export function listPromptBlocks(userId: string, presetId: string): PromptBlock[] | null {
+  const preset = getPreset(userId, presetId);
+  if (!preset) return null;
+  return normalizePromptBlocks((preset.prompt_order || []) as PromptBlock[]);
+}
+
+export function getPromptBlock(userId: string, presetId: string, blockId: string): PromptBlock | null {
+  const blocks = listPromptBlocks(userId, presetId);
+  if (!blocks) return null;
+  return blocks.find((block) => block.id === blockId) || null;
+}
+
+export function createPromptBlock(
+  userId: string,
+  presetId: string,
+  input: CreatePromptBlockInput,
+  index?: number
+): PromptBlock | null {
+  const preset = getPreset(userId, presetId);
+  if (!preset) return null;
+
+  const blocks = normalizePromptBlocks((preset.prompt_order || []) as PromptBlock[]);
+  const block = normalizePromptBlock(input || {});
+  const insertAt = typeof index === "number" && Number.isFinite(index)
+    ? Math.max(0, Math.min(blocks.length, Math.floor(index)))
+    : blocks.length;
+  blocks.splice(insertAt, 0, block);
+
+  updatePreset(userId, presetId, { prompt_order: blocks });
+  return block;
+}
+
+export function updatePromptBlock(
+  userId: string,
+  presetId: string,
+  blockId: string,
+  input: UpdatePromptBlockInput
+): PromptBlock | null {
+  const preset = getPreset(userId, presetId);
+  if (!preset) return null;
+
+  const blocks = normalizePromptBlocks((preset.prompt_order || []) as PromptBlock[]);
+  const index = blocks.findIndex((block) => block.id === blockId);
+  if (index === -1) return null;
+
+  const updated = normalizePromptBlock({ ...blocks[index], ...(input || {}), id: blockId });
+  blocks[index] = updated;
+  updatePreset(userId, presetId, { prompt_order: blocks });
+  return updated;
+}
+
+export function deletePromptBlock(userId: string, presetId: string, blockId: string): boolean {
+  const preset = getPreset(userId, presetId);
+  if (!preset) return false;
+
+  const blocks = normalizePromptBlocks((preset.prompt_order || []) as PromptBlock[]);
+  const index = blocks.findIndex((block) => block.id === blockId);
+  if (index === -1) return false;
+
+  blocks.splice(index, 1);
+  updatePreset(userId, presetId, { prompt_order: blocks });
+  return true;
+}
+
+export function listPromptBlockCategories(userId: string, presetId: string): PromptBlockCategoryGroup[] | null {
+  const blocks = listPromptBlocks(userId, presetId);
+  if (!blocks) return null;
+
+  const groups: PromptBlockCategoryGroup[] = [];
+  let current: PromptBlockCategoryGroup = { categoryBlock: null, children: [] };
+  for (const block of blocks) {
+    if (block.marker === "category") {
+      if (current.categoryBlock || current.children.length > 0) groups.push(current);
+      current = { categoryBlock: block, children: [] };
+    } else {
+      current.children.push(block);
+    }
+  }
+  if (current.categoryBlock || current.children.length > 0) groups.push(current);
+  return groups;
 }

@@ -63,6 +63,7 @@ import {
   setCharacterWorldBookIds,
 } from "../utils/character-world-books";
 import * as worldBooksSvc from "../services/world-books.service";
+import * as presetsSvc from "../services/presets.service";
 import * as regexScriptsSvc from "../services/regex-scripts.service";
 import * as databanksSvc from "../services/databank";
 import * as filesSvc from "../services/files.service";
@@ -94,6 +95,7 @@ import {
   type SharedRpcEndpointPolicy,
 } from "./shared-rpc-pool.service";
 import { getTextContent, type LlmMessage } from "../llm/types";
+import type { CreatePresetInput, UpdatePresetInput } from "../types/preset";
 import { getDb } from "../db/connection";
 import { normalizeSpindleAppNavigationPath } from "./url-safety";
 import {
@@ -324,6 +326,17 @@ type RuntimeWorkerToHost =
     }
   | { type: "user_storage_move"; requestId: string; from: string; to: string; userId?: string }
   | { type: "user_storage_stat"; requestId: string; path: string; userId?: string }
+  | { type: "presets_list"; requestId: string; limit?: number; offset?: number; userId?: string }
+  | { type: "presets_get"; requestId: string; presetId: string; userId?: string }
+  | { type: "presets_create"; requestId: string; input: CreatePresetInput; userId?: string }
+  | { type: "presets_update"; requestId: string; presetId: string; input: UpdatePresetInput; userId?: string }
+  | { type: "presets_delete"; requestId: string; presetId: string; userId?: string }
+  | { type: "preset_blocks_list"; requestId: string; presetId: string; userId?: string }
+  | { type: "preset_blocks_get"; requestId: string; presetId: string; blockId: string; userId?: string }
+  | { type: "preset_blocks_create"; requestId: string; presetId: string; input: presetsSvc.CreatePromptBlockInput; index?: number; userId?: string }
+  | { type: "preset_blocks_update"; requestId: string; presetId: string; blockId: string; input: presetsSvc.UpdatePromptBlockInput; userId?: string }
+  | { type: "preset_blocks_delete"; requestId: string; presetId: string; blockId: string; userId?: string }
+  | { type: "preset_categories_list"; requestId: string; presetId: string; userId?: string }
   | {
       type: "tokens_count_text";
       requestId: string;
@@ -2411,6 +2424,40 @@ export class WorkerHost {
         break;
       case "vars_has_chat":
         this.handleVarsHasChat(msg.requestId, msg.chatId, msg.key);
+        break;
+      // ─── Presets (gated: "presets") ─────────────────────────────────
+      case "presets_list":
+        this.handlePresetsList(msg.requestId, msg.limit, msg.offset, msg.userId);
+        break;
+      case "presets_get":
+        this.handlePresetsGet(msg.requestId, msg.presetId, msg.userId);
+        break;
+      case "presets_create":
+        this.handlePresetsCreate(msg.requestId, msg.input, msg.userId);
+        break;
+      case "presets_update":
+        this.handlePresetsUpdate(msg.requestId, msg.presetId, msg.input, msg.userId);
+        break;
+      case "presets_delete":
+        this.handlePresetsDelete(msg.requestId, msg.presetId, msg.userId);
+        break;
+      case "preset_blocks_list":
+        this.handlePresetBlocksList(msg.requestId, msg.presetId, msg.userId);
+        break;
+      case "preset_blocks_get":
+        this.handlePresetBlocksGet(msg.requestId, msg.presetId, msg.blockId, msg.userId);
+        break;
+      case "preset_blocks_create":
+        this.handlePresetBlocksCreate(msg.requestId, msg.presetId, msg.input, msg.index, msg.userId);
+        break;
+      case "preset_blocks_update":
+        this.handlePresetBlocksUpdate(msg.requestId, msg.presetId, msg.blockId, msg.input, msg.userId);
+        break;
+      case "preset_blocks_delete":
+        this.handlePresetBlocksDelete(msg.requestId, msg.presetId, msg.blockId, msg.userId);
+        break;
+      case "preset_categories_list":
+        this.handlePresetCategoriesList(msg.requestId, msg.presetId, msg.userId);
         break;
       // ─── Characters (gated: "characters") ─────────────────────────────
       case "characters_list":
@@ -5855,6 +5902,154 @@ export class WorkerHost {
     try {
       const vars = this.getChatVars(chatId);
       this.postToWorker({ type: "response", requestId, result: key in vars });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  // ─── Presets CRUD (gated: "presets") ────────────────────────────────
+
+  private resolvePresetUserOrThrow(userId?: string): string {
+    if (!this.hasPermission("presets")) {
+      throw new Error(`${PERMISSION_DENIED_PREFIX} presets — Presets permission not granted`);
+    }
+    const resolvedUserId = this.resolveEffectiveUserId(userId);
+    if (!resolvedUserId) throw new Error("userId is required for operator-scoped extensions");
+    this.enforceScopedUser(resolvedUserId);
+    return resolvedUserId;
+  }
+
+  private handlePresetsList(requestId: string, limit?: number, offset?: number, userId?: string): void {
+    try {
+      const resolvedUserId = this.resolvePresetUserOrThrow(userId);
+      const result = presetsSvc.listPresets(resolvedUserId, {
+        limit: Math.min(limit || 50, 200),
+        offset: offset || 0,
+      });
+      this.postToWorker({
+        type: "response",
+        requestId,
+        result: { data: result.data, total: result.total },
+      });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  private handlePresetsGet(requestId: string, presetId: string, userId?: string): void {
+    try {
+      const resolvedUserId = this.resolvePresetUserOrThrow(userId);
+      this.postToWorker({ type: "response", requestId, result: presetsSvc.getPreset(resolvedUserId, presetId) });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  private handlePresetsCreate(requestId: string, input: CreatePresetInput, userId?: string): void {
+    try {
+      const resolvedUserId = this.resolvePresetUserOrThrow(userId);
+      if (!input?.name || typeof input.name !== "string" || !input.name.trim()) {
+        throw new Error("Preset name is required");
+      }
+      if (!input?.provider || typeof input.provider !== "string" || !input.provider.trim()) {
+        throw new Error("Preset provider is required");
+      }
+      const preset = presetsSvc.createPreset(resolvedUserId, input);
+      this.postToWorker({ type: "response", requestId, result: preset });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  private handlePresetsUpdate(requestId: string, presetId: string, input: UpdatePresetInput, userId?: string): void {
+    try {
+      const resolvedUserId = this.resolvePresetUserOrThrow(userId);
+      const preset = presetsSvc.updatePreset(resolvedUserId, presetId, input || {});
+      if (!preset) throw new Error("Preset not found");
+      this.postToWorker({ type: "response", requestId, result: preset });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  private handlePresetsDelete(requestId: string, presetId: string, userId?: string): void {
+    try {
+      const resolvedUserId = this.resolvePresetUserOrThrow(userId);
+      this.postToWorker({ type: "response", requestId, result: presetsSvc.deletePreset(resolvedUserId, presetId) });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  private handlePresetBlocksList(requestId: string, presetId: string, userId?: string): void {
+    try {
+      const resolvedUserId = this.resolvePresetUserOrThrow(userId);
+      const blocks = presetsSvc.listPromptBlocks(resolvedUserId, presetId);
+      if (!blocks) throw new Error("Preset not found");
+      this.postToWorker({ type: "response", requestId, result: blocks });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  private handlePresetBlocksGet(requestId: string, presetId: string, blockId: string, userId?: string): void {
+    try {
+      const resolvedUserId = this.resolvePresetUserOrThrow(userId);
+      this.postToWorker({ type: "response", requestId, result: presetsSvc.getPromptBlock(resolvedUserId, presetId, blockId) });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  private handlePresetBlocksCreate(
+    requestId: string,
+    presetId: string,
+    input: presetsSvc.CreatePromptBlockInput,
+    index?: number,
+    userId?: string,
+  ): void {
+    try {
+      const resolvedUserId = this.resolvePresetUserOrThrow(userId);
+      const block = presetsSvc.createPromptBlock(resolvedUserId, presetId, input || {}, index);
+      if (!block) throw new Error("Preset not found");
+      this.postToWorker({ type: "response", requestId, result: block });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  private handlePresetBlocksUpdate(
+    requestId: string,
+    presetId: string,
+    blockId: string,
+    input: presetsSvc.UpdatePromptBlockInput,
+    userId?: string,
+  ): void {
+    try {
+      const resolvedUserId = this.resolvePresetUserOrThrow(userId);
+      const block = presetsSvc.updatePromptBlock(resolvedUserId, presetId, blockId, input || {});
+      if (!block) throw new Error("Prompt block not found");
+      this.postToWorker({ type: "response", requestId, result: block });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  private handlePresetBlocksDelete(requestId: string, presetId: string, blockId: string, userId?: string): void {
+    try {
+      const resolvedUserId = this.resolvePresetUserOrThrow(userId);
+      this.postToWorker({ type: "response", requestId, result: presetsSvc.deletePromptBlock(resolvedUserId, presetId, blockId) });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  private handlePresetCategoriesList(requestId: string, presetId: string, userId?: string): void {
+    try {
+      const resolvedUserId = this.resolvePresetUserOrThrow(userId);
+      const groups = presetsSvc.listPromptBlockCategories(resolvedUserId, presetId);
+      if (!groups) throw new Error("Preset not found");
+      this.postToWorker({ type: "response", requestId, result: groups });
     } catch (err: any) {
       this.postToWorker({ type: "response", requestId, error: err.message });
     }

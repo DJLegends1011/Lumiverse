@@ -57,6 +57,7 @@ import {
   normalizeOwnedSharedRpcEndpoint,
 } from "./shared-rpc";
 import { AsyncLocalStorage } from "node:async_hooks";
+import type { Preset, CreatePresetInput, UpdatePresetInput, PromptBlock } from "../types/preset";
 
 const nativeProcessExit = process.exit.bind(process);
 
@@ -69,6 +70,11 @@ type TokenCountResult = {
   tokenizer_id: string | null;
   tokenizer_name: string;
   approximate: boolean;
+};
+
+type PromptBlockCategoryGroup = {
+  categoryBlock: PromptBlock | null;
+  children: PromptBlock[];
 };
 
 type FrontendProcessState =
@@ -233,6 +239,17 @@ type RuntimeWorkerToHost =
   | { type: "user_storage_move"; requestId: string; from: string; to: string; userId?: string }
   | { type: "user_storage_stat"; requestId: string; path: string; userId?: string }
   | { type: "user_get_role"; requestId: string; userId?: string }
+  | { type: "presets_list"; requestId: string; limit?: number; offset?: number; userId?: string }
+  | { type: "presets_get"; requestId: string; presetId: string; userId?: string }
+  | { type: "presets_create"; requestId: string; input: CreatePresetInput; userId?: string }
+  | { type: "presets_update"; requestId: string; presetId: string; input: UpdatePresetInput; userId?: string }
+  | { type: "presets_delete"; requestId: string; presetId: string; userId?: string }
+  | { type: "preset_blocks_list"; requestId: string; presetId: string; userId?: string }
+  | { type: "preset_blocks_get"; requestId: string; presetId: string; blockId: string; userId?: string }
+  | { type: "preset_blocks_create"; requestId: string; presetId: string; input: Partial<PromptBlock>; index?: number; userId?: string }
+  | { type: "preset_blocks_update"; requestId: string; presetId: string; blockId: string; input: Partial<Omit<PromptBlock, "id">>; userId?: string }
+  | { type: "preset_blocks_delete"; requestId: string; presetId: string; blockId: string; userId?: string }
+  | { type: "preset_categories_list"; requestId: string; presetId: string; userId?: string }
   | {
       type: "tokens_count_text";
       requestId: string;
@@ -502,6 +519,23 @@ type RuntimeSpindleAPI = SpindleAPI & {
     } | void>,
     priority?: number
   ): void;
+  presets: {
+    list(options?: { limit?: number; offset?: number; userId?: string }): Promise<{ data: Preset[]; total: number }>;
+    get(presetId: string, userId?: string): Promise<Preset | null>;
+    create(input: CreatePresetInput, userId?: string): Promise<Preset>;
+    update(presetId: string, input: UpdatePresetInput, userId?: string): Promise<Preset>;
+    delete(presetId: string, userId?: string): Promise<boolean>;
+    blocks: {
+      list(presetId: string, userId?: string): Promise<PromptBlock[]>;
+      get(presetId: string, blockId: string, userId?: string): Promise<PromptBlock | null>;
+      create(presetId: string, input: Partial<PromptBlock>, options?: { index?: number; userId?: string }): Promise<PromptBlock>;
+      update(presetId: string, blockId: string, input: Partial<Omit<PromptBlock, "id">>, userId?: string): Promise<PromptBlock>;
+      delete(presetId: string, blockId: string, userId?: string): Promise<boolean>;
+    };
+    categories: {
+      list(presetId: string, userId?: string): Promise<PromptBlockCategoryGroup[]>;
+    };
+  };
   tokens: {
     countText(text: string, options?: { model?: string; modelSource?: TokenModelSource; userId?: string }): Promise<TokenCountResult>;
     countMessages(
@@ -1878,6 +1912,87 @@ const spindleApi: RuntimeSpindleAPI = {
         const requestId = crypto.randomUUID();
         const result = await request({ type: "vars_has_chat", requestId, chatId, key });
         return result as boolean;
+      },
+    },
+  },
+
+  presets: {
+    async list(options?: { limit?: number; offset?: number; userId?: string }): Promise<{ data: Preset[]; total: number }> {
+      const requestId = crypto.randomUUID();
+      const result = await request({
+        type: "presets_list",
+        requestId,
+        limit: options?.limit,
+        offset: options?.offset,
+        userId: options?.userId,
+      });
+      return result as { data: Preset[]; total: number };
+    },
+    async get(presetId: string, userId?: string): Promise<Preset | null> {
+      const requestId = crypto.randomUUID();
+      const result = await request({ type: "presets_get", requestId, presetId, userId });
+      return result as Preset | null;
+    },
+    async create(input: CreatePresetInput, userId?: string): Promise<Preset> {
+      assertMutationAllowed("spindle.presets.create()");
+      const requestId = crypto.randomUUID();
+      const result = await request({ type: "presets_create", requestId, input, userId });
+      return result as Preset;
+    },
+    async update(presetId: string, input: UpdatePresetInput, userId?: string): Promise<Preset> {
+      assertMutationAllowed("spindle.presets.update()");
+      const requestId = crypto.randomUUID();
+      const result = await request({ type: "presets_update", requestId, presetId, input, userId });
+      return result as Preset;
+    },
+    async delete(presetId: string, userId?: string): Promise<boolean> {
+      assertMutationAllowed("spindle.presets.delete()");
+      const requestId = crypto.randomUUID();
+      const result = await request({ type: "presets_delete", requestId, presetId, userId });
+      return result as boolean;
+    },
+    blocks: {
+      async list(presetId: string, userId?: string): Promise<PromptBlock[]> {
+        const requestId = crypto.randomUUID();
+        const result = await request({ type: "preset_blocks_list", requestId, presetId, userId });
+        return result as PromptBlock[];
+      },
+      async get(presetId: string, blockId: string, userId?: string): Promise<PromptBlock | null> {
+        const requestId = crypto.randomUUID();
+        const result = await request({ type: "preset_blocks_get", requestId, presetId, blockId, userId });
+        return result as PromptBlock | null;
+      },
+      async create(presetId: string, input: Partial<PromptBlock>, options?: { index?: number; userId?: string }): Promise<PromptBlock> {
+        assertMutationAllowed("spindle.presets.blocks.create()");
+        const requestId = crypto.randomUUID();
+        const result = await request({
+          type: "preset_blocks_create",
+          requestId,
+          presetId,
+          input,
+          index: options?.index,
+          userId: options?.userId,
+        });
+        return result as PromptBlock;
+      },
+      async update(presetId: string, blockId: string, input: Partial<Omit<PromptBlock, "id">>, userId?: string): Promise<PromptBlock> {
+        assertMutationAllowed("spindle.presets.blocks.update()");
+        const requestId = crypto.randomUUID();
+        const result = await request({ type: "preset_blocks_update", requestId, presetId, blockId, input, userId });
+        return result as PromptBlock;
+      },
+      async delete(presetId: string, blockId: string, userId?: string): Promise<boolean> {
+        assertMutationAllowed("spindle.presets.blocks.delete()");
+        const requestId = crypto.randomUUID();
+        const result = await request({ type: "preset_blocks_delete", requestId, presetId, blockId, userId });
+        return result as boolean;
+      },
+    },
+    categories: {
+      async list(presetId: string, userId?: string): Promise<PromptBlockCategoryGroup[]> {
+        const requestId = crypto.randomUUID();
+        const result = await request({ type: "preset_categories_list", requestId, presetId, userId });
+        return result as PromptBlockCategoryGroup[];
       },
     },
   },

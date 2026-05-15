@@ -31,6 +31,7 @@ declare const spindle: import('lumiverse-spindle-types').SpindleAPI
 | [Tokens](tokens.md) | Free | Count text, message arrays, or stored chats against an explicit model or the main/sidecar model |
 | [Characters](characters.md) | `characters` | CRUD on character cards |
 | [Chats](chats.md) | `chats` | CRUD on chat sessions + active chat |
+| [Presets](presets.md) | `presets` | CRUD on user presets, prompt blocks, and category groups |
 | [World Books](world-books.md) | `world_books` | CRUD on world books and entries |
 | [Regex Scripts](regex-scripts.md) | `regex_scripts` | CRUD on regex scripts (find/replace rules) |
 | [Databanks](databanks.md) | `databanks` | CRUD on databanks and their documents |

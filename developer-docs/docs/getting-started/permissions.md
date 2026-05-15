@@ -33,6 +33,7 @@ These are always available:
 | `"ephemeral_storage"` | Use temporary storage with TTL, memory pooling, and per-extension quotas |
 | `"characters"` | Full CRUD on character cards (list, get, create, update, delete) |
 | `"chats"` | CRUD on chat sessions (list, get, update, delete) + get active chat |
+| `"presets"` | CRUD on user presets, prompt blocks, and derived category groups |
 | `"world_books"` | Full CRUD on world books and their entries (list, get, create, update, delete) |
 | `"databanks"` | Full CRUD on databanks and their documents (list, get, create, update, delete, reprocess, read parsed content) |
 | `"personas"` | Full CRUD on personas (list, get, create, update, delete) + active switching + attached world book retrieval |

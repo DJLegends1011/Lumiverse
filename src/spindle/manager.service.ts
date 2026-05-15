@@ -22,10 +22,10 @@ import { spawnAsync } from "./spawn-async";
 import { normalizeSpindleHttpsUrl } from "./url-safety";
 
 export type InstallScope = "operator" | "user";
-type ManagedSpindlePermission = SpindlePermission | "databanks";
+type ManagedSpindlePermission = SpindlePermission | "databanks" | "presets";
 
 function isManagedPermission(permission: string): permission is ManagedSpindlePermission {
-  return permission === "databanks" || isValidPermission(permission);
+  return permission === "databanks" || permission === "presets" || isValidPermission(permission);
 }
 
 type BackendSafetyCheck = {
@@ -272,6 +272,7 @@ export const PRIVILEGED_PERMISSIONS = new Set([
   "characters",
   "chats",
   "world_books",
+  "presets",
   "regex_scripts",
   "databanks",
   "personas",
