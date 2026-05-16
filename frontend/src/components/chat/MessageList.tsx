@@ -589,24 +589,24 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
     if (!el) return
 
     let pendingRaf = 0
-    const pendingRows = new Set<Element>()
+    let settleRaf = 0
 
-    const handleMessageContentLayout = (event: Event) => {
-      const target = event.target
-      if (target instanceof Element) {
-        const row = target.closest('[data-index][data-message-id]')
-        if (row) pendingRows.add(row)
-      }
-
+    const handleMessageContentLayout = () => {
       if (pendingRaf) return
       pendingRaf = requestAnimationFrame(() => {
         pendingRaf = 0
-        for (const row of pendingRows) {
+        const visibleRows = el.querySelectorAll('[data-index][data-message-id]')
+        for (const row of visibleRows) {
           rowVirtualizer.measureElement(row)
         }
-        pendingRows.clear()
 
         if (recoverTailVoid()) return
+        if (!settleRaf) {
+          settleRaf = requestAnimationFrame(() => {
+            settleRaf = 0
+            recoverTailVoid()
+          })
+        }
 
         const latest = scrollRef.current
         if (!latest || !isPinnedRef.current) return
@@ -621,7 +621,7 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
     return () => {
       el.removeEventListener(MESSAGE_CONTENT_LAYOUT_EVENT, handleMessageContentLayout)
       if (pendingRaf) cancelAnimationFrame(pendingRaf)
-      pendingRows.clear()
+      if (settleRaf) cancelAnimationFrame(settleRaf)
     }
   }, [recoverTailVoid, rowVirtualizer])
 
