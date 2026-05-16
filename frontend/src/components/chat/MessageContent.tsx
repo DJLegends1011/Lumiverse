@@ -1170,30 +1170,6 @@ function notifyMessageContentLayout(el: HTMLElement): void {
   })
 }
 
-function measureVisualContentHeight(container: HTMLElement): number | null {
-  const containerTop = container.getBoundingClientRect().top
-  let maxBottom = 0
-
-  const visit = (root: ParentNode) => {
-    for (const child of Array.from(root.children)) {
-      if (!(child instanceof HTMLElement)) continue
-
-      const computed = getComputedStyle(child)
-      if (computed.position === 'fixed') continue
-
-      const rect = child.getBoundingClientRect()
-      maxBottom = Math.max(maxBottom, rect.bottom - containerTop)
-
-      if (child.shadowRoot) visit(child.shadowRoot)
-      visit(child)
-    }
-  }
-
-  visit(container)
-  const measured = Math.ceil(maxBottom)
-  return measured > 0 ? measured : null
-}
-
 function IsolatedHtml({ html }: { html: string }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -1210,7 +1186,34 @@ function IsolatedHtml({ html }: { html: string }) {
       shadow.querySelector('style[data-lumi-island-base]')?.remove()
     }
     notifyMessageContentLayout(el)
-    return attachCodeCopyHandler(shadow)
+
+    let pendingRaf = 0
+    const scheduleLayoutNotify = () => {
+      if (pendingRaf) return
+      pendingRaf = requestAnimationFrame(() => {
+        pendingRaf = 0
+        notifyMessageContentLayout(el)
+      })
+    }
+
+    const resizeObserver = new ResizeObserver(scheduleLayoutNotify)
+    resizeObserver.observe(el)
+
+    const mutationObserver = new MutationObserver(scheduleLayoutNotify)
+    mutationObserver.observe(shadow, { childList: true, subtree: true, attributes: true, characterData: true })
+
+    shadow.addEventListener('load', scheduleLayoutNotify, true)
+    shadow.addEventListener('error', scheduleLayoutNotify, true)
+
+    const cleanupCodeCopy = attachCodeCopyHandler(shadow)
+    return () => {
+      cleanupCodeCopy()
+      resizeObserver.disconnect()
+      mutationObserver.disconnect()
+      shadow.removeEventListener('load', scheduleLayoutNotify, true)
+      shadow.removeEventListener('error', scheduleLayoutNotify, true)
+      if (pendingRaf) cancelAnimationFrame(pendingRaf)
+    }
   }, [html])
 
   return <div ref={ref} className={styles.htmlIsland} />
@@ -1431,7 +1434,6 @@ export default function MessageContent({
   const maxStreamingHeightRef = useRef(0)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const [streamingMinHeight, setStreamingMinHeight] = useState<number | null>(null)
-  const [contentMinHeight, setContentMinHeight] = useState<number | null>(null)
 
   const handleLightboxClose = useCallback(() => setLightboxSrc(null), [])
 
@@ -1467,19 +1469,22 @@ export default function MessageContent({
       pendingRaf = window.requestAnimationFrame(() => {
         pendingRaf = 0
         if (cancelled) return
-
-        const nextMinHeight = measureVisualContentHeight(container)
-        setContentMinHeight((current) => {
-          if (nextMinHeight == null) return current === null ? current : null
-          return current != null && Math.abs(current - nextMinHeight) < 1 ? current : nextMinHeight
-        })
         notifyMessageContentLayout(container)
       })
+    }
+
+    const handleChildLayoutNotify = (event: Event) => {
+      if (event.target === container) return
+      scheduleLayoutNotify()
     }
 
     const observer = new ResizeObserver(scheduleLayoutNotify)
     observer.observe(container)
 
+    const mutationObserver = new MutationObserver(scheduleLayoutNotify)
+    mutationObserver.observe(container, { childList: true, subtree: true, attributes: true, characterData: true })
+
+    container.addEventListener(MESSAGE_CONTENT_LAYOUT_EVENT, handleChildLayoutNotify)
     container.addEventListener('load', scheduleLayoutNotify, true)
     container.addEventListener('error', scheduleLayoutNotify, true)
 
@@ -1492,6 +1497,8 @@ export default function MessageContent({
     return () => {
       cancelled = true
       observer.disconnect()
+      mutationObserver.disconnect()
+      container.removeEventListener(MESSAGE_CONTENT_LAYOUT_EVENT, handleChildLayoutNotify)
       container.removeEventListener('load', scheduleLayoutNotify, true)
       container.removeEventListener('error', scheduleLayoutNotify, true)
       if (pendingRaf) window.cancelAnimationFrame(pendingRaf)
@@ -1653,7 +1660,7 @@ export default function MessageContent({
     prevTextLenRef.current = currentLen
   }, [content, isStreaming])
 
-  const minHeight = Math.max(streamingMinHeight ?? 0, contentMinHeight ?? 0)
+  const minHeight = streamingMinHeight ?? 0
 
   return (
     <>
