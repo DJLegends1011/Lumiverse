@@ -9,7 +9,9 @@
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--lumiverse-border) 55%, transparent) transparent;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .list::-webkit-scrollbar {
@@ -39,11 +41,13 @@
   padding: 12px 0;
   font-size: calc(12px * var(--lumiverse-font-scale, 1));
   color: var(--lumiverse-text-muted);
+  flex-shrink: 0;
 }
 
 .virtualSpace {
   position: relative;
   width: 100%;
+  flex-shrink: 0;
   overflow-anchor: none;
 }
 
@@ -52,11 +56,8 @@
   top: 0;
   left: 0;
   right: 0;
-  contain: layout style;
-}
-
-.virtualRow:not([data-item-type='messageFooter']):not([data-item-type='bottom']) {
   padding-bottom: 8px;
+  contain: layout style;
 }
 
 .errorBubble {
