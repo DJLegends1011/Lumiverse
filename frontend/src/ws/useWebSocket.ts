@@ -517,13 +517,14 @@ export function useWebSocket() {
                 latest.imageGeneration.autoGenerate !== false &&
                 !latest.sceneGenerating
               ) {
+                const outputTarget = latest.imageGeneration.outputTarget || 'background'
                 latest.setSceneGenerating(true)
                 imageGenApi.generate({
                   chatId: payload.chatId,
                   forceGeneration: !!latest.imageGeneration.forceGeneration,
-                  outputTarget: 'background',
+                  outputTarget,
                 }).then((res) => {
-                  if (res.generated && res.imageDataUrl) {
+                  if (outputTarget === 'background' && res.generated && res.imageDataUrl) {
                     store.getState().setSceneBackground(res.imageDataUrl)
                   }
                 }).catch((err) => {
