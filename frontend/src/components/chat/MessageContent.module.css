@@ -1,4 +1,5 @@
 .content {
+  position: relative;
   font-size: calc(14px * var(--lumiverse-font-scale, 1));
   line-height: 1.65;
   color: var(--lumiverse-text);
@@ -15,6 +16,8 @@
 /* Prevent browser-generated quote marks on <q> wrappers */
 .prose {
   display: flow-root;
+  position: relative;
+  max-width: 100%;
 }
 
 .prose q {
@@ -479,6 +482,8 @@
 /* ── HTML Islands (Shadow DOM isolated content) ── */
 .htmlIsland {
   display: flow-root;
+  position: relative;
+  max-width: 100%;
   margin: 8px 0;
   border-radius: var(--lcs-radius-sm);
   overflow: hidden;

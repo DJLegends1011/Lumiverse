@@ -345,6 +345,8 @@ const VOID_HTML_TAGS = new Set([
 const ISLAND_BASE_CSS = `
   :host {
     display: flow-root;
+    position: relative;
+    max-width: 100%;
     font-size: calc(14px * var(--lumiverse-font-scale, 1));
     line-height: 1.65;
     color: var(--lumiverse-text);
@@ -1168,6 +1170,30 @@ function notifyMessageContentLayout(el: HTMLElement): void {
   })
 }
 
+function measureVisualContentHeight(container: HTMLElement): number | null {
+  const containerTop = container.getBoundingClientRect().top
+  let maxBottom = 0
+
+  const visit = (root: ParentNode) => {
+    for (const child of Array.from(root.children)) {
+      if (!(child instanceof HTMLElement)) continue
+
+      const computed = getComputedStyle(child)
+      if (computed.position === 'fixed') continue
+
+      const rect = child.getBoundingClientRect()
+      maxBottom = Math.max(maxBottom, rect.bottom - containerTop)
+
+      if (child.shadowRoot) visit(child.shadowRoot)
+      visit(child)
+    }
+  }
+
+  visit(container)
+  const measured = Math.ceil(maxBottom)
+  return measured > 0 ? measured : null
+}
+
 function IsolatedHtml({ html }: { html: string }) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -1405,6 +1431,7 @@ export default function MessageContent({
   const maxStreamingHeightRef = useRef(0)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const [streamingMinHeight, setStreamingMinHeight] = useState<number | null>(null)
+  const [contentMinHeight, setContentMinHeight] = useState<number | null>(null)
 
   const handleLightboxClose = useCallback(() => setLightboxSrc(null), [])
 
@@ -1439,7 +1466,14 @@ export default function MessageContent({
       if (cancelled || pendingRaf) return
       pendingRaf = window.requestAnimationFrame(() => {
         pendingRaf = 0
-        if (!cancelled) notifyMessageContentLayout(container)
+        if (cancelled) return
+
+        const nextMinHeight = measureVisualContentHeight(container)
+        setContentMinHeight((current) => {
+          if (nextMinHeight == null) return current === null ? current : null
+          return current != null && Math.abs(current - nextMinHeight) < 1 ? current : nextMinHeight
+        })
+        notifyMessageContentLayout(container)
       })
     }
 
@@ -1619,13 +1653,15 @@ export default function MessageContent({
     prevTextLenRef.current = currentLen
   }, [content, isStreaming])
 
+  const minHeight = Math.max(streamingMinHeight ?? 0, contentMinHeight ?? 0)
+
   return (
     <>
       <div
         data-component="MessageContent"
         ref={containerRef}
         className={clsx(styles.content, isUser ? styles.contentUser : styles.contentChar)}
-        style={streamingMinHeight ? { minHeight: `${streamingMinHeight}px` } : undefined}
+        style={minHeight > 0 ? { minHeight: `${minHeight}px` } : undefined}
       >
         {renderedBlocks}
         <SpindleMessageWidgets messageId={messageId} />
