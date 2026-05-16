@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Image as ImageIcon, Settings2, Trash2, Plus, X, Workflow } from 'lucide-react'
+import { Image as ImageIcon, Settings2, Trash2, Plus, X, Workflow, Shuffle } from 'lucide-react'
 import { IconBrush } from '@tabler/icons-react'
 import { useStore } from '@/store'
 import { imageGenApi, type ComfyUICapabilities, type SceneData } from '@/api/image-gen'
@@ -223,6 +223,31 @@ function ParamField({
               value={numValue}
               onChange={(e) => onChange(paramKey, schema.type === 'integer' ? parseInt(e.target.value) : parseFloat(e.target.value))}
             />
+          </FormField>
+        )
+      }
+      if (schema.type === 'integer' && paramKey.toLowerCase() === 'seed') {
+        return (
+          <FormField label={displayName} hint={schema.description}>
+            <div className={styles.inlineRow}>
+              <TextInput
+                className={styles.inlineGrow}
+                value={value != null ? String(value) : ''}
+                onChange={(v) => {
+                  const parsed = parseInt(v)
+                  onChange(paramKey, v === '' ? undefined : (isNaN(parsed) ? undefined : parsed))
+                }}
+                placeholder={schema.default != null ? String(schema.default) : ''}
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Shuffle size={14} />}
+                onClick={() => onChange(paramKey, -1)}
+              >
+                Randomize
+              </Button>
+            </div>
           </FormField>
         )
       }

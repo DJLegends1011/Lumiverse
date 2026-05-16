@@ -211,6 +211,7 @@ export async function generateSceneBackground(
     const promptMode = opts?.promptMode || settings.promptMode || "scene";
     const outputTarget = opts?.outputTarget || settings.outputTarget || "background";
     const params = { ...connection.default_parameters, ...(settings.parameters || {}) };
+    normalizeRandomSeed(params, !!provider.capabilities.parameters.seed);
     const promptResult = await resolveImagePrompt(
       userId,
       chatId,
@@ -416,6 +417,14 @@ function numberParam(value: unknown): number | undefined {
 
 function stringParam(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function normalizeRandomSeed(params: Record<string, any>, supportsSeed: boolean): void {
+  if (!supportsSeed) return;
+  const seed = params.seed;
+  if (seed == null || (typeof seed === "string" && seed.trim() === "")) {
+    params.seed = -1;
+  }
 }
 
 function resolvePromptInput(settings: ImageGenSettings, opts?: GenerateImageOptions): ImageGenPromptPreset {

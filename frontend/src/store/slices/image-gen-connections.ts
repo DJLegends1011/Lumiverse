@@ -31,7 +31,9 @@ export const createImageGenConnectionsSlice: StateCreator<AppStore, [], [], Imag
       ? state.imageGeneration
       : { ...state.imageGeneration, activeImageGenConnectionId }
 
-    if (imageGeneration !== state.imageGeneration) persistImageGeneration(imageGeneration)
+    // Profile hydration can run before full settings load on mobile/resume.
+    // Do not write this derived connection choice back or it can overwrite
+    // saved image prompt presets with the generation-slice defaults.
     return { imageGenProfiles: profiles, activeImageGenConnectionId, imageGeneration }
   }),
 
