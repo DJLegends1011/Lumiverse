@@ -65,6 +65,31 @@ describe("detectDangerousBackendCapabilities", () => {
     expect(detectDangerousBackendCapabilities(code)).toEqual([]);
   });
 
+  test("allows inert dynamic-code words and ordinary base64 decoding", () => {
+    const code = `
+      const docs = "This parser uses no eval() or Function() calls.";
+      const note = \`Template text mentioning eval() is still documentation.\`;
+      const bytes = Buffer.from(payload, "base64");
+      void docs;
+      void note;
+      void bytes;
+    `;
+
+    expect(detectDangerousBackendCapabilities(code)).toEqual([]);
+  });
+
+  test("still flags actual dynamic execution", () => {
+    const samples = [
+      `eval("1 + 1")`,
+      `Function("return 1")`,
+      'const value = `${eval("1 + 1")}`',
+    ];
+
+    for (const code of samples) {
+      expect(detectDangerousBackendCapabilities(code)).toContain("dynamic code execution");
+    }
+  });
+
   test("flags common evasions for native backend capabilities", () => {
     const samples: Array<[string, string]> = [
       [`Bun["file"]("/etc/passwd")`, "dangerous Bun system API usage"],

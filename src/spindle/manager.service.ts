@@ -219,6 +219,120 @@ function addDestructuringHits(content: string, hits: Set<string>): void {
   }
 }
 
+function maskStringAndCommentContent(content: string): string {
+  let out = "";
+  let state: "code" | "single" | "double" | "template" | "line_comment" | "block_comment" = "code";
+  let templateExpressionDepth = 0;
+
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i]!;
+    const next = content[i + 1];
+
+    if (state === "line_comment") {
+      if (ch === "\n" || ch === "\r") {
+        out += ch;
+        state = "code";
+      } else {
+        out += " ";
+      }
+      continue;
+    }
+
+    if (state === "block_comment") {
+      if (ch === "*" && next === "/") {
+        out += "  ";
+        i++;
+        state = "code";
+      } else {
+        out += ch === "\n" || ch === "\r" ? ch : " ";
+      }
+      continue;
+    }
+
+    if (state === "single" || state === "double") {
+      const quote = state === "single" ? "'" : '"';
+      if (ch === "\\") {
+        out += " ";
+        if (next !== undefined) {
+          out += next === "\n" || next === "\r" ? next : " ";
+          i++;
+        }
+      } else if (ch === quote) {
+        out += ch;
+        state = "code";
+      } else {
+        out += ch === "\n" || ch === "\r" ? ch : " ";
+      }
+      continue;
+    }
+
+    if (state === "template") {
+      if (ch === "\\") {
+        out += " ";
+        if (next !== undefined) {
+          out += next === "\n" || next === "\r" ? next : " ";
+          i++;
+        }
+      } else if (ch === "`") {
+        out += ch;
+        state = "code";
+      } else if (ch === "$" && next === "{") {
+        out += "  ";
+        i++;
+        templateExpressionDepth = 1;
+        state = "code";
+      } else {
+        out += ch === "\n" || ch === "\r" ? ch : " ";
+      }
+      continue;
+    }
+
+    if (ch === "/" && next === "/") {
+      out += "  ";
+      i++;
+      state = "line_comment";
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      out += "  ";
+      i++;
+      state = "block_comment";
+      continue;
+    }
+    if (ch === "'") {
+      out += ch;
+      state = "single";
+      continue;
+    }
+    if (ch === '"') {
+      out += ch;
+      state = "double";
+      continue;
+    }
+    if (ch === "`") {
+      out += ch;
+      state = "template";
+      continue;
+    }
+
+    if (templateExpressionDepth > 0) {
+      if (ch === "{") templateExpressionDepth++;
+      else if (ch === "}") {
+        templateExpressionDepth--;
+        if (templateExpressionDepth === 0) {
+          out += " ";
+          state = "template";
+          continue;
+        }
+      }
+    }
+
+    out += ch;
+  }
+
+  return out;
+}
+
 /**
  * Best-effort lint for accidental privileged backend API usage. This catches
  * honest mistakes in bundled extension code; it is not a sandbox boundary
@@ -241,7 +355,7 @@ export function detectDangerousBackendCapabilities(content: string): string[] {
     if (/\bObject\.getOwnPropertyDescriptor\s*\(\s*process\s*,\s*["'`]env["'`]/.test(source)) {
       hits.add("dangerous process API usage");
     }
-    if (/\beval\s*\(|\bFunction\s*\(|\bBuffer\.from\s*\([^)]*["'`]base64["'`]/.test(source)) {
+    if (/\beval\s*\(|\bFunction\s*\(/.test(maskStringAndCommentContent(source))) {
       hits.add("dynamic code execution");
     }
   }
