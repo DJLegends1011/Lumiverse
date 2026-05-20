@@ -881,6 +881,16 @@ export default function InputArea({ chatId }: InputAreaProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [atQuery, isGroupChat, groupCharacterIds, mutedCharacterIds, characters])
 
+  // While hidden for mobile edit, the RO below cannot observe a display:none
+  // element, so --lcs-input-safe-zone would freeze at the pre-edit (potentially
+  // tall) value and leave a void under the message list. Override directly.
+  useLayoutEffect(() => {
+    if (!hideForMobileEdit) return
+    const parent = containerRef.current?.parentElement
+    if (!parent) return
+    parent.style.setProperty('--lcs-input-safe-zone', '16px')
+  }, [hideForMobileEdit])
+
   // ResizeObserver — set --lcs-input-safe-zone on parent so scroll padding stays in sync
   useLayoutEffect(() => {
     const el = containerRef.current
