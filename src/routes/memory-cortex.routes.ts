@@ -133,7 +133,25 @@ interface CortexFreshnessSnapshot {
 
 interface StoredCortexFreshnessSnapshot extends CortexFreshnessSnapshot {
   completedAt: number;
+  /** Unix seconds when the most recent rebuild was kicked off. Used as a
+   *  cooldown backstop so a persistent failure (or whatever's nudging the
+   *  freshness check) can't loop us into rebuilding on every warmup hit. */
+  lastAttemptedAt: number;
 }
+
+/**
+ * Minimum gap between non-forced full rebuilds. Applied even when other
+ * defenses (Phases 1–4) think a rebuild is warranted — guarantees we can't
+ * loop more than once per minute regardless of what's drifting upstream.
+ * Forced rebuilds (`POST /warm { force: true }`) bypass the gate.
+ */
+const FULL_REBUILD_COOLDOWN_SEC = 60;
+
+type CortexRebuildTriggerBucket =
+  | "manual_force"
+  | "signature_drift"
+  | "chunks_recreated"
+  | "incremental_resume";
 
 interface WarmupComponentResult {
   status: "started" | "complete" | "skipped";
@@ -169,6 +187,7 @@ function parseStoredCortexFreshness(chat: ReturnType<typeof getChat>): StoredCor
     rebuildSignature,
     sourceChunkCount: typeof raw.sourceChunkCount === "number" ? raw.sourceChunkCount : -1,
     completedAt: typeof raw.completedAt === "number" ? raw.completedAt : 0,
+    lastAttemptedAt: typeof raw.lastAttemptedAt === "number" ? raw.lastAttemptedAt : 0,
   };
 }
 
@@ -209,11 +228,18 @@ function stampCortexFreshnessSnapshot(
   const chat = getChat(userId, chatId);
   if (!chat) return;
 
+  // Preserve the rebuild-attempt timestamp so the cooldown gate continues
+  // to reflect the actual start time, not the completion overwrite. Defaults
+  // to 0 (no cooldown effect) when this stamp comes from the no-op
+  // `already_ready` re-stamp path rather than a real rebuild completion.
+  const existing = parseStoredCortexFreshness(chat);
+  const now = Math.floor(Date.now() / 1000);
   const metadata = {
     ...chat.metadata,
     cortex_rebuild_state: {
       ...snapshot,
-      completedAt: Math.floor(Date.now() / 1000),
+      completedAt: now,
+      lastAttemptedAt: existing?.lastAttemptedAt ?? 0,
     },
   };
 
@@ -221,6 +247,55 @@ function stampCortexFreshnessSnapshot(
     JSON.stringify(metadata),
     chatId,
     userId,
+  );
+}
+
+/**
+ * Stamp `cortex_rebuild_state.lastAttemptedAt` at rebuild kickoff. Preserves
+ * any prior freshness fields so a failed rebuild doesn't erase the last
+ * known-good completion record, but advances the cooldown window so the
+ * next warmup hit can be gated cleanly.
+ */
+function stampCortexRebuildAttempt(userId: string, chatId: string): void {
+  const chat = getChat(userId, chatId);
+  if (!chat) return;
+
+  const existing = parseStoredCortexFreshness(chat);
+  const now = Math.floor(Date.now() / 1000);
+  const metadata = {
+    ...chat.metadata,
+    cortex_rebuild_state: {
+      ltcmConfigHash: existing?.ltcmConfigHash ?? null,
+      rebuildSignature: existing?.rebuildSignature ?? "",
+      sourceChunkCount: existing?.sourceChunkCount ?? -1,
+      completedAt: existing?.completedAt ?? 0,
+      lastAttemptedAt: now,
+    },
+  };
+
+  getDb().query("UPDATE chats SET metadata = ? WHERE id = ? AND user_id = ?").run(
+    JSON.stringify(metadata),
+    chatId,
+    userId,
+  );
+}
+
+function logCortexRebuildTrigger(
+  chatId: string,
+  bucket: CortexRebuildTriggerBucket,
+  details: {
+    totalChunks: number;
+    pendingChunks: number;
+    completedChunks: number;
+    storedSignature: string | null;
+    currentSignature: string;
+  },
+): void {
+  const sigChanged = details.storedSignature !== null && details.storedSignature !== details.currentSignature;
+  console.info(
+    `[memory-cortex] rebuild_trigger chat=${chatId} bucket=${bucket}`
+      + ` total=${details.totalChunks} pending=${details.pendingChunks} completed=${details.completedChunks}`
+      + ` signature_changed=${sigChanged}`,
   );
 }
 
@@ -415,18 +490,47 @@ async function performChatWarmup(userId: string, chatId: string, force: boolean)
             stampCortexFreshnessSnapshot(userId, chatId, snapshot);
             cortex = { status: "skipped", reason: "already_ready" };
           } else {
-            const { characterNames, descriptionAliases } = await resolveCortexParticipants(userId, freshChat);
-            startTrackedCortexRebuild({
-              userId,
-              chatId,
-              characterNames,
-              descriptionAliases,
-              generateRawFn: sidecar.generateRawFn,
-              sidecarConnectionId: sidecar.sidecarConnectionId,
-              snapshot,
-              ...(force ? {} : { source: "warmup" as const }),
-            });
-            cortex = { status: "started", reason: force ? "rebuild_started" : "warmup_started" };
+            const stored = parseStoredCortexFreshness(freshChat);
+            const nowSec = Math.floor(Date.now() / 1000);
+            const inCooldown = !force
+              && stored !== null
+              && stored.lastAttemptedAt > 0
+              && nowSec - stored.lastAttemptedAt < FULL_REBUILD_COOLDOWN_SEC;
+
+            if (inCooldown) {
+              cortex = { status: "skipped", reason: "rebuild_cooldown" };
+            } else {
+              const bucket: CortexRebuildTriggerBucket = force
+                ? "manual_force"
+                : coverage.requiresFullRebuild
+                  ? (stored && stored.rebuildSignature !== snapshot.rebuildSignature
+                      ? "signature_drift"
+                      : "chunks_recreated")
+                  : "incremental_resume";
+
+              logCortexRebuildTrigger(chatId, bucket, {
+                totalChunks: coverage.totalChunks,
+                pendingChunks: coverage.pendingChunks,
+                completedChunks: coverage.completedChunks,
+                storedSignature: stored?.rebuildSignature ?? null,
+                currentSignature: snapshot.rebuildSignature,
+              });
+
+              stampCortexRebuildAttempt(userId, chatId);
+
+              const { characterNames, descriptionAliases } = await resolveCortexParticipants(userId, freshChat);
+              startTrackedCortexRebuild({
+                userId,
+                chatId,
+                characterNames,
+                descriptionAliases,
+                generateRawFn: sidecar.generateRawFn,
+                sidecarConnectionId: sidecar.sidecarConnectionId,
+                snapshot,
+                ...(force ? {} : { source: "warmup" as const }),
+              });
+              cortex = { status: "started", reason: force ? "rebuild_started" : "warmup_started" };
+            }
           }
         }
       }
