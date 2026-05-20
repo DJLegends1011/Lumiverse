@@ -35,6 +35,7 @@ declare const spindle: import('lumiverse-spindle-types').SpindleAPI
 | [World Books](world-books.md) | `world_books` | CRUD on world books and entries |
 | [Regex Scripts](regex-scripts.md) | `regex_scripts` | CRUD on regex scripts (find/replace rules) |
 | [Databanks](databanks.md) | `databanks` | CRUD on databanks and their documents |
+| [Memories](memories.md) | `memories` | Memory Cortex (entities, relations, vaults, consolidations) + long-term chat memory CRUD |
 | [Personas](personas.md) | `personas` | CRUD on personas + active switching + attached world books |
 | [Council](council.md) | Free | Read the active council members and configuration |
 | [Chat Mutation](chat-mutation.md) | `chat_mutation` | Read and modify chat messages |

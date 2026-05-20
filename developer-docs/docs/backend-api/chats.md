@@ -163,6 +163,9 @@ const memories = await spindle.chats.getMemories('chat-id', { topK: 8 })
     - **`getMemories()`** — retrieves semantically relevant *past* conversation segments via vector search. Read-only, no side effects.
     - **`spindle.chat.getMessages()`** ([Chat Mutation](chat-mutation.md)) — returns the full raw message list for a chat.
 
+!!! tip "Need more than retrieval?"
+    `getMemories()` is the lightweight entry point under the `chats` permission. The richer surface — listing vectorized chunks, warming a chat, invalidating the cache, plus the full Memory Cortex (entities, relations, vaults, consolidations, salience) — lives under [`spindle.memories`](memories.md) and the dedicated `memories` permission. The same retrieval call is mirrored there as `spindle.memories.chatMemory.get()`.
+
 ---
 
 !!! tip "Chats vs Chat Mutation"
