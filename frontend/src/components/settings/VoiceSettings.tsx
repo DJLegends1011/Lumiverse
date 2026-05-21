@@ -6,6 +6,7 @@ import { ttsConnectionsApi } from '@/api/tts-connections'
 import { ttsApi } from '@/api/tts'
 import { Toggle } from '@/components/shared/Toggle'
 import SearchableSelect from '@/components/shared/SearchableSelect'
+import VoicePicker from '@/components/shared/VoicePicker'
 import { speak, stop, setTTSVolume, setTTSSpeed, isSpeaking } from '@/lib/ttsAudio'
 import { isWebSpeechAvailable } from '@/lib/sttEngine'
 import styles from './VoiceSettings.module.css'
@@ -205,6 +206,41 @@ export default function VoiceSettings() {
           </div>
         </div>
 
+        {/* ── Narration Voice ───────────────────────────────────────── */}
+        <div className={styles.subHeader}>Narration</div>
+
+        <div className={styles.toggleRow}>
+          <Toggle.Checkbox
+            checked={voiceSettings.narrationVoice !== null}
+            onChange={(v) =>
+              setVoiceSettings({
+                narrationVoice: v
+                  ? { connectionId: voiceSettings.ttsConnectionId ?? '', voice: '' }
+                  : null,
+              })
+            }
+            disabled={!voiceSettings.ttsEnabled}
+            label="Use a separate narrator voice"
+            hint="Speak narration/thoughts in a different voice from character speech. Applies anywhere narration appears (single-character cards too)."
+          />
+        </div>
+
+        {voiceSettings.narrationVoice !== null && (
+          <div className={styles.row} style={{ alignItems: 'flex-start' }}>
+            <span className={styles.label} style={{ paddingTop: 6 }}>Narrator</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <VoicePicker
+                value={voiceSettings.narrationVoice}
+                onChange={(next) => setVoiceSettings({ narrationVoice: next })}
+                disabled={!voiceSettings.ttsEnabled}
+                ariaLabel="Narrator"
+                clearLabel="Use speech voice for narration"
+                portal
+              />
+            </div>
+          </div>
+        )}
+
         {/* ── Speech Detection Rules ────────────────────────────────── */}
         <div className={styles.subHeader}>Speech Detection</div>
 
@@ -218,8 +254,9 @@ export default function VoiceSettings() {
             value={voiceSettings.speechDetectionRules.asterisked}
             onChange={(e) => updateDetectionRule('asterisked', e.target.value)}
           >
-            <option value="skip">Skip (Thought)</option>
+            <option value="skip">Skip</option>
             <option value="narration">Read as Narration</option>
+            <option value="thought">Read as Thoughts (character voice)</option>
           </select>
         </div>
 

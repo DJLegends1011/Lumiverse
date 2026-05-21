@@ -497,6 +497,10 @@ export default function ChatView() {
           // no council profile binding or resolution issue - keep current settings
         }
 
+        // Snapshot chat metadata into the store so features like TTS voice
+        // resolution can read it without an extra fetch.
+        useStore.getState().setActiveChatMetadata(chat.metadata ?? null)
+
         // Load per-chat wallpaper from metadata
         const wp = chat.metadata?.wallpaper as import('@/types/store').WallpaperRef | undefined
         if (wp?.image_id) {

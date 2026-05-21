@@ -274,9 +274,24 @@ app.patch("/:id/metadata", async (c) => {
     return c.json({ error: "Body must be an object of metadata keys" }, 400);
   }
   // Translate `null` sentinels to `undefined` so mergeChatMetadata deletes them.
+  // Also sanitize the `voiceOverrides` payload here — TTS voice routing is
+  // client-side, but defensive parsing keeps malformed clients from writing
+  // garbage that confuses the resolver later.
   const partial: Record<string, any> = {};
   for (const [key, value] of Object.entries(body)) {
-    partial[key] = value === null ? undefined : value;
+    if (value === null) {
+      partial[key] = undefined;
+      continue;
+    }
+    if (key === "voiceOverrides") {
+      const sanitized = svc.sanitizeVoiceOverrides(value);
+      // If the caller sent a voiceOverrides blob and nothing survived
+      // sanitization, treat it as a delete rather than silently keeping
+      // a stale value.
+      partial[key] = sanitized ?? undefined;
+      continue;
+    }
+    partial[key] = value;
   }
   const updated = svc.mergeChatMetadata(userId, chatId, partial);
   if (!updated) return c.json({ error: "Not found" }, 404);

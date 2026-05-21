@@ -50,6 +50,13 @@ export function useCharacterTheme() {
     : null
   const appliedAvatarKeyRef = useRef<string | null>(null)
   const nameAppliedAvatarKeyRef = useRef<string | null>(null)
+  // Monotonic request tokens. Every effect run bumps its counter; only the
+  // latest run is allowed to write to the palette cache or to the store.
+  // This protects against a slow extraction finishing after the user has
+  // already switched characters (which would otherwise stamp the previous
+  // character's palette onto the new one).
+  const overlayRequestIdRef = useRef(0)
+  const nameRequestIdRef = useRef(0)
 
   // ── 1. Character name colors (opt-in via characterAware) ──
   useEffect(() => {
@@ -66,17 +73,20 @@ export function useCharacterTheme() {
 
     if (nameAppliedAvatarKeyRef.current === avatarCacheKey) return
 
-    let cancelled = false
+    const myRequestId = ++nameRequestIdRef.current
+    const isStale = () => myRequestId !== nameRequestIdRef.current
 
     const apply = async () => {
       try {
         let palette = paletteCache.get(avatarCacheKey)
         if (!palette) {
-          palette = await extractPalette(avatarUrl)
-          paletteCache.set(avatarCacheKey, palette)
+          const extracted = await extractPalette(avatarUrl)
+          if (isStale()) return
+          paletteCache.set(avatarCacheKey, extracted)
+          palette = extracted
         }
 
-        if (cancelled) return
+        if (isStale()) return
 
         const vars = deriveCharacterNameVars(palette)
         for (const [key, value] of Object.entries(vars)) {
@@ -84,18 +94,25 @@ export function useCharacterTheme() {
         }
         nameAppliedAvatarKeyRef.current = avatarCacheKey
       } catch (err) {
+        if (isStale()) return
         console.warn('[useCharacterTheme] Name color extraction failed:', err)
       }
     }
 
     apply()
-    return () => { cancelled = true }
+    return () => { /* request id bump on next run supersedes this one */ }
   }, [characterAware, hasExtensionOverrides, activeCharacterId, avatarUrl, avatarCacheKey])
 
   // ── 2. Character-aware theme overlay (opt-in) ──
   // Suppressed when extension theme overrides are active — extensions take full
   // control of the palette, so character-derived accent/baseColors must yield.
   useEffect(() => {
+    // Bump the request id for any state change. Synchronous early-return
+    // branches still need to invalidate in-flight extractions so they don't
+    // overwrite the freshly-cleared overlay.
+    const myRequestId = ++overlayRequestIdRef.current
+    const isStale = () => myRequestId !== overlayRequestIdRef.current
+
     if (!characterAware || hasExtensionOverrides) {
       setCharacterThemeOverlay(null)
       appliedAvatarKeyRef.current = null
@@ -109,17 +126,17 @@ export function useCharacterTheme() {
     }
     if (appliedAvatarKeyRef.current === avatarCacheKey) return
 
-    let cancelled = false
-
     const apply = async () => {
       try {
         let palette = paletteCache.get(avatarCacheKey)
         if (!palette) {
-          palette = await extractPalette(avatarUrl)
-          paletteCache.set(avatarCacheKey, palette)
+          const extracted = await extractPalette(avatarUrl)
+          if (isStale()) return
+          paletteCache.set(avatarCacheKey, extracted)
+          palette = extracted
         }
 
-        if (cancelled) return
+        if (isStale()) return
 
         const overlay = deriveCharacterOverlay(palette)
 
@@ -129,14 +146,16 @@ export function useCharacterTheme() {
         appliedAvatarKeyRef.current = avatarCacheKey
         setCharacterThemeOverlay(overlay)
       } catch (err) {
+        // Only clear the overlay on a fresh failure — a stale failure must
+        // not stomp on whatever the current request has (or will) apply.
+        if (isStale()) return
+        console.warn('[useCharacterTheme] Theme overlay failed:', err)
         setCharacterThemeOverlay(null)
         appliedAvatarKeyRef.current = null
-        console.warn('[useCharacterTheme] Theme overlay failed:', err)
       }
     }
 
     apply()
-    return () => { cancelled = true }
   }, [characterAware, hasExtensionOverrides, activeCharacterId, avatarUrl, avatarCacheKey, setCharacterThemeOverlay])
 
   // ── 3. React to CHARACTER_AVATAR_CHANGED — force resample ──

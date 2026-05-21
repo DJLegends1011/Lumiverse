@@ -133,6 +133,25 @@ export interface GroupChatMetadata {
   character_ids: string[];
   talkativeness_overrides?: Record<string, number>;
   concatenation_mode?: boolean;
+  /**
+   * Per-chat voice overrides. `narrator` overrides the global narration voice
+   * for this chat; `characters[characterId]` overrides that member's speech
+   * voice for this chat. Either field absent → fall back to character default
+   * → global default.
+   */
+  voiceOverrides?: {
+    narrator?: VoiceRef;
+    characters?: Record<string, VoiceRef>;
+  };
+}
+
+/**
+ * Documented shape for `Character.extensions.ttsVoice`. The extensions field
+ * is free-form JSON, so this is a soft contract — readers always null-check
+ * and validate at runtime.
+ */
+export interface CharacterTtsExtension {
+  ttsVoice?: VoiceRef;
 }
 
 // ---- Message Attachment ----
@@ -484,6 +503,23 @@ export interface TtsConnectionModelsPreviewInput {
   provider: string;
   api_url?: string;
   api_key?: string;
+}
+
+/**
+ * Reference to a specific TTS voice on a specific connection. Used wherever
+ * a "voice choice" needs to persist beyond the global default: a character's
+ * default voice (characters.extensions.ttsVoice), per-chat overrides
+ * (chat.metadata.voiceOverrides), and the global narrator voice
+ * (voiceSettings.narrationVoice).
+ *
+ * `voice` is the provider-side voice id (empty string falls back to the
+ * connection's default voice). `parameters.speed` is optional and overrides
+ * the global speed for this voice when set.
+ */
+export interface VoiceRef {
+  connectionId: string
+  voice: string
+  parameters?: { speed?: number }
 }
 
 export interface TtsParameterSchema {

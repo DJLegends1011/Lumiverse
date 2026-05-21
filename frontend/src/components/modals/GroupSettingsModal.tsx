@@ -3,11 +3,29 @@ import { useStore } from '@/store'
 import { ModalShell } from '@/components/shared/ModalShell'
 import { CloseButton } from '@/components/shared/CloseButton'
 import { Button } from '@/components/shared/FormComponents'
+import VoicePicker from '@/components/shared/VoicePicker'
 import { chatsApi } from '@/api/chats'
 import { presetsApi } from '@/api/presets'
+import { ttsConnectionsApi } from '@/api/tts-connections'
 import { getCharacterAvatarThumbUrl } from '@/lib/avatarUrls'
-import type { Character, Chat, PresetRegistryItem } from '@/types/api'
+import type { Character, Chat, PresetRegistryItem, VoiceRef } from '@/types/api'
 import styles from './GroupChatCreatorModal.module.css'
+
+/**
+ * Parse a free-form metadata blob into a VoiceRef. Returns null on shape
+ * mismatch so untyped chat.metadata can't crash the editor.
+ */
+function readVoiceRef(value: unknown): VoiceRef | null {
+  if (!value || typeof value !== 'object') return null
+  const v = value as Record<string, unknown>
+  if (typeof v.connectionId !== 'string' || !v.connectionId) return null
+  const voice = typeof v.voice === 'string' ? v.voice : ''
+  const parameters =
+    v.parameters && typeof v.parameters === 'object'
+      ? { speed: typeof (v.parameters as any).speed === 'number' ? (v.parameters as any).speed : undefined }
+      : undefined
+  return { connectionId: v.connectionId, voice, parameters }
+}
 
 type GroupCardMode = 'swap' | 'merge_ignore_muted' | 'merge'
 
@@ -20,11 +38,25 @@ export default function GroupSettingsModal() {
     onSaved?: (chat: Chat) => void
   } | null
   const characters = useStore((s) => s.characters)
+  const activeCharacterId = useStore((s) => s.activeCharacterId)
+  const setActiveChatMetadata = useStore((s) => s.setActiveChatMetadata)
+  const ttsProfiles = useStore((s) => s.ttsProfiles)
+  const setTtsProfiles = useStore((s) => s.setTtsProfiles)
+  const setTtsProviders = useStore((s) => s.setTtsProviders)
 
   const chatId = modalProps?.chatId ?? ''
   const metadata = modalProps?.metadata ?? {}
   const isGroup = metadata.group === true
   const characterIds: string[] = metadata.character_ids ?? []
+  // Single-character chats hang voice overrides off the chat's owning
+  // character. The modal opens for the active chat, so activeCharacterId is
+  // a reliable proxy when this isn't a group.
+  const chatCharacter = useMemo(
+    () => (!isGroup && activeCharacterId
+      ? characters.find((c) => c.id === activeCharacterId) ?? null
+      : null),
+    [isGroup, activeCharacterId, characters],
+  )
 
   const selectedCharacters = useMemo(
     () => characterIds.map((id) => characters.find((c) => c.id === id)).filter(Boolean) as Character[],
@@ -56,6 +88,26 @@ export default function GroupSettingsModal() {
   const [scenarioCustom, setScenarioCustom] = useState(existingOverride.content ?? '')
   const [saving, setSaving] = useState(false)
 
+  // ── Voice overrides ──────────────────────────────────────────────────
+  // Only exposed in single-character chats. Group chats use the member-bar
+  // context menu to set per-member overrides individually.
+  const initialVoiceOverrides = metadata.voiceOverrides && typeof metadata.voiceOverrides === 'object'
+    ? metadata.voiceOverrides as Record<string, any>
+    : {}
+  const [narratorOverride, setNarratorOverride] = useState<VoiceRef | null>(
+    readVoiceRef(initialVoiceOverrides.narrator),
+  )
+  const [characterOverride, setCharacterOverride] = useState<VoiceRef | null>(
+    chatCharacter
+      ? readVoiceRef(initialVoiceOverrides.characters?.[chatCharacter.id])
+      : null,
+  )
+
+  const characterDefaultVoice = useMemo(
+    () => readVoiceRef(chatCharacter?.extensions?.ttsVoice),
+    [chatCharacter],
+  )
+
   useEffect(() => {
     let cancelled = false
     setLoadingPresets(true)
@@ -71,6 +123,17 @@ export default function GroupSettingsModal() {
       })
     return () => { cancelled = true }
   }, [])
+
+  // Lazy-load TTS profiles / providers if the user opened the modal without
+  // visiting global Voice settings first. Voice pickers can't populate
+  // without these.
+  useEffect(() => {
+    if (isGroup) return
+    if (ttsProfiles.length === 0) {
+      ttsConnectionsApi.list().then((res) => setTtsProfiles(res.data || [])).catch(() => {})
+    }
+    ttsConnectionsApi.providers().then((res) => setTtsProviders(res.providers || [])).catch(() => {})
+  }, [isGroup, ttsProfiles.length, setTtsProfiles, setTtsProviders])
 
   const handleSave = useCallback(async () => {
     if (saving || !chatId) return
@@ -94,10 +157,32 @@ export default function GroupSettingsModal() {
               ...(scenarioMode === 'custom' ? { content: scenarioCustom } : {}),
             }
           : null
+      } else if (chatCharacter) {
+        // Single-character chats: merge the current per-character overrides
+        // map so any voices set by other surfaces (future per-chat narrator
+        // override hooks, etc.) survive a save here.
+        const existing = (initialVoiceOverrides.characters && typeof initialVoiceOverrides.characters === 'object')
+          ? { ...initialVoiceOverrides.characters }
+          : {}
+        if (characterOverride) {
+          existing[chatCharacter.id] = characterOverride
+        } else {
+          delete existing[chatCharacter.id]
+        }
+        const nextOverrides: Record<string, any> = {}
+        if (narratorOverride) nextOverrides.narrator = narratorOverride
+        if (Object.keys(existing).length > 0) nextOverrides.characters = existing
+        // Send `null` to delete the key entirely when nothing remains; the
+        // server treats null as a delete via mergeChatMetadata.
+        metadataPatch.voiceOverrides = Object.keys(nextOverrides).length > 0 ? nextOverrides : null
       }
 
       await chatsApi.patchMetadata(chatId, metadataPatch)
       const updatedChat = await chatsApi.get(chatId, { messages: false })
+      // Keep the resolver's view of metadata fresh so any subsequent TTS
+      // playback (manual or auto) picks up the new overrides without waiting
+      // for a chat reopen.
+      setActiveChatMetadata(updatedChat.metadata ?? null)
       modalProps?.onSaved?.(updatedChat)
       closeModal()
     } catch (err) {
@@ -105,7 +190,7 @@ export default function GroupSettingsModal() {
     } finally {
       setSaving(false)
     }
-  }, [saving, chatId, groupName, impersonationPresetId, isGroup, talkativenessOverrides, groupCardMode, scenarioMode, scenarioMemberId, scenarioCustom, modalProps, closeModal])
+  }, [saving, chatId, groupName, impersonationPresetId, isGroup, talkativenessOverrides, groupCardMode, scenarioMode, scenarioMemberId, scenarioCustom, chatCharacter, characterOverride, narratorOverride, initialVoiceOverrides, setActiveChatMetadata, modalProps, closeModal])
 
   return (
     <ModalShell isOpen={true} onClose={closeModal} maxWidth={520}>
@@ -152,6 +237,39 @@ export default function GroupSettingsModal() {
               When set, input-bar one-liner impersonation uses this preset's impersonation prompt, assistant impersonation prefill, and parameters without changing the main preset for the chat.
             </div>
           </div>
+
+          {!isGroup && chatCharacter && (
+            <>
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>Voice for {chatCharacter.name} (this chat)</label>
+                <VoicePicker
+                  value={characterOverride}
+                  onChange={setCharacterOverride}
+                  ariaLabel={`${chatCharacter.name} voice`}
+                  clearLabel={characterDefaultVoice ? 'Use character default' : 'Use global default'}
+                  portal
+                />
+                <div style={{ fontSize: 'calc(11px * var(--lumiverse-font-scale, 1))', color: 'var(--lumiverse-text-dim)', lineHeight: 1.45 }}>
+                  Overrides {chatCharacter.name}&apos;s voice for this chat only. Leave unset to use
+                  {characterDefaultVoice ? ' the character’s default voice.' : ' the global default voice.'}
+                </div>
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>Narrator (this chat)</label>
+                <VoicePicker
+                  value={narratorOverride}
+                  onChange={setNarratorOverride}
+                  ariaLabel="Narrator voice"
+                  clearLabel="Use global narrator"
+                  portal
+                />
+                <div style={{ fontSize: 'calc(11px * var(--lumiverse-font-scale, 1))', color: 'var(--lumiverse-text-dim)', lineHeight: 1.45 }}>
+                  Overrides the narrator voice for narration segments in this chat. Falls back to the global narrator voice (or speech voice) when unset.
+                </div>
+              </div>
+            </>
+          )}
 
           {isGroup && (
             <>

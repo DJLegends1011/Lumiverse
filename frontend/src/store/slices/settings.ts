@@ -351,6 +351,7 @@ export const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> 
       quoted: 'speech' as const,
       undecorated: 'narration' as const,
     },
+    narrationVoice: null,
   },
 
   hydrateStartupSettings: (settings: StartupSettings) => {

@@ -167,6 +167,21 @@
   border: 1.5px solid var(--lumiverse-bg, rgba(18, 18, 24, 0.95));
 }
 
+.voiceBadge {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--lumiverse-primary-050, rgba(106, 163, 255, 0.3));
+  border: 1.5px solid var(--lumiverse-bg, rgba(18, 18, 24, 0.95));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--lumiverse-primary, #6aa3ff);
+}
+
 /* Talkativeness indicator as border opacity */
 .talkHigh .avatar,
 .talkHigh .avatarFallback {

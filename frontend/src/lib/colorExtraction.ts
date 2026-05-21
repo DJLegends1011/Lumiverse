@@ -284,9 +284,28 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
+    // `decoding = 'async'` lets the browser defer pixel decoding past onload,
+    // which can leave drawImage/getImageData reading transparent pixels and
+    // collapsing extractPalette into its grey/purple fallback. Await decode()
+    // explicitly so the canvas sample only runs once pixels are guaranteed.
     img.decoding = 'async'
-    img.onload = () => resolve(img)
-    img.onerror = reject
+    img.onerror = () => reject(new Error(`Failed to load image: ${src}`))
+    img.onload = () => {
+      const finish = () => {
+        if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+          reject(new Error(`Image decoded with zero dimensions: ${src}`))
+          return
+        }
+        resolve(img)
+      }
+      // decode() is well-supported (Chrome 64+, FF 63+, Safari 11.1+) but
+      // fall back gracefully if it isn't available or rejects spuriously.
+      if (typeof img.decode === 'function') {
+        img.decode().then(finish).catch(finish)
+      } else {
+        finish()
+      }
+    }
     img.src = src
   })
 }

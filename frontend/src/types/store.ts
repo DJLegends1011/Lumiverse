@@ -7,6 +7,13 @@ export interface ChatSlice {
   activeChatWallpaper: WallpaperRef | null
   /** Active avatar image_id override from chat metadata (alternate avatar selection) */
   activeChatAvatarId: string | null
+  /**
+   * The raw chat.metadata for the currently-open chat. Lets features like TTS
+   * voice resolution read per-chat config (voiceOverrides, etc.) without an
+   * extra fetch. Updated whenever chat metadata changes (e.g. a voice override
+   * write).
+   */
+  activeChatMetadata: Record<string, any> | null
   messages: Message[]
   isStreaming: boolean
   streamingContent: string
@@ -26,6 +33,7 @@ export interface ChatSlice {
   setActiveChat: (chatId: string | null, characterId?: string | null) => void
   setActiveChatWallpaper: (wallpaper: WallpaperRef | null) => void
   setActiveChatAvatarId: (imageId: string | null) => void
+  setActiveChatMetadata: (metadata: Record<string, any> | null) => void
   setMessages: (messages: Message[], total?: number) => void
   prependMessages: (messages: Message[]) => void
   addMessage: (message: Message) => void
@@ -1121,7 +1129,7 @@ export interface TtsConnectionsSlice {
 
 // ---- Voice Settings ----
 export interface SpeechDetectionRules {
-  asterisked: 'skip' | 'narration'
+  asterisked: 'skip' | 'narration' | 'thought'
   quoted: 'speech' | 'narration' | 'skip'
   undecorated: 'narration' | 'speech' | 'skip'
 }
@@ -1140,6 +1148,13 @@ export interface VoiceSettings {
   ttsSpeed: number
   ttsVolume: number
   speechDetectionRules: SpeechDetectionRules
+  /**
+   * Default narrator voice for narration/thought segments (asterisked and any
+   * undecorated text classified as narration). When null, narration falls
+   * back to the speech voice — useful for users who don't want a separate
+   * narrator at all.
+   */
+  narrationVoice: import('@/types/api').VoiceRef | null
 }
 
 // ---- Loadouts Slice ----

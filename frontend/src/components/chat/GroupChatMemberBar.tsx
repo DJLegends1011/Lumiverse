@@ -5,7 +5,7 @@ import { generateApi } from '@/api/generate'
 import { getCharacterAvatarThumbUrl } from '@/lib/avatarUrls'
 import { toast } from '@/lib/toast'
 import { shouldForceLoomRuntimePreset } from '@/lib/loom/runtimeProfile'
-import { Plus, VolumeX, Volume2, UserMinus } from 'lucide-react'
+import { Plus, VolumeX, Volume2, UserMinus, AudioLines } from 'lucide-react'
 import { IconBolt } from '@tabler/icons-react'
 import ContextMenu, { type ContextMenuPos, type ContextMenuEntry } from '@/components/shared/ContextMenu'
 import { useLongPress } from '@/hooks/useLongPress'
@@ -131,6 +131,25 @@ export default function GroupChatMemberBar({ chatId }: GroupChatMemberBarProps) 
     [handleForceGenerate]
   )
 
+  const handleOpenVoiceModal = useCallback(
+    (characterId: string) => {
+      setContextMenu(null)
+      openModal('memberVoice', { chatId, characterId })
+    },
+    [chatId, openModal],
+  )
+
+  // Set of group member ids that have a per-chat voice override applied.
+  // Used to badge the avatars so an override is discoverable at a glance.
+  const activeChatMetadata = useStore((s) => s.activeChatMetadata)
+  const overrideIds = useMemo(() => {
+    const overrides = activeChatMetadata?.voiceOverrides
+    if (!overrides || typeof overrides !== 'object') return new Set<string>()
+    const chars = (overrides as any).characters
+    if (!chars || typeof chars !== 'object') return new Set<string>()
+    return new Set(Object.keys(chars).filter((id) => !!chars[id]))
+  }, [activeChatMetadata])
+
   if (groupCharacterIds.length === 0) return null
 
   const contextIsMuted = contextMenu ? mutedCharacterIds.includes(contextMenu.characterId) : false
@@ -152,6 +171,12 @@ export default function GroupChatMemberBar({ chatId }: GroupChatMemberBarProps) 
         icon: contextIsMuted ? <Volume2 size={13} /> : <VolumeX size={13} />,
         onClick: () => handleToggleMute(cid),
       },
+      {
+        key: 'voice',
+        label: overrideIds.has(cid) ? 'Voice (overridden)' : 'Voice…',
+        icon: <AudioLines size={13} />,
+        onClick: () => handleOpenVoiceModal(cid),
+      },
       { key: 'div', type: 'divider' as const },
       {
         key: 'remove',
@@ -161,7 +186,7 @@ export default function GroupChatMemberBar({ chatId }: GroupChatMemberBarProps) 
         danger: true,
       },
     ]
-  }, [contextMenu, contextIsMuted, isStreaming, handleForceGenerateFromMenu, handleToggleMute, handleRemoveMember])
+  }, [contextMenu, contextIsMuted, isStreaming, overrideIds, handleForceGenerateFromMenu, handleToggleMute, handleOpenVoiceModal, handleRemoveMember])
 
   return (
     <div className={styles.barWrapper}>
@@ -177,6 +202,7 @@ export default function GroupChatMemberBar({ chatId }: GroupChatMemberBarProps) 
             isActive={id === activeGroupCharacterId}
             isMuted={mutedCharacterIds.includes(id)}
             isStreaming={isStreaming}
+            hasVoiceOverride={overrideIds.has(id)}
             onForceGenerate={handleForceGenerate}
             onOpenContextMenu={openContextMenu}
           />
@@ -208,11 +234,12 @@ interface MemberButtonProps {
   isActive: boolean
   isMuted: boolean
   isStreaming: boolean
+  hasVoiceOverride: boolean
   onForceGenerate: (id: string) => void
   onOpenContextMenu: (id: string, pos: ContextMenuPos) => void
 }
 
-function MemberButton({ id, characters, isActive, isMuted, isStreaming, onForceGenerate, onOpenContextMenu }: MemberButtonProps) {
+function MemberButton({ id, characters, isActive, isMuted, isStreaming, hasVoiceOverride, onForceGenerate, onOpenContextMenu }: MemberButtonProps) {
   const char = characters.find((c: any) => c.id === id)
   const talk = char?.talkativeness ?? 0.5
   const avatarUrl = getCharacterAvatarThumbUrl(char)
@@ -250,6 +277,11 @@ function MemberButton({ id, characters, isActive, isMuted, isStreaming, onForceG
       )}
       <span className={styles.name}>{char?.name || 'Unknown'}</span>
       {isMuted && <span className={styles.mutedBadge} />}
+      {hasVoiceOverride && (
+        <span className={styles.voiceBadge} aria-hidden="true" title="Custom voice for this chat">
+          <AudioLines size={9} strokeWidth={2.5} />
+        </span>
+      )}
     </button>
   )
 }

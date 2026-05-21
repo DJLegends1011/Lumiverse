@@ -45,6 +45,82 @@ function getGroupMemberKey(metadata: Record<string, any>): string | null {
   return ids.length > 0 ? [...ids].sort().join("\0") : null;
 }
 
+/**
+ * Shape-check for a VoiceRef as stored in metadata or extensions. Returns
+ * the parsed VoiceRef or null. Used by the metadata patch validator and
+ * exported for any future server-side TTS resolution.
+ */
+export interface VoiceRef {
+  connectionId: string;
+  voice: string;
+  parameters?: { speed?: number };
+}
+
+function parseVoiceRef(value: unknown): VoiceRef | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.connectionId !== "string" || !v.connectionId) return null;
+  const voice = typeof v.voice === "string" ? v.voice : "";
+  let parameters: VoiceRef["parameters"];
+  if (v.parameters && typeof v.parameters === "object") {
+    const p = v.parameters as Record<string, unknown>;
+    const speed = typeof p.speed === "number" && Number.isFinite(p.speed) ? p.speed : undefined;
+    parameters = speed !== undefined ? { speed } : undefined;
+  }
+  return { connectionId: v.connectionId, voice, parameters };
+}
+
+/**
+ * Sanitize a `voiceOverrides` payload, dropping malformed entries. Returns
+ * undefined when the result would be empty so callers can elide the key.
+ */
+export function sanitizeVoiceOverrides(
+  raw: unknown,
+): { narrator?: VoiceRef; characters?: Record<string, VoiceRef> } | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const r = raw as Record<string, unknown>;
+  const out: { narrator?: VoiceRef; characters?: Record<string, VoiceRef> } = {};
+  const narrator = parseVoiceRef(r.narrator);
+  if (narrator) out.narrator = narrator;
+  if (r.characters && typeof r.characters === "object" && !Array.isArray(r.characters)) {
+    const chars: Record<string, VoiceRef> = {};
+    for (const [id, ref] of Object.entries(r.characters as Record<string, unknown>)) {
+      const parsed = parseVoiceRef(ref);
+      if (parsed && typeof id === "string" && id) chars[id] = parsed;
+    }
+    if (Object.keys(chars).length > 0) out.characters = chars;
+  }
+  if (!out.narrator && !out.characters) return undefined;
+  return out;
+}
+
+/**
+ * Look up the per-chat narrator-voice override (if any). Backend resolver
+ * hook — unused by current pipelines because TTS resolution is client-side,
+ * but exposed for future server-side audio rendering.
+ */
+export function getNarratorVoiceOverride(
+  metadata: Record<string, any>,
+): VoiceRef | null {
+  const overrides = metadata?.voiceOverrides;
+  if (!overrides || typeof overrides !== "object") return null;
+  return parseVoiceRef((overrides as any).narrator);
+}
+
+/**
+ * Look up the per-chat voice override for a specific character (if any).
+ */
+export function getCharacterVoiceOverride(
+  metadata: Record<string, any>,
+  characterId: string,
+): VoiceRef | null {
+  const overrides = metadata?.voiceOverrides;
+  if (!overrides || typeof overrides !== "object") return null;
+  const chars = (overrides as any).characters;
+  if (!chars || typeof chars !== "object") return null;
+  return parseVoiceRef(chars[characterId]);
+}
+
 function isSqliteCorruptionError(err: any): boolean {
   return err?.errno === 11
     || (typeof err?.code === "string" && err.code.startsWith("SQLITE_CORRUPT"))

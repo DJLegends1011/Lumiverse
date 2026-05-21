@@ -11,6 +11,7 @@ import DryRunModal from './DryRunModal'
 import PromptItemizerModal from './PromptItemizerModal'
 import GroupChatCreatorModal from './GroupChatCreatorModal'
 import AddGroupMemberModal from '@/components/chat/AddGroupMemberModal'
+import MemberVoiceModal from './MemberVoiceModal'
 import ManageChatsModal from './ManageChatsModal'
 import ChatPickerModal from './ChatPickerModal'
 import MemoryCortexDiagnosticsModal from './MemoryCortexDiagnosticsModal'
@@ -88,6 +89,7 @@ export default function ModalContainer() {
       {activeModal === 'promptItemizer' && <PromptItemizerModal />}
       {activeModal === 'groupChatCreator' && <GroupChatCreatorModal />}
       {activeModal === 'addGroupMember' && modalProps.chatId && <AddGroupMemberModal />}
+      {activeModal === 'memberVoice' && modalProps.chatId && modalProps.characterId && <MemberVoiceModal />}
       {activeModal === 'manageChats' && <ManageChatsModal />}
       {activeModal === 'chatPicker' && modalProps.characterId && modalProps.characterName && (
         <ChatPickerModal

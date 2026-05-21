@@ -183,7 +183,7 @@ export default function BubbleMessageDefault({
   const { handleSwipe } = useSwipeAction(message, chatId)
   const onSwipeLeft = useCallback(() => handleSwipe('left'), [handleSwipe])
   const onSwipeRight = useCallback(() => handleSwipe('right'), [handleSwipe])
-  const { canPlay, isPlaying, toggle: togglePlayback } = useMessagePlayback(message.id, message.content)
+  const { canPlay, isPlaying, toggle: togglePlayback } = useMessagePlayback(message.id, message.content, message.name, message.is_user)
   const canOpenContextMenu = !isEditing && !isSelectMode && messageContextMenuEnabled
 
   const closeContextMenu = useCallback(() => setContextMenuPos(null), [])

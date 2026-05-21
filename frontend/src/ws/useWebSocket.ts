@@ -452,7 +452,23 @@ export function useWebSocket() {
             }
 
             if (payload.messageId && typeof payload.content === 'string') {
-              triggerTTSAutoPlay(payload.messageId, payload.content)
+              // Resolve speaker name for voice routing: in group chats the
+              // active group character is who just spoke; in single-char
+              // chats it's the chat's owning character. AI generation is
+              // always is_user=false.
+              const characters = state.characters
+              const speakerId = state.isGroupChat
+                ? state.activeGroupCharacterId
+                : state.activeCharacterId
+              const speakerName = speakerId
+                ? (characters.find((c) => c.id === speakerId)?.name ?? '')
+                : ''
+              triggerTTSAutoPlay({
+                messageId: payload.messageId,
+                content: payload.content,
+                name: speakerName,
+                isUser: false,
+              })
             }
 
             // Impersonate draft: stash the streamed content for the input box

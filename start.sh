@@ -406,14 +406,48 @@ ensure_bun() {
 # ─── Bun channel upgrade (optional) ─────────────────────────────────────────
 # Honors --upgrade-bun / --upgrade-bun-canary. Runs after ensure_bun so the
 # binary exists; `bun upgrade [--canary|--stable]` swaps the binary in-place
-# at $BUN_INSTALL/bin/bun. On Termux we route through _bun so the
-# grun/proot wrapper is preserved.
+# at $BUN_INSTALL/bin/bun. On native Termux we cannot use `bun upgrade` —
+# Bun's built-in updater probes for `ld` and aborts ("unsupported on systems
+# without ld") because Termux uses bionic, not glibc. Instead we rebuild the
+# bun-termux wrapper, which is the source of truth for Bun on Termux.
 upgrade_bun_if_requested() {
   [[ -z "$BUN_UPGRADE_CHANNEL" ]] && return 0
 
   local before
   before="$(_bun --version 2>/dev/null || echo unknown)"
 
+  # ── Native Termux path ────────────────────────────────────────────────────
+  # proot-distro (IS_PROOT) is a real glibc env, so it falls through to the
+  # standard `bun upgrade` path below.
+  if [[ "$IS_TERMUX" == true ]]; then
+    if [[ "$BUN_UPGRADE_CHANNEL" == "canary" ]]; then
+      warn "Bun canary builds are not supported on native Termux — the bun-termux"
+      warn "wrapper only packages stable releases. Skipping upgrade; continuing"
+      warn "with the existing $before binary."
+      warn "If you specifically need canary, run inside a proot-distro Linux instead."
+      return 0
+    fi
+
+    info "Updating bun-termux wrapper (current Bun: $before)..."
+    if [[ ! -d "$HOME/.bun-termux" ]]; then
+      warn "bun-termux directory not found at \$HOME/.bun-termux."
+      warn "  Reinstall it: rm -rf \$HOME/.bun-termux && ./start.sh"
+      warn "Continuing with the existing $before binary."
+      return 0
+    fi
+
+    if ! (cd "$HOME/.bun-termux" && git pull && make && make install); then
+      err "bun-termux rebuild failed. Continuing with the existing $before binary."
+      return 0
+    fi
+
+    local after
+    after="$(_bun --version 2>/dev/null || echo unknown)"
+    ok "Bun upgraded via bun-termux: $before -> $after"
+    return 0
+  fi
+
+  # ── Standard path (macOS, Linux, proot-distro, WSL, etc.) ─────────────────
   if [[ "$BUN_UPGRADE_CHANNEL" == "canary" ]]; then
     info "Upgrading Bun to latest canary (current: $before)..."
     if ! _bun upgrade --canary; then

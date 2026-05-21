@@ -26,6 +26,9 @@ import type { WallpaperRef } from '@/types/store'
 import { toast } from '@/lib/toast'
 import { Button } from '@/components/shared/FormComponents'
 import SearchableSelect from '@/components/shared/SearchableSelect'
+import VoicePicker from '@/components/shared/VoicePicker'
+import { ttsConnectionsApi } from '@/api/tts-connections'
+import type { VoiceRef } from '@/types/api'
 import { filterWorldBooksForChatContextAttachment } from '@/lib/worldBookIndexPrompt'
 import styles from './CharacterEditorPage.module.css'
 import clsx from 'clsx'
@@ -47,7 +50,7 @@ import {
 
 const DEBOUNCE_MS = 2000
 
-type TabId = 'core' | 'system' | 'greetings' | 'identity' | 'gallery' | 'expressions' | 'advanced'
+type TabId = 'core' | 'system' | 'greetings' | 'identity' | 'gallery' | 'expressions' | 'voice' | 'advanced'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'core', label: 'Core Prompts' },
@@ -56,6 +59,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'identity', label: 'Identity' },
   { id: 'gallery', label: 'Gallery' },
   { id: 'expressions', label: 'Expressions' },
+  { id: 'voice', label: 'Voice' },
   { id: 'advanced', label: 'Advanced' },
 ]
 
@@ -1210,6 +1214,20 @@ export default function CharacterEditorPage() {
                     <ExpressionEditorTab characterId={character.id} />
                   )}
 
+                  {activeTab === 'voice' && (
+                    <CharacterVoiceTab
+                      value={readVoiceRef(workingExtensions.ttsVoice)}
+                      onChange={(next) => {
+                        mutateExtensions((ext) => {
+                          const out = { ...ext }
+                          if (next) out.ttsVoice = next
+                          else delete out.ttsVoice
+                          return out
+                        }, true)
+                      }}
+                    />
+                  )}
+
                   {activeTab === 'advanced' && (
                     <>
                       <div className={styles.fieldGroup}>
@@ -1432,6 +1450,82 @@ function Field({
           onChange={(e) => onChange(e.target.value)}
           placeholder={`${label}...`}
         />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Parse a free-form extensions blob into a VoiceRef. Returns null when the
+ * shape doesn't match — `extensions` is untyped JSON so we trust nothing.
+ */
+function readVoiceRef(value: unknown): VoiceRef | null {
+  if (!value || typeof value !== 'object') return null
+  const v = value as Record<string, unknown>
+  if (typeof v.connectionId !== 'string' || !v.connectionId) return null
+  const voice = typeof v.voice === 'string' ? v.voice : ''
+  const parameters =
+    v.parameters && typeof v.parameters === 'object'
+      ? { speed: typeof (v.parameters as any).speed === 'number' ? (v.parameters as any).speed : undefined }
+      : undefined
+  return { connectionId: v.connectionId, voice, parameters }
+}
+
+/**
+ * Character editor "Voice" tab. Owns the per-character default voice stored
+ * at `character.extensions.ttsVoice`. The picker lazy-loads the TTS profile
+ * list on mount so users who arrive here without having visited the global
+ * Voice settings still see their connections.
+ */
+function CharacterVoiceTab({
+  value,
+  onChange,
+}: {
+  value: VoiceRef | null
+  onChange: (next: VoiceRef | null) => void
+}) {
+  const ttsProfiles = useStore((s) => s.ttsProfiles)
+  const setTtsProfiles = useStore((s) => s.setTtsProfiles)
+  const setTtsProviders = useStore((s) => s.setTtsProviders)
+  const openDrawer = useStore((s) => s.openDrawer)
+
+  useEffect(() => {
+    if (ttsProfiles.length === 0) {
+      ttsConnectionsApi.list().then((res) => setTtsProfiles(res.data || [])).catch(() => {})
+    }
+    ttsConnectionsApi.providers().then((res) => setTtsProviders(res.providers || [])).catch(() => {})
+  }, [ttsProfiles.length, setTtsProfiles, setTtsProviders])
+
+  return (
+    <div className={styles.fieldGroup}>
+      <span className={styles.fieldLabel}>Character Voice</span>
+      <span className={styles.fieldHelper}>
+        Default voice used when this character speaks. Falls back to the global voice when unset.
+        Group chats can override this per chat.
+      </span>
+
+      {ttsProfiles.length === 0 ? (
+        <div className={styles.fieldHelper} style={{ marginTop: 8 }}>
+          No TTS connections configured.{' '}
+          <button
+            type="button"
+            onClick={() => openDrawer?.('connections')}
+            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent, #6aa3ff)', cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Add one in Connections
+          </button>
+          .
+        </div>
+      ) : (
+        <div style={{ marginTop: 8 }}>
+          <VoicePicker
+            value={value}
+            onChange={onChange}
+            ariaLabel="Character voice"
+            clearLabel="Use global default"
+            portal
+          />
+        </div>
       )}
     </div>
   )

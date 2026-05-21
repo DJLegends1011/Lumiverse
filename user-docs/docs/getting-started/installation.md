@@ -111,6 +111,12 @@ The start scripts accept flags to control behavior:
     | `--upgrade-bun` | Upgrade Bun to the latest stable release, then continue |
     | `--upgrade-bun-canary` | Upgrade Bun to the latest canary build, then continue |
 
+    !!! note "Termux behavior"
+        Bun's built-in `bun upgrade` command does not work on native Termux — it aborts with `'bun upgrade' is unsupported on systems without ld` because Termux uses Android's bionic libc, not glibc. On Termux:
+
+        * `--upgrade-bun` rebuilds the [`bun-termux`](https://github.com/Happ1ness-dev/bun-termux) wrapper at `$HOME/.bun-termux` (`git pull && make && make install`), which is the actual source of Bun on Termux.
+        * `--upgrade-bun-canary` is **not supported** — bun-termux only packages stable releases. The start script will skip the upgrade and continue with the existing binary. If you specifically need canary, run Lumiverse inside a [proot-distro Linux](https://github.com/termux/proot-distro) environment, where standard `bun upgrade --canary` works normally.
+
 === "Windows (`start.ps1`)"
 
     | Flag | Description |
@@ -185,6 +191,39 @@ If you want to build the image locally:
 ```bash
 docker-compose -f docker-compose.build.yml up -d
 ```
+
+#### Forcing a fresh frontend bundle
+
+The build pipeline uses Docker's layer cache, so if Docker doesn't see a meaningful change in the frontend inputs it will reuse the previously baked Vite bundle. This is normally what you want — but if you're tracking the `staging` branch (or anywhere else fast-moving), you may want to guarantee the bundle was rebuilt from your current checkout before it gets packaged into the image.
+
+The build accepts a `FRONTEND_REFRESH` build arg that cache-busts the Vite build layer without invalidating apt, the CA refresh, or backend dependencies:
+
+=== "macOS / Linux"
+
+    ```bash
+    FRONTEND_REFRESH=$(date -u +%s) docker compose -f docker-compose.build.yml build
+    docker compose -f docker-compose.build.yml up -d
+    ```
+
+=== "Windows (PowerShell)"
+
+    ```powershell
+    $env:FRONTEND_REFRESH = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    docker compose -f docker-compose.build.yml build
+    docker compose -f docker-compose.build.yml up -d
+    ```
+
+Any value different from the last build will do — the timestamp examples above are just an easy way to guarantee uniqueness.
+
+!!! tip "Staging users"
+    `staging` ships frontend changes more frequently than `main`. If you build the image right after a `git pull` and don't see your latest UI work in the running container, run the `FRONTEND_REFRESH` invocation above to force the Vite stage to rerun. A sibling `CA_REFRESH` arg works the same way for the CA trust store — useful if you hit "unable to verify the first certificate" errors talking to providers:
+
+    ```bash
+    CA_REFRESH=$(date -u +%G-W%V) FRONTEND_REFRESH=$(date -u +%s) \
+      docker compose -f docker-compose.build.yml build
+    ```
+
+If you'd rather throw away the cache entirely (slower, but belt-and-braces), pass `--no-cache` to `docker compose build` instead.
 
 ### Docker Environment Variables
 
@@ -355,7 +394,7 @@ If you launched Lumiverse with one of the start scripts, the runner is attached 
 The `--build` / `-Build` flag rebuilds the frontend before launching — important when switching branches because the precompiled assets differ.
 
 !!! warning "Docker users"
-    The Operator Panel's branch switch and the `git checkout` flow both assume Lumiverse is running from a git checkout. If you're using the pre-built Docker image (`ghcr.io/prolix-oc/lumiverse:latest`), there is no working tree to switch — you'd need to either rebuild from source against the `staging` branch (`docker-compose -f docker-compose.build.yml up -d` after `git checkout staging`) or wait for the next image tag.
+    The Operator Panel's branch switch and the `git checkout` flow both assume Lumiverse is running from a git checkout. If you're using the pre-built Docker image (`ghcr.io/prolix-oc/lumiverse:latest`), there is no working tree to switch — you'd need to either rebuild from source against the `staging` branch (`docker-compose -f docker-compose.build.yml up -d` after `git checkout staging`) or wait for the next image tag. When rebuilding to follow `staging`, pass `FRONTEND_REFRESH=$(date -u +%s)` so the Vite bundle is regenerated from your fresh checkout — see [Forcing a fresh frontend bundle](#forcing-a-fresh-frontend-bundle).
 
 !!! tip "Roll back to main if staging breaks"
     Staging can occasionally ship a regression. Switching back to `main` from the Operator Panel (or `git checkout main && ./start.sh --build`) returns you to the last stable release without touching your `data/` folder.
