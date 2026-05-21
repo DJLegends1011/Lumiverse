@@ -10,6 +10,7 @@ import {
   createInputBarActionHandle,
   destroyAllPlacementsForExtension,
 } from './placement-helper'
+import { createComponentsHelper, destroyAllComponentsForExtension } from './components-helper'
 import { generateUUID } from '@/lib/uuid'
 import { installSpindleNavigationGuards } from './navigation-guards'
 import { createUIEventsHelper, type FrontendUIEventsHelper } from './ui-events-helper'
@@ -471,6 +472,7 @@ async function doLoadFrontendExtension(
           })
         },
       },
+      components: createComponentsHelper(extensionId),
       uploads: {
         async pickFile(options) {
           const input = document.createElement('input')
@@ -746,6 +748,7 @@ export async function unloadFrontendExtension(extensionId: string): Promise<void
   loaded.processHandlers.clear()
   unregisterTagInterceptorsByExtension(extensionId)
   removeMessageWidgetsByExtension(extensionId)
+  destroyAllComponentsForExtension(extensionId)
   destroyAllPlacementsForExtension(extensionId)
   loadedExtensions.delete(extensionId)
 

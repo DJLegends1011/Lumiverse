@@ -72,6 +72,7 @@ nav = [
     { "UI Event Helpers" = "frontend-api/ui-events-helper.md" },
     { "Events" = "frontend-api/events.md" },
     { "UI Placement" = "frontend-api/ui-placement.md" },
+    { "Shared Components" = "frontend-api/shared-components.md" },
     { "Backend Communication" = "frontend-api/backend-communication.md" },
     { "Frontend Process Lifecycle" = "frontend-api/processes.md" },
     { "Message Tags" = "frontend-api/message-tags.md" },
