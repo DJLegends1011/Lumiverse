@@ -249,9 +249,12 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
         lumiaOOCStyle,
       ].join(':')
 
+      // Below key must stay content-independent as folding content into the key remounts the row every streamed token and thrashes the virtualizer.
+      const key = ['message', message.id, message.swipe_id, displayMode].join(':')
+
       items.push({
         type: 'message',
-        key: measureKey,
+        key,
         measureKey,
         message,
         messageIndex: index,
@@ -485,7 +488,11 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
 
   useLayoutEffect(() => {
     rowVirtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item) => {
-      const scrollOffset = rowVirtualizer.scrollOffset ?? scrollRef.current?.scrollTop ?? 0
+      const el = scrollRef.current
+      if (el && el.scrollHeight - el.scrollTop - el.clientHeight > SCROLLED_UP_EPSILON) {
+        return false
+      }
+      const scrollOffset = rowVirtualizer.scrollOffset ?? el?.scrollTop ?? 0
       return item.end < scrollOffset
     }
 
@@ -499,9 +506,90 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
   // Gate that keeps the keyboard/safe-zone repin from fighting the unified
   // scroll guard while streaming is active.
   const isStreamingRef = useRef(isStreaming)
-  useEffect(() => {
-    isStreamingRef.current = isStreaming
-  }, [isStreaming])
+  const streamEndSettleUntilRef = useRef(0)
+  const reflowAnchorRef = useRef<{ el: HTMLElement; top: number } | null>(null)
+  const settleRafRef = useRef(0)
+  const STREAM_END_SETTLE_MS = 1200
+  const SCROLLED_UP_EPSILON = 24
+
+  const captureReflowAnchor = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) {
+      reflowAnchorRef.current = null
+      return
+    }
+    const sRect = el.getBoundingClientRect()
+    // Skip images/islands/widgets as they are the reflow, so they make a useless anchor.
+    const blocks = el.querySelectorAll<HTMLElement>(
+      '[data-virtual-index] :is(p,li,blockquote,h1,h2,h3,h4,h5,h6,pre)',
+    )
+    let anchor: HTMLElement | null = null
+    for (const b of blocks) {
+      if (b.closest('img,svg,video,canvas,iframe,[data-spindle-mount],[class*="_htmlIsland_"],[class*="_inlineImage_"]')) continue
+      if (b.querySelector('img,svg,video,canvas,iframe')) continue
+      if (!b.textContent?.trim()) continue
+      const r = b.getBoundingClientRect()
+      if (r.height < 8) continue
+      if (r.top >= sRect.top - 2 && r.top < sRect.bottom) {
+        anchor = b
+        break
+      }
+    }
+    reflowAnchorRef.current = anchor
+      ? { el: anchor, top: anchor.getBoundingClientRect().top }
+      : null
+  }, [])
+
+  const restoreReflowAnchor = useCallback(() => {
+    const anchor = reflowAnchorRef.current
+    const el = scrollRef.current
+    if (!anchor || !el || !anchor.el.isConnected) return
+    const delta = (anchor.el.getBoundingClientRect().top - anchor.top) / getUiScale()
+    if (Math.abs(delta) < 1) return
+    isProgrammaticScrollRef.current = true
+    el.scrollTop += delta
+    lastScrollTopRef.current = el.scrollTop
+    lastScrollHeightRef.current = el.scrollHeight
+  }, [])
+
+  // A one-shot correction misses the progressive reflow (deferred render,
+  // async image loads) and leaves a visible bounce.
+  const runSettleLoop = useCallback(() => {
+    if (settleRafRef.current) cancelAnimationFrame(settleRafRef.current)
+    const tick = () => {
+      if (performance.now() >= streamEndSettleUntilRef.current || !reflowAnchorRef.current) {
+        settleRafRef.current = 0
+        return
+      }
+      restoreReflowAnchor()
+      settleRafRef.current = requestAnimationFrame(tick)
+    }
+    settleRafRef.current = requestAnimationFrame(tick)
+  }, [restoreReflowAnchor])
+
+  useEffect(() => () => {
+    if (settleRafRef.current) cancelAnimationFrame(settleRafRef.current)
+  }, [])
+
+  const pinToBottomIfNeeded = useCallback((el: HTMLElement) => {
+    const target = el.scrollHeight - el.clientHeight
+    if (Math.abs(el.scrollTop - target) <= 1) return
+    isProgrammaticScrollRef.current = true
+    el.scrollTop = target
+  }, [])
+
+  if (isStreamingRef.current && !isStreaming) {
+    const el = scrollRef.current
+    const distFromBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight : 0
+    if (el && distFromBottom > SCROLLED_UP_EPSILON) {
+      streamEndSettleUntilRef.current = performance.now() + STREAM_END_SETTLE_MS
+      captureReflowAnchor()
+      runSettleLoop()
+    } else {
+      streamEndSettleUntilRef.current = 0
+    }
+  }
+  isStreamingRef.current = isStreaming
 
   const scrollToHistoryBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const el = scrollRef.current
@@ -524,8 +612,6 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
   const BOTTOM_REPIN_EPSILON = 6
 
   const recoverTailVoid = useCallback(() => {
-    // If user deliberately scrolled up, the streaming height-lock 
-    // releasing at stream end must not snap them down.
     if (!isPinnedRef.current) return false
 
     const el = scrollRef.current
@@ -580,6 +666,11 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
     if (isProgrammaticScrollRef.current) {
       isProgrammaticScrollRef.current = false
       return
+    }
+
+    if (streamEndSettleUntilRef.current !== 0) {
+      streamEndSettleUntilRef.current = 0
+      reflowAnchorRef.current = null
     }
 
     if (prependVisualOffsetRef.current > 0 && deltaTop < 0) {
@@ -728,8 +819,7 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
       // so streaming tokens (or any other bottom growth) don't push content
       // up the screen.
       if (isPinnedRef.current) {
-        isProgrammaticScrollRef.current = true
-        latest.scrollTop = latest.scrollHeight - latest.clientHeight
+        pinToBottomIfNeeded(latest)
       }
     }
 
@@ -744,7 +834,7 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
       mo.disconnect()
       if (pendingRaf) cancelAnimationFrame(pendingRaf)
     }
-  }, [isCoarsePointer, recoverTailVoid, rowVirtualizer])
+  }, [isCoarsePointer, pinToBottomIfNeeded, recoverTailVoid, rowVirtualizer])
 
   // Re-pin to bottom when the input safe-zone changes — keyboard opening on
   // mobile/iOS PWA grows --lcs-input-safe-zone. Without this, the last
@@ -765,8 +855,7 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
       if (!isPinnedRef.current) return
       const latest = scrollRef.current
       if (!latest) return
-      isProgrammaticScrollRef.current = true
-      latest.scrollTop = latest.scrollHeight - latest.clientHeight
+      pinToBottomIfNeeded(latest)
     }
 
     // iOS keyboard animation (~250-350ms) fires multiple visualViewport
@@ -796,7 +885,7 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
       vv?.removeEventListener('scroll', repinIfAnchored)
       clearSettleTimers()
     }
-  }, [])
+  }, [pinToBottomIfNeeded])
 
   // Scroll to bottom on chat change — always pin when switching chats
   useEffect(() => {
@@ -839,8 +928,7 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
 
         const latest = scrollRef.current
         if (!latest || !isPinnedRef.current) return
-        isProgrammaticScrollRef.current = true
-        latest.scrollTop = latest.scrollHeight - latest.clientHeight
+        pinToBottomIfNeeded(latest)
         lastScrollTopRef.current = latest.scrollTop
         lastScrollHeightRef.current = latest.scrollHeight
       })
@@ -852,7 +940,7 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
       if (pendingRaf) cancelAnimationFrame(pendingRaf)
       if (settleRaf) cancelAnimationFrame(settleRaf)
     }
-  }, [measureMountedRows, recoverTailVoid])
+  }, [pinToBottomIfNeeded, measureMountedRows, recoverTailVoid])
 
   return (
     <div
