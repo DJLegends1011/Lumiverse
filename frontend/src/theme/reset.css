@@ -27,7 +27,16 @@
 
 html {
   height: 100%;
-  overflow: hidden;
+  /* `overflow: clip` (vs `hidden`) is strictly non-scrollable — it cannot be
+     scrolled programmatically, by keyboard (PgUp/PgDn), wheel, or touch. The
+     ViewportDrawer wrapper is position:fixed and uses transform:translateX to
+     slide off-screen when closed, which leaves its bounding rect extending
+     past the right edge of the viewport. With `overflow: hidden`, Chromium's
+     "alternate axis" wheel/keyboard heuristic could redirect vertical scroll
+     attempts inside textareas (chat input, character description, greetings,
+     etc.) into a horizontal scrollLeft on body, making the whole UI slide
+     sideways. `clip` shuts that path down entirely. */
+  overflow: clip;
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
   /* Let the browser choose optimal font rendering. On macOS Big Sur+,
@@ -39,7 +48,7 @@ html {
 }
 
 body {
-  overflow: hidden;
+  overflow: clip;
   overscroll-behavior: none;
   font-family: var(--lumiverse-font-family);
   font-size: calc(14px * var(--lumiverse-font-scale, 1));
