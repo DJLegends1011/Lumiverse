@@ -2929,6 +2929,35 @@ const spindleApi: RuntimeSpindleAPI = {
     },
   },
 
+  webSearch: {
+    async query(input: {
+      query: string;
+      count?: number;
+      scrape?: boolean;
+      userId?: string;
+    }): Promise<import("lumiverse-spindle-types").WebSearchResponseDTO> {
+      const requestId = crypto.randomUUID();
+      const result = await request({
+        type: "web_search_query",
+        requestId,
+        query: input.query,
+        count: input.count,
+        scrape: input.scrape,
+        userId: input.userId,
+      } as any);
+      return result as import("lumiverse-spindle-types").WebSearchResponseDTO;
+    },
+    async getSettings(userId?: string): Promise<import("lumiverse-spindle-types").WebSearchSettingsDTO> {
+      const requestId = crypto.randomUUID();
+      const result = await request({
+        type: "web_search_get_settings",
+        requestId,
+        userId,
+      } as any);
+      return result as import("lumiverse-spindle-types").WebSearchSettingsDTO;
+    },
+  },
+
   textEditor: {
     async open(options?: {
       title?: string;

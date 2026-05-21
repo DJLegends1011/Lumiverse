@@ -43,6 +43,7 @@ nav = [
     { "Author's Note" = "chatting/authors-note.md" },
     { "Attachments" = "chatting/attachments.md" },
     { "Speech-to-Text" = "chatting/speech-to-text.md" },
+    { "Text-to-Speech" = "chatting/text-to-speech.md" },
     { "OOC Comments" = "chatting/ooc.md" },
     { "Loom Summary" = "chatting/loom-summary.md" },
     { "Long-Term Memory" = "chatting/memory.md" },
@@ -92,6 +93,8 @@ nav = [
   { "Image Generation" = [
     { "Overview" = "image-generation/index.md" },
     { "Setup & Providers" = "image-generation/setup.md" },
+    { "Prompts & Presets" = "image-generation/prompts-and-presets.md" },
+    { "Scene, Output & Timeouts" = "image-generation/scene-and-output.md" },
   ] },
   { "Customization" = [
     { "Themes" = "customization/themes.md" },
@@ -102,9 +105,16 @@ nav = [
   ] },
   { "Settings" = [
     { "Embeddings" = "settings/embeddings.md" },
+    { "Web Search" = "settings/web-search.md" },
     { "Push Notifications" = "settings/push-notifications.md" },
     { "LumiHub" = "settings/lumihub.md" },
     { "Users & Auth" = "settings/users.md" },
+  ] },
+  { "Data Portability" = [
+    { "Overview" = "data-portability/index.md" },
+    { "Exporting Your Data" = "data-portability/exporting.md" },
+    { "Importing an Archive" = "data-portability/importing.md" },
+    { "API Keys & Tickets" = "data-portability/api-keys-and-tickets.md" },
   ] },
   { "Extensions" = [
     { "Overview" = "extensions/index.md" },

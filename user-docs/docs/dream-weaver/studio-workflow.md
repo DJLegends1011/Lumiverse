@@ -1,53 +1,38 @@
 # Studio Workflow
 
-The Dream Weaver Studio is where you turn an idea into a card. Add direction, run commands, and decide which generated cards become part of the result.
+The Studio is a chat thread. You type slash commands in the composer, tool cards appear in the log with their results, and you decide what to keep with a click.
 
 ---
 
 ## Starting a Weave
 
-1. Open the **Dream Weaver** panel
-2. Choose **Character** or **Scenario**
-3. Optionally add direction in **Source Material**
-4. Optionally choose persona, connection, model, refinement, or advanced generation settings
-5. Open the Studio
+1. Open the **Dream Weaver** panel.
+2. Choose **Character** or **Scenario** with the header switcher.
+3. Open or create a session — the Studio opens to its empty thread.
+4. Type your source with `/dream …` (or fill the panel's **Source Material** field before opening the Studio). The Dream Summary card appears in the log.
+5. Run tools (`/name`, `/appearance`, …) or hit **Run Full Suite** to generate the core set in one go.
 
-If you enter source before opening the Studio, Dream Weaver adds it automatically. If you open a blank Studio, add direction with `/dream` before running generation commands.
+If the log is empty, the Studio shows a short onboarding prompt: _"Describe your concept. Type /dream followed by a few sentences about your character — their personality, look, or role."_
 
-!!! warning "Source is required for generation"
-    The source field is optional before opening the Studio, but generation commands still need source. Use `/dream your source text` before running `/name`, `/appearance`, `/personality`, `/scenario`, `/voice`, `/first_message`, `/greeting`, `/add_lorebook`, or `/add_npc`.
+!!! warning "Tools need source first"
+    Every generation tool except `/help` and `/dream` is blocked until a Dream Summary exists. Add one with `/dream …` before running anything else.
 
-!!! tip "Good source"
-    Include the premise, mood, relationship to `{{user}}`, genre, constraints, and anything you do not want.
-
-!!! note "Character or scenario"
-    Dream Weaver does not detect this from your source text. Use **Character** for one primary character. Use **Scenario** for a narrator, world, location, or setup card.
+!!! tip "Good source pays off"
+    Include the premise, mood, relationship to `{{user}}`, genre, constraints, and anything you don't want. Specific source = specific results. See [Sources & Roadmap](sources-and-roadmap.md).
 
 ---
 
-## Commands
+## The Composer
 
-Type a slash command in the Studio composer. Add instructions after the command when you want to steer the result.
+The chat composer sits at the bottom of the Studio. Type a message and hit Enter to send (Shift+Enter for a new line). The placeholder reads _"/dream describe the setup, or run /name. Shift+Enter for a new line."_
 
-| Command | Use It For | Needs Source |
-|---------|------------|--------------|
-| `/help` | Show available commands | No |
-| `/dream` | Add direction for Dream Weaver to use | No |
-| `/name` | Generate or replace the name/title | Yes |
-| `/appearance` | Generate appearance, setting, or visual presentation | Yes |
-| `/personality` | Generate behavior, rules, habits, or contradictions | Yes |
-| `/scenario` | Generate the starting situation | Yes |
-| `/voice` | Generate voice guidance | Yes |
-| `/first_message` | Generate the main opening message | Yes |
-| `/greeting` | Generate an alternate greeting | Yes |
-| `/add_lorebook` | Add one lorebook entry | Yes |
-| `/add_npc` | Add one supporting NPC | Yes |
+### Slash Command Autocomplete
 
-Examples:
+Typing `/` opens a popover with matching tools (up to 6 results), grouped by category (**Soul**, **World**, **Lifecycle**). Each entry shows the command, display name, and a short description. Press **Tab** to complete the highlighted command, or **Enter** to submit it directly.
 
-```text
-/dream A quiet rural inn is built over a sealed shrine. The owner knows more than she admits.
-```
+### Sending a Command With Direction
+
+You can append instruction text after the command. The tool uses it as guidance for that run:
 
 ```text
 /personality make her warmth feel practiced, not natural
@@ -57,34 +42,121 @@ Examples:
 /scenario keep {{user}} as a suspicious guest arriving during a storm
 ```
 
+Direction can also be added _after_ a tool runs by clicking **Adjust** on its tool card (see below).
+
 ---
 
-## Cards
+## Tools
 
-Most generation commands create a card. Review the card before you use it.
+All tools below need source material to be present (added via `/dream`) except `/help` and `/dream` itself.
+
+| Command | Category | Purpose | Mode |
+|---------|----------|---------|------|
+| `/dream` | Lifecycle | Add or edit the dream source for the session. | Append / edit |
+| `/help` | Lifecycle | List every tool with a short description. | — |
+| `/name` | Soul | Generate the character name (or scenario title). | Overwrite |
+| `/appearance` | Soul | Generate appearance, setting, or visual presentation. | Overwrite |
+| `/personality` | Soul | Generate behavioral patterns, habits, contradictions. | Overwrite |
+| `/scenario` | Soul | Generate the current situation and relationship to `{{user}}`. | Overwrite |
+| `/voice` | Soul | Generate voice guidance — baseline, rhythm, diction, quirks, hard nos. | Overwrite |
+| `/first_message` | Soul | Generate the main opening message. | Overwrite |
+| `/greeting` | Soul | Generate an alternate entry-point greeting. | Overwrite |
+| `/add_lorebook` | World | Generate one lorebook entry (keys, comment, content). | Append |
+| `/add_npc` | World | Generate one supporting NPC (name, description, optional voice notes). | Append |
+
+**Overwrite** tools replace the previously accepted result for that field — accepting a new `/name` card swaps the name on the draft. **Append** tools add to a list — every `/add_npc` you accept stacks another NPC on the draft.
+
+---
+
+## Tool Cards
+
+Each generation produces a **tool card** in the chat log. The card header shows the tool icon, display name, intent line (e.g. _"Setting the character's name"_), status badge, execution time, and token usage. While the tool is running, output fields show skeleton loaders.
+
+Once the card reaches **Ready to Review**, the action row appears:
 
 | Action | Result |
 |--------|--------|
-| **Use result** | Adds the card to the workspace |
-| **Discard** | Leaves the card out |
-| **Run again** | Runs the same command again |
-| **Adjust** | Reruns with extra instruction |
-| **Cancel run** | Stops a running card |
+| **Use result** | Accept the output. Adds (or replaces) the matching field on the draft. |
+| **Run again** | Re-run the same command with the same arguments. Produces a new card that supersedes the old one. |
+| **Adjust** | Open the inline **nudge** box and re-run with extra guidance. The old card is marked _Replaced_. |
+| **Discard** | Reject the output. The card stays in the log for reference but the draft is not updated. |
 
-The card header shows status, token usage, and runtime. Open **Run details** when you need the raw tool output.
+You can also **Cancel run** while a card is in progress, and expand **Run details** on any completed card to see the raw structured output.
 
-For fields like name, appearance, personality, scenario, voice, and first message, using a newer card replaces the older accepted card for that field. Lorebook entries and NPCs are added instead of replacing each other.
+### Adjust / Nudge
+
+Clicking **Adjust** drops a small "What should change?" input under the card with a **Run adjusted** button. Use it to retry without retyping the original command:
+
+```text
+make her warmth feel practiced, not natural — keep the height and outfit
+```
+
+Run adjusted produces a new tool card linked to the previous one (with `supersedes_id`). The old card is greyed out and tagged **Replaced**; the new card becomes the latest in the chain.
 
 ---
 
-## Reading the Workspace
+## Run Full Suite
 
-The workspace is the current result. It is built from the cards you have accepted. If something feels wrong, discard the card that caused the problem or run the command again with clearer instructions.
+When the Studio has source material, a banner above the chat log offers **Run Full Suite**. It runs **name → appearance → personality → scenario → first message → voice** in sequence and queues all the tool cards into the log. When the run finishes, the banner shows:
 
-Common adjustments:
+> _N tools ready — review results below, then accept what you like._
 
-| Goal | Example |
-|------|---------|
+You still have to accept each card individually — the suite generates the candidates but doesn't auto-apply them. If any step fails, the banner switches to an error state with a **Retry** button.
+
+Use Run Full Suite when you want a complete first draft to react to. Skip it when you want to iterate on a single field — running `/name` then `/appearance` manually gives you tighter control.
+
+---
+
+## Progress Badges
+
+A horizontal **Character Progress** (or **Scenario Progress**) bar sits above the chat. Each tracked field appears as a chip — Name, Personality, First Message, Scenario, Appearance, Voice — with a checkmark once accepted. Required fields are visually highlighted while they're still missing. The right-hand counter shows the running total (e.g. `4 / 6`).
+
+The bar updates every time you accept a tool card.
+
+---
+
+## Required Fields for Finalize
+
+You can't finalize until three fields are filled:
+
+| Field | Character | Scenario |
+|-------|-----------|----------|
+| **Name / Title** | Character name | Scenario title |
+| **Personality** | Character behavior | Narrator or world behavior |
+| **First Message** | Opening message | Opening narration |
+
+If any of those is missing, the Studio footer reads _"Needs … before finalizing"_ and the **Finalize** button is disabled. Appearance, scenario, voice guidance, lorebook entries, NPCs, alternate greetings, and visuals are all optional — finalize will happily ship a minimal card if that's what you want.
+
+---
+
+## Voice Guidance Editor
+
+The `/voice` tool produces a structured voice profile, edited in the **Voice Guidance** editor (opened from the voice tool card or from the workspace panel). Each rule lives under one of five categories:
+
+| Category | Use it for |
+|----------|------------|
+| **Baseline** | Core vocal characteristics (tone, register, pacing baseline). |
+| **Rhythm** | Speech patterns, pacing variations, pauses. |
+| **Diction** | Word choice, vocabulary level, formality. |
+| **Quirks** | Idiosyncratic speech patterns, verbal tics, signature phrases. |
+| **Hard nos** | Absolute rules to avoid (forbidden words, accents you don't want, etc.). |
+
+Each category is a list of rules — add, remove, or reorder freely. A category badge shows how many rules it contains.
+
+A **Structured / Compiled** toggle at the top of the editor switches between the editable rule view and the read-only compiled string that's actually fed to the model at runtime.
+
+`/voice` populates both halves automatically. Hand-editing the rules afterwards is encouraged when the auto-generated wording doesn't match what you hear in your head.
+
+---
+
+## Workspace Behaviour
+
+The workspace draft is rebuilt from your accepted tool cards on every change. If a tool card is later **discarded** or **superseded** by a newer accepted card, the draft updates accordingly. Nothing is "saved" — the chat log is the source of truth, and the draft is just the latest accepted projection of it.
+
+Common adjustments when something feels off:
+
+| Goal | Example nudge |
+|------|---------------|
 | More grounded | `less dramatic, more everyday` |
 | More specific | `add concrete habits and visual details` |
 | Less polished | `make the wording rougher and more natural` |
@@ -93,46 +165,36 @@ Common adjustments:
 
 ---
 
-## Character Workflow
+## Common Workflows
 
-For a character, a common workflow is:
+### Character
 
-1. Add source with the panel field or `/dream`
-2. Generate `/name`, `/appearance`, and `/personality`
-3. Generate `/scenario` once the character has a clear shape
-4. Generate `/voice` and `/first_message`
-5. Add `/add_lorebook` or `/add_npc` only if the card needs supporting world detail
-6. Use the **Visuals** tab if you want generated visual assets
-7. Finalize when the required fields are filled
+1. `/dream` your concept (or fill **Source Material** before opening).
+2. Hit **Run Full Suite** and let it queue six cards.
+3. Walk down the log: **Use result** for keepers, **Adjust** on anything close-but-wrong, **Run again** if you want a different draft of the same thing.
+4. Add `/add_lorebook` / `/add_npc` if the card needs supporting world detail.
+5. Open the **Visuals** tab to generate a portrait.
+6. **Finalize Character** once Name, Personality, and First Message are checked off.
 
-You can do these in a different order. The main rule is that source must exist before generation commands run.
+### Scenario
 
----
+1. Flip the header switcher to **Scenario**.
+2. `/dream` the premise, setting, tone, and `{{user}}`'s role.
+3. `/name` for the scenario title, `/appearance` for the setting, `/personality` for narrator behavior, `/scenario` and `/first_message` for the opening situation.
+4. Use `/voice` to lock in narrator voice (optional but recommended).
+5. **Finalize Scenario**.
 
-## Scenario Workflow
-
-For a scenario:
-
-1. Set the switcher to **Scenario**
-2. Use `/dream` to describe the premise, setting, tone, and role of `{{user}}`
-3. Use `/name` for the scenario title
-4. Use `/appearance` for the setting and sensory presentation
-5. Use `/personality` for narrator or world behavior
-6. Use `/scenario` and `/first_message` to establish the opening situation
-
-Scenario mode saves through the same card system as normal characters. The difference is how Dream Weaver writes the fields.
+You can mix and match — the only rule is that source must exist before generation tools run.
 
 ---
 
-## Previous Weaves
+## Tips
 
-The panel keeps saved sessions under **Previous Weaves**.
+!!! tip "Nudge before re-running"
+    Pick **Adjust** over **Run again** when the result is _almost_ right. A nudge that mentions what to keep is faster than rerolling from scratch.
 
-Use:
+!!! tip "Use Run Full Suite for first drafts only"
+    The Suite is great for generating six candidates fast. For revisions, run tools individually — you'll get cards that respond to recent context instead of restarting from the source.
 
-1. **All** to see every session
-2. **Drafts** to find unfinished sessions
-3. **Finalized** to find sessions already linked to a generated card
-4. **Search** to filter by source, type, or tone
-
-Finalized sessions can be reopened. If you accept new cards and update, Dream Weaver updates the linked card instead of creating a new one.
+!!! tip "Append tools stack"
+    `/add_npc` and `/add_lorebook` don't replace previous entries. Run them once per NPC or lore beat you want; the draft collects them all.

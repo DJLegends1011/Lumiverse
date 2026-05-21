@@ -14,7 +14,13 @@ export const chatsApi = {
     return get<PaginatedResult<RecentChat>>('/chats/recent', params)
   },
 
-  listRecentGrouped(params?: { limit?: number; offset?: number }) {
+  listRecentGrouped(params?: {
+    limit?: number
+    offset?: number
+    search?: string
+    sort?: 'name' | 'recent' | 'created'
+    direction?: 'asc' | 'desc'
+  }) {
     return get<PaginatedResult<GroupedRecentChat>>('/chats/recent-grouped', params)
   },
 

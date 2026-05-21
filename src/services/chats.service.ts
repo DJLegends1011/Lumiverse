@@ -447,7 +447,19 @@ export function listRecentChats(userId: string, pagination: PaginationParams): P
   );
 }
 
-export function listRecentChatsGrouped(userId: string, pagination: PaginationParams): PaginatedResult<GroupedRecentChat> {
+export type GroupedRecentChatSort = 'name' | 'recent' | 'created';
+
+export interface GroupedRecentChatOptions {
+  search?: string;
+  sort?: GroupedRecentChatSort;
+  direction?: 'asc' | 'desc';
+}
+
+export function listRecentChatsGrouped(
+  userId: string,
+  pagination: PaginationParams,
+  options: GroupedRecentChatOptions = {},
+): PaginatedResult<GroupedRecentChat> {
   const db = getDb();
 
   // Parse metadata in JS so a single malformed row cannot make SQLite abort
@@ -459,6 +471,7 @@ export function listRecentChatsGrouped(userId: string, pagination: PaginationPar
         c.character_id,
         c.name,
         c.metadata,
+        c.created_at,
         c.updated_at,
         ch.name AS character_name,
         ch.avatar_path AS character_avatar_path,
@@ -481,9 +494,11 @@ export function listRecentChatsGrouped(userId: string, pagination: PaginationPar
     return { ...row, metadata, isGroup, groupKey };
   });
 
+  // Dedup on the rows pre-sorted by updated_at DESC so the surviving row
+  // is always the most recent chat per solo character / group member set.
   const seenSoloCharacterIds = new Set<string>();
   const seenGroupKeys = new Set<string>();
-  const groupedRows = parsedRows.filter((row) => {
+  const dedupedRows = parsedRows.filter((row) => {
     if (row.isGroup) {
       if (!row.groupKey) return true;
       if (seenGroupKeys.has(row.groupKey)) return false;
@@ -495,8 +510,34 @@ export function listRecentChatsGrouped(userId: string, pagination: PaginationPar
     return true;
   });
 
+  const displayName = (row: any): string => {
+    if (row.isGroup) return (row.name || row.character_name || '').toString();
+    return (row.character_name || row.name || '').toString();
+  };
+
+  const searchTerm = options.search?.trim().toLowerCase() ?? '';
+  const filteredRows = searchTerm
+    ? dedupedRows.filter((row) => {
+        const chatName = (row.name || '').toLowerCase();
+        const charName = (row.character_name || '').toLowerCase();
+        return chatName.includes(searchTerm) || charName.includes(searchTerm);
+      })
+    : dedupedRows;
+
+  const sort: GroupedRecentChatSort = options.sort ?? 'recent';
+  const direction = options.direction ?? (sort === 'name' ? 'asc' : 'desc');
+  const sign = direction === 'asc' ? 1 : -1;
+  const sortedRows = [...filteredRows].sort((a, b) => {
+    if (sort === 'name') {
+      return sign * displayName(a).localeCompare(displayName(b), undefined, { sensitivity: 'base' });
+    }
+    const aVal = sort === 'created' ? (a.created_at ?? 0) : (a.updated_at ?? 0);
+    const bVal = sort === 'created' ? (b.created_at ?? 0) : (b.updated_at ?? 0);
+    return sign * (aVal - bVal);
+  });
+
   return {
-    data: groupedRows.slice(pagination.offset, pagination.offset + pagination.limit).map((row: any) => {
+    data: sortedRows.slice(pagination.offset, pagination.offset + pagination.limit).map((row: any) => {
       const metadata = row.metadata;
       const isGroup = row.isGroup;
       return {
@@ -515,7 +556,7 @@ export function listRecentChatsGrouped(userId: string, pagination: PaginationPar
         } : {}),
       };
     }),
-    total: groupedRows.length,
+    total: sortedRows.length,
     limit: pagination.limit,
     offset: pagination.offset,
   };

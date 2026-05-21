@@ -6,11 +6,11 @@ Speech-to-Text (STT) lets you dictate a chat message from the input bar instead 
 
 ## Setting Up STT
 
-Open **Settings > Voice > Speech-to-Text** and choose a provider.
+Open **Settings → Voice & Speech → Speech-to-Text** and choose a provider.
 
 | Provider | Best For | Notes |
 |----------|----------|-------|
-| **Web Speech API** | Fast browser-native dictation | Availability depends on your browser. Chrome and Edge usually work best. |
+| **Web Speech API** | Fast browser-native dictation | Availability depends on your browser. Chrome and Edge usually work best. The option is greyed out (with "Unavailable") when your browser doesn't support it. |
 | **STT Connection** | Whisper and OpenAI-compatible transcription models | Requires an STT connection with an API key and transcription model. |
 
 For an STT connection:
@@ -19,10 +19,24 @@ For an STT connection:
 2. Go to **STT Connections**
 3. Click **New STT Connection**
 4. Enter a name, API key, and transcription model such as `gpt-4o-transcribe`, `whisper-1`, or your provider's equivalent
-5. Return to **Settings > Voice** and select that connection
+5. Return to **Settings → Voice & Speech** and select that connection
 
 !!! tip "OpenAI-compatible endpoints"
     STT connections use OpenAI-compatible `/audio/transcriptions` APIs. Leave **API URL** empty for OpenAI, or enter your proxy/self-hosted endpoint if it implements that route.
+
+---
+
+## Voice & Speech Panel Options
+
+The Speech-to-Text section of **Voice & Speech** has several toggles that affect how dictation behaves:
+
+| Setting | What it does |
+|---------|--------------|
+| **Language** | Recognition language. Eleven locales are built in: English (US/UK), Japanese, Mandarin (Simplified), Spanish, French, German, Italian, Brazilian Portuguese, Korean, and Russian. For STT-connection providers, Lumiverse also normalizes the locale to the ISO country code Whisper expects. |
+| **Continuous recognition** | When on, recognition keeps running across silences instead of stopping at the first pause. Useful for long dictation sessions; pair with the **auto-submit** option below if you want hands-free finishing. |
+| **Show interim results** | Displays partial transcriptions in the input bar as you speak. Web Speech only — Whisper-style connections only return the final transcript. |
+| **Auto-submit after silence** | Decides the recording is finished after a sustained pause and either dispatches it (Web Speech) or sends it for transcription (STT connections). See [Auto-Submit After Silence](#auto-submit-after-silence) below. |
+| **Show mic button in input bar** | Toggles the microphone shortcut shown next to the message input. Turn it off if you only use the keyboard. |
 
 ---
 

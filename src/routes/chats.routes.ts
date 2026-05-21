@@ -122,7 +122,18 @@ app.get("/recent", (c) => {
 app.get("/recent-grouped", (c) => {
   const userId = c.get("userId");
   const pagination = parsePagination(c.req.query("limit"), c.req.query("offset"), RECENT_CHATS_DEFAULT_LIMIT);
-  return c.json(svc.listRecentChatsGrouped(userId, pagination));
+  const search = c.req.query("search");
+  const sortParam = c.req.query("sort");
+  const directionParam = c.req.query("direction");
+  const sort: svc.GroupedRecentChatSort | undefined =
+    sortParam === "name" || sortParam === "recent" || sortParam === "created" ? sortParam : undefined;
+  const direction: "asc" | "desc" | undefined =
+    directionParam === "asc" || directionParam === "desc" ? directionParam : undefined;
+  return c.json(svc.listRecentChatsGrouped(userId, pagination, {
+    ...(search ? { search } : {}),
+    ...(sort ? { sort } : {}),
+    ...(direction ? { direction } : {}),
+  }));
 });
 
 app.get("/character-chats/:characterId", (c) => {

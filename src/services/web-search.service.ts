@@ -27,6 +27,11 @@ export interface WebSearchResponse {
   context: string;
 }
 
+export interface WebSearchOptions {
+  /** When false, skip page scraping. `documents` is returned empty and `context` is "". Defaults to true. */
+  scrape?: boolean;
+}
+
 interface SearxngResult {
   title?: string;
   url?: string;
@@ -143,10 +148,11 @@ export async function searchWeb(
   userId: string,
   query: string,
   requestedCount?: number,
+  options?: WebSearchOptions,
 ): Promise<WebSearchResponse> {
   const settings = await getWebSearchSettings(userId);
   const apiKey = await getWebSearchApiKey(userId);
-  return searchWebWithConfig(query, requestedCount, settings, apiKey);
+  return searchWebWithConfig(query, requestedCount, settings, apiKey, options);
 }
 
 export async function searchWebWithConfig(
@@ -154,6 +160,7 @@ export async function searchWebWithConfig(
   requestedCount: number | undefined,
   settings: WebSearchSettings,
   apiKey: string | null,
+  options?: WebSearchOptions,
 ): Promise<WebSearchResponse> {
   const trimmedQuery = query.trim();
   if (!trimmedQuery) {
@@ -166,6 +173,15 @@ export async function searchWebWithConfig(
 
   const count = Math.max(1, Math.min(requestedCount ?? settings.defaultResultCount, settings.maxResultCount));
   const results = await fetchSearxngResults(trimmedQuery, count, settings, apiKey);
+
+  if (options?.scrape === false) {
+    return {
+      query: trimmedQuery,
+      results,
+      documents: [],
+      context: "",
+    };
+  }
 
   const documents: WebSearchDocument[] = [];
   const scrapeCount = Math.min(results.length, settings.maxPagesToScrape);

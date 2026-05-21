@@ -295,6 +295,59 @@ Database migrations run automatically on startup — your data is preserved acro
 
 ---
 
+## Switching Branches
+
+Lumiverse ships two long-lived branches:
+
+| Branch | Cadence | Audience |
+|--------|---------|----------|
+| **`main`** | Tagged releases. Most stable. | Default for everyone. |
+| **`staging`** | Receives merged work earlier than `main`. May ship rough edges or in-progress features. | Users who want a preview of upcoming changes and don't mind the occasional regression. |
+
+You can move between branches at any time. Your `data/` folder is unaffected.
+
+### From the Operator Panel (recommended)
+
+If you're running Lumiverse with the visual terminal runner (the default for the start scripts), you can switch branches without leaving the app:
+
+1. Open **Settings → Operator Panel**.
+2. Look at the **Branch** card — it shows the branch you're on (`main` or `staging`).
+3. Click **Switch to staging** (or **Switch to main** if you're already on staging).
+4. Confirm the prompt. Lumiverse will checkout, pull, reinstall, rebuild the frontend, and restart the server. Your browser will reconnect automatically when the new build is up.
+
+!!! note "Runner IPC must be connected"
+    The button is disabled when the **Runner IPC** badge in the Operator Panel reads _Unavailable_. The runner is what executes the checkout/pull/rebuild on your behalf. If you launched without the runner (`--no-runner` / `-NoRunner`), restart with it enabled or use the git command flow below.
+
+### From the Command Line
+
+=== "macOS / Linux"
+
+    ```bash
+    git fetch origin
+    git checkout staging      # or: git checkout main
+    git pull
+    ./start.sh --build
+    ```
+
+=== "Windows"
+
+    ```powershell
+    git fetch origin
+    git checkout staging      # or: git checkout main
+    git pull
+    .\start.ps1 -Build
+    ```
+
+The `--build` / `-Build` flag rebuilds the frontend before launching — important when switching branches because the precompiled assets differ.
+
+!!! warning "Docker users"
+    The Operator Panel's branch switch and the `git checkout` flow both assume Lumiverse is running from a git checkout. If you're using the pre-built Docker image (`ghcr.io/prolix-oc/lumiverse:latest`), there is no working tree to switch — you'd need to either rebuild from source against the `staging` branch (`docker-compose -f docker-compose.build.yml up -d` after `git checkout staging`) or wait for the next image tag.
+
+!!! tip "Roll back to main if staging breaks"
+    Staging can occasionally ship a regression. Switching back to `main` from the Operator Panel (or `git checkout main && ./start.sh --build`) returns you to the last stable release without touching your `data/` folder.
+
+---
+
 ## Migrating from SillyTavern
 
 If you're coming from SillyTavern, Lumiverse includes a migration tool that imports your characters, chat history, world books, and personas. You can migrate from a local directory, or connect to a remote machine over **SFTP** or **SMB** if your SillyTavern installation lives on another device.

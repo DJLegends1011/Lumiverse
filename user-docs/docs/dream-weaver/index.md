@@ -1,8 +1,27 @@
 # Dream Weaver
 
-Dream Weaver helps you make high-quality character and scenario cards from an idea. It is useful when building a card by hand would take too long, when you need help turning a loose concept into polished fields, or when existing cards do not match what you want.
+Dream Weaver turns an idea into a finished character or scenario card. You describe what you want, run a handful of tools, review the results, and accept the ones that fit. When the required fields are filled in, **Finalize** writes a real card to your library and creates its launch chat.
 
-Start with as much or as little direction as you have. Dream Weaver lets you build the card piece by piece, review each generated card, keep what works, and save the result when it is ready.
+Dream Weaver is best when you have a clear idea but writing the fields by hand would take too long, or when you want a polished first draft you can edit afterwards.
+
+---
+
+## What's New: Dream Weaver 2.0
+
+The Studio is now **chat-based**. Instead of a card pane on the side, you have a chat thread where each tool you run produces an embedded **tool card** that you accept, retry, adjust, or discard inline.
+
+Key changes from earlier versions:
+
+- **Chat-style composer** with slash-command autocomplete.
+- **Tool cards** appear in the thread with `Use result` / `Run again` / `Adjust` / `Discard` actions.
+- **Adjust** opens an inline nudge box so you can retry a tool with extra guidance.
+- **Run Full Suite** generates name, appearance, personality, scenario, first message, and voice in one go.
+- **Progress badges** at the top show which fields are still missing before you can finalize.
+- **Editable Dream source** — open the Dream Summary card, click the pencil, and rewrite your source at any time.
+- **Voice Guidance editor** for structured baseline / rhythm / diction / quirks / hard nos rules.
+- **Visuals tab** with portrait stage, ComfyUI workflow editor, and a **Suggest Tags** helper.
+
+The slash command vocabulary is mostly unchanged — `/dream`, `/name`, `/appearance`, `/personality`, `/scenario`, `/voice`, `/first_message`, `/greeting`, `/add_lorebook`, `/add_npc`, `/help` — but they now produce tool cards rather than full-screen drafts.
 
 ---
 
@@ -11,18 +30,18 @@ Start with as much or as little direction as you have. Dream Weaver lets you bui
 Use Dream Weaver when you want to:
 
 1. Turn an idea into a character or scenario card
-2. Create a card that matches a specific character, role, setup, or scenario you cannot find elsewhere
+2. Create a card that matches a role, setup, or scenario you can't find elsewhere
 3. Get help writing the parts of a card that are hard to phrase manually
-4. Explore variations before choosing the version you want to keep
-5. Add supporting details, such as lore, NPCs, greetings, or portrait prompts, after the main idea is clear
+4. Iterate on individual fields without rewriting the whole card
+5. Add supporting lore (NPCs, lorebook entries) after the main idea is clear
 
-Dream Weaver works best when you know what you want, but need help turning it into a finished card.
+Dream Weaver works best when you know what you want but need help turning it into a finished card.
 
 ---
 
 ## When Not to Use It
 
-Dream Weaver is not required for normal editing. Use the regular **Character Browser** when you already know the exact edits you want.
+Use the regular **Character Browser** when you already know the exact edits you want.
 
 | Situation | Better Tool |
 |-----------|-------------|
@@ -32,30 +51,40 @@ Dream Weaver is not required for normal editing. Use the regular **Character Bro
 | You are importing a finished character card | Character import |
 | You do not want generated suggestions | Character editor |
 
-You can edit Dream Weaver output later in the regular character editor. If you reopen the same Dream Weaver session, **Update Character** or **Update Scenario** updates the linked card instead of creating a duplicate.
+You can always edit Dream Weaver output later in the regular character editor. If you reopen the same Dream Weaver session, **Update Character** or **Update Scenario** updates the linked card instead of creating a duplicate.
 
 ---
 
-## How It Works
+## Studio Layout
 
-Dream Weaver has four core parts:
+The Studio is a centred modal with two tabs:
 
-| Piece | What It Does |
-|-------|--------------|
-| **Source** | The idea, premise, reference, or direction Dream Weaver uses |
-| **Command** | A slash command like `/name`, `/appearance`, or `/scenario` |
-| **Card** | A generated suggestion you can use, discard, retry, or adjust |
-| **Workspace** | The current result built from the cards you have accepted |
+| Tab | Purpose |
+|-----|---------|
+| **Studio** | The chat thread where you run tools, review tool cards, and edit voice guidance. Progress badges and the Suite Runner banner sit above the log. |
+| **Visuals** | Portrait stage and image-gen controls — generate the card's portrait once the text fields take shape. |
 
-Source is required before generation commands can run. The source field in the panel is optional because you can open a blank Studio, but commands like `/name`, `/personality`, and `/scenario` still need direction first. Add it with `/dream`.
+A header strip carries the session name, a **Character / Scenario** switcher (disabled once the session is finalized), and a **Draft / Linked** status pill. The footer shows the same status with a **Close** button and a **Finalize** (or **Update**) button. If any required field is missing, the footer tells you which ones.
 
-When you accept a card, Dream Weaver adds it to the workspace. Discarded cards are ignored. For single-field tools, accepting a newer card replaces the older accepted card for that field.
+---
+
+## Chat Thread Artifacts
+
+Anything that happens in a session shows up as an entry in the chat log:
+
+| Artifact | What it is |
+|----------|------------|
+| **Dream Summary** | A summary of the active source. Shows the dream text plus optional tone and dislikes chips. Click the pencil to edit. |
+| **User Command Bubble** | The slash command you ran, shown as a small grey bubble. |
+| **Tool Card** | The result of a tool run. Includes a header (tool name, intent), execution time, token usage, output fields, and the action buttons. Expand **Run details** for the raw output. |
+| **System Note** | Inline note from the Studio itself — `/help` output, status changes, or errors. |
+| **Nudge Inline** | Appears when you click **Adjust** on a tool card. Lets you type what should change before retrying. |
 
 ---
 
 ## Character vs. Scenario
 
-Dream Weaver does not decide the card type from your source text. Choose **Character** or **Scenario** with the switcher.
+Dream Weaver doesn't infer the card type from your source text. Pick **Character** or **Scenario** with the switcher in the header.
 
 Use **Character** when you want one primary character.
 
@@ -70,15 +99,13 @@ Use **Scenario** when you want a narrator, world, location, setup, or situation 
 | `/voice` | Character speech style | Narrator or world voice |
 | `/first_message` | Character opening message | Opening narration or scene prompt |
 
-The switcher controls this behavior. `/dream` only adds direction for Dream Weaver to use.
+The switcher controls which framing the tools write to. `/dream` only adds direction for Dream Weaver to use — it does not pick the card type for you.
 
 ---
 
 ## Saved Weaves
 
-The **Previous Weaves** section keeps Dream Weaver sessions in one place. Use the filters to show all sessions, drafts, or finalized sessions. Use search to find older sessions.
-
-Finalized sessions stay in the same list as drafts, but they are marked differently. Open a finalized session when you want to keep working and update the linked card.
+The Dream Weaver panel keeps every session in **Previous Weaves**. Filter by **All**, **Drafts**, or **Finalized**, or use search to find an older session. Finalized sessions live in the same list — they're tagged with a different status pill — and can be reopened to keep iterating on the linked card.
 
 ---
 
@@ -86,6 +113,6 @@ Finalized sessions stay in the same list as drafts, but they are marked differen
 
 | Guide | What You'll Learn |
 |-------|-------------------|
-| [Studio Workflow](studio-workflow.md) | Add source, run commands, accept cards, and build the result |
-| [Sources & Roadmap](sources-and-roadmap.md) | Current source support and planned character/world book imports |
-| [Visuals & Finalizing](visuals-and-finalizing.md) | Generate visual assets, finalize, and update generated cards |
+| [Studio Workflow](studio-workflow.md) | Use the chat composer, slash commands, tool cards, Suite Runner, and the Voice Guidance editor. |
+| [Sources & Roadmap](sources-and-roadmap.md) | Add and edit dream source, what counts as useful source, and what import sources are planned. |
+| [Visuals & Finalizing](visuals-and-finalizing.md) | Generate portraits, manage ComfyUI workflows, suggest tags, finalize, and update the linked card. |

@@ -6,7 +6,7 @@ Council tools are specialized analysis functions that members can run during del
 
 ## Built-In Tools
 
-Lumiverse ships with **16 built-in tools** across 5 categories.
+Lumiverse ships with **17 built-in tools** across 5 categories.
 
 ### Story Direction (6 tools)
 
@@ -34,12 +34,13 @@ Lumiverse ships with **16 built-in tools** across 5 categories.
 | `pov_enforcer` | **POV Enforcer** | Enforces point-of-view consistency and narrative perspective continuity based on active POV rules |
 | `flame_kindler` | **Flame Kindler** | Analyzes relationships between characters and guides their logical progression based on established history and character details |
 
-### Context (2 tools)
+### Context (3 tools)
 
 | Tool | Display Name | What It Does |
 |------|-------------|-------------|
 | `historical_accuracy` | **Historical Accuracy** | Checks the roleplay's direction against real historical facts, events, and canon to ensure accuracy |
 | `style_adherence` | **Narrative Style Adherence** | Analyzes the story for adherence to the selected narrative style and enforces stylistic consistency |
+| `web_search` | **Web Search** | Runs a real-world web search via your configured SearXNG instance and returns a condensed context block from the top pages. Requires [Web Search](../settings/web-search.md) to be enabled. |
 
 ### Content (3 tools)
 
@@ -50,7 +51,7 @@ Lumiverse ships with **16 built-in tools** across 5 categories.
 | `detect_expression` | **Expression Detector** | Analyzes scene sentiment and selects the character's facial expression from configured [expression](../characters/expressions.md) labels |
 
 !!! note "Gated tools"
-    **Scene Generator** and **Expression Detector** only appear when the relevant feature is configured. Expression Detector requires the character to have expressions set up. Scene Generator requires an image generation connection.
+    **Scene Generator**, **Expression Detector**, and **Web Search** only appear when the relevant feature is configured. Expression Detector requires the character to have expressions set up. Scene Generator requires an image generation connection. Web Search requires [Web Search](../settings/web-search.md) to be enabled with an API URL.
 
 ---
 

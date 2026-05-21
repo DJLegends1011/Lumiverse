@@ -2818,6 +2818,13 @@ export class WorkerHost {
       case "push_get_status":
         this.handlePushGetStatus(msg.requestId, msg.userId);
         break;
+      // ─── Web Search (gated: "web_search") ──────────────────────────────
+      case "web_search_query":
+        void this.handleWebSearchQuery(msg.requestId, msg.query, msg.count, msg.scrape, msg.userId);
+        break;
+      case "web_search_get_settings":
+        void this.handleWebSearchGetSettings(msg.requestId, msg.userId);
+        break;
       // ─── User Context (free tier — no permission needed) ────────────────
       case "user_is_visible":
         this.handleUserIsVisible(msg.requestId, msg.userId);
@@ -9096,6 +9103,65 @@ export class WorkerHost {
           subscriptionCount: subs.length,
         },
       });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  // ─── Web Search (gated: "web_search") ──────────────────────────────────
+
+  private async handleWebSearchQuery(
+    requestId: string,
+    query: string,
+    count?: number,
+    scrape?: boolean,
+    userId?: string,
+  ): Promise<void> {
+    try {
+      if (!this.hasPermission("web_search")) {
+        throw new Error(`${PERMISSION_DENIED_PREFIX} web_search — Web search permission not granted`);
+      }
+      const resolvedUserId = this.resolveEffectiveUserId(userId);
+      if (!resolvedUserId) throw new Error("userId is required for operator-scoped extensions");
+      this.enforceScopedUser(resolvedUserId);
+
+      const webSearchSvc = await import("../services/web-search.service");
+      const response = await webSearchSvc.searchWeb(resolvedUserId, query, count, {
+        scrape: scrape !== false,
+      });
+
+      const payload: {
+        query: string;
+        results: typeof response.results;
+        documents?: typeof response.documents;
+        context?: string;
+      } = {
+        query: response.query,
+        results: response.results,
+      };
+      if (scrape !== false) {
+        payload.documents = response.documents;
+        payload.context = response.context;
+      }
+
+      this.postToWorker({ type: "response", requestId, result: payload });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  private async handleWebSearchGetSettings(requestId: string, userId?: string): Promise<void> {
+    try {
+      if (!this.hasPermission("web_search")) {
+        throw new Error(`${PERMISSION_DENIED_PREFIX} web_search — Web search permission not granted`);
+      }
+      const resolvedUserId = this.resolveEffectiveUserId(userId);
+      if (!resolvedUserId) throw new Error("userId is required for operator-scoped extensions");
+      this.enforceScopedUser(resolvedUserId);
+
+      const settingsSvc = await import("../services/web-search-settings.service");
+      const settings = await settingsSvc.getWebSearchSettings(resolvedUserId);
+      this.postToWorker({ type: "response", requestId, result: settings });
     } catch (err: any) {
       this.postToWorker({ type: "response", requestId, error: err.message });
     }
