@@ -1389,13 +1389,14 @@ export default function MessageContent({
     getTagInterceptorRegistryVersion,
     getTagInterceptorRegistryVersion,
   )
+  const deliveredTagInterceptsRef = useRef(new Set<string>())
   const interceptedMessageTags = useMemo(
     () => stripMessageTags(content, { messageId, chatId, isUser, isStreaming }),
     [content, messageId, chatId, isUser, isStreaming, interceptorRegistryVersion],
   )
 
   useLayoutEffect(() => {
-    dispatchMessageTagIntercepts(interceptedMessageTags.intercepts)
+    dispatchMessageTagIntercepts(interceptedMessageTags.intercepts, deliveredTagInterceptsRef.current)
   }, [interceptedMessageTags.intercepts])
 
   const interceptorCleanedContent = interceptedMessageTags.content

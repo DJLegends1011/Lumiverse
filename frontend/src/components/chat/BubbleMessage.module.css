@@ -25,6 +25,19 @@
   display: none;
 }
 
+/* On touch devices, suppress the native iOS/Android long-press callout
+ * (Copy/Look Up/Share popup and the selection magnifier) so it doesn't race
+ * with our in-app long-press → context menu — that's the standard hold path
+ * on mobile. Desktop (mouse) text selection is untouched, so the context
+ * menu's "Copy selection if any" behavior still works with a real selection. */
+@media (hover: none) and (pointer: coarse) {
+  .card {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
 /* Bottom specular highlight */
 .card::after {
   content: '';

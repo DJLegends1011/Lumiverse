@@ -18,7 +18,6 @@ type PendingTagIntercept = {
 }
 
 const tagInterceptors = new Map<string, RegisteredTagInterceptor[]>()
-const delivered = new Set<string>()
 let interceptorVersion = 0
 const listeners = new Set<() => void>()
 
@@ -205,7 +204,7 @@ export function stripMessageTags(
   return { content: output, intercepts }
 }
 
-export function dispatchMessageTagIntercepts(intercepts: PendingTagIntercept[]): void {
+export function dispatchMessageTagIntercepts(intercepts: PendingTagIntercept[], delivered: Set<string>): void {
   for (const { payload, interceptor } of intercepts) {
     const key = deliveryKey(payload, interceptor)
     if (delivered.has(key)) continue

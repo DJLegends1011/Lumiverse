@@ -20,7 +20,7 @@ import useSwipeAction from '@/hooks/useSwipeAction'
 import useSwipeGesture from '@/hooks/useSwipeGesture'
 import { useLongPress } from '@/hooks/useLongPress'
 import { useMessagePlayback } from '@/hooks/useMessagePlayback'
-import { copyTextToClipboard } from '@/lib/clipboard'
+import { copyTextToClipboard, getSelectionTextWithin } from '@/lib/clipboard'
 import { useStore } from '@/store'
 import type { Message } from '@/types/api'
 import type { GenerationMetrics } from '@/types/ws-events'
@@ -193,7 +193,8 @@ export default function BubbleMessageDefault({
   }, [closeContextMenu])
 
   const handleCopy = useCallback(() => {
-    copyTextToClipboard(message.content).catch(console.error)
+    const selected = getSelectionTextWithin(cardRef.current)
+    copyTextToClipboard(selected || message.content).catch(console.error)
   }, [message.content])
 
   const longPress = useLongPress({

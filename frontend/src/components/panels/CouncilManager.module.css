@@ -382,12 +382,16 @@
   align-items: center;
   gap: 10px;
   flex: 1;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .chanceHint {
   font-size: calc(11px * var(--lumiverse-font-scale, 1));
   color: var(--lumiverse-text-dim);
-  white-space: nowrap;
+  flex: 1 1 0;
+  min-width: 0;
+  line-height: 1.35;
 }
 
 .memberDivider {
