@@ -144,6 +144,13 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
   const lastScrollHeightRef = useRef(0)
   const lastScrollTopRef = useRef(0)
   const measuredRowHeightsRef = useRef<Map<string, number>>(new Map())
+  // Tracks the most recently measured row height per message.id, irrespective
+  // of which swipe variant produced it. When a new variant has no measureKey
+  // entry yet (first paint after a swipe), this is a far better initial
+  // estimate than the content heuristic — especially for HTML-heavy bodies
+  // where the heuristic can be hundreds of pixels off and the resulting
+  // height delta would trigger scroll oscillation.
+  const lastMeasuredByMessageIdRef = useRef<Map<string, number>>(new Map())
   const averageMeasuredHeightRef = useRef<number | null>(null)
   const prependVisualOffsetRef = useRef(0)
   const isPrependingRef = useRef(false)
@@ -183,6 +190,7 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
     topLoadArmedRef.current = true
     lastScrollTopRef.current = 0
     measuredRowHeightsRef.current = new Map()
+    lastMeasuredByMessageIdRef.current = new Map()
     averageMeasuredHeightRef.current = null
   }, [chatId])
 
@@ -249,8 +257,13 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
         lumiaOOCStyle,
       ].join(':')
 
-      // Below key must stay content-independent as folding content into the key remounts the row every streamed token and thrashes the virtualizer.
-      const key = ['message', message.id, message.swipe_id, displayMode].join(':')
+      // Key intentionally excludes content AND swipe_id: folding either in
+      // remounts the row on every streamed token or variant swap, which
+      // dumps the virtualizer back onto the heuristic estimate and triggers
+      // a ResizeObserver cascade as the new content settles. MessageCard
+      // re-renders reactively on prop change, so a stable row identity is
+      // safe across variants.
+      const key = ['message', message.id, displayMode].join(':')
 
       items.push({
         type: 'message',
@@ -277,6 +290,7 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
 
   useEffect(() => {
     measuredRowHeightsRef.current = new Map()
+    lastMeasuredByMessageIdRef.current = new Map()
     averageMeasuredHeightRef.current = null
   }, [displayMode, isCoarsePointer, lumiaOOCStyle])
 
@@ -303,6 +317,13 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
   const estimateMessageSize = useCallback((message: Message, measureKey: string) => {
     const measured = measuredRowHeightsRef.current.get(measureKey)
     if (measured) return measured
+
+    // No entry for this exact variant yet — fall back to the row's prior
+    // measured height before the heuristic. Bridges the gap between a
+    // swipe / edit changing the measureKey and the ResizeObserver firing
+    // with the new content's true size.
+    const lastForMessage = lastMeasuredByMessageIdRef.current.get(message.id)
+    if (lastForMessage) return lastForMessage
 
     const el = scrollRef.current
     const width = Math.max(240, el?.clientWidth ?? 720)
@@ -422,6 +443,10 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
       const measureKey = element.getAttribute('data-measure-key')
       if (measureKey && measured >= MIN_MEASURED_ROW_HEIGHT) {
         measuredRowHeightsRef.current.set(measureKey, measured)
+        const messageId = element.getAttribute('data-message-id')
+        if (messageId) {
+          lastMeasuredByMessageIdRef.current.set(messageId, measured)
+        }
         const values = Array.from(measuredRowHeightsRef.current.values())
         const sample = values.slice(-80)
         averageMeasuredHeightRef.current = sample.reduce((sum, value) => sum + value, 0) / sample.length
