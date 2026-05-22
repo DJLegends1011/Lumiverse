@@ -1,11 +1,13 @@
 import { getTextContent, type LlmMessage } from "../../../llm/types";
 import { rawGenerate, type RawGenerateInput } from "../../generate.service";
 import * as connectionsSvc from "../../connections.service";
+import * as personasSvc from "../../personas.service";
 import * as tokenizerSvc from "../../tokenizer.service";
 import { getDWGenParams, applyDWGenParams } from "../dw-gen-params";
 import { getFragment } from "../prompts/index";
 import type { AnyDreamWeaverTool } from "./types";
 import type { DreamWeaverSession, DreamWeaverWorkspace } from "../../../types/dream-weaver";
+import type { Persona } from "../../../types/persona";
 
 export interface AssemblePromptInput {
   tool: AnyDreamWeaverTool;
@@ -18,9 +20,11 @@ export interface AssemblePromptInput {
 export function assemblePrompt(input: AssemblePromptInput): string {
   const { tool, session, draft, nudgeText } = input;
 
+  const persona = loadPersona(session);
+
   const parts: string[] = [];
   parts.push(getFragment("base-system"));
-  parts.push(getWorkspaceFrame(draft));
+  parts.push(getWorkspaceFrame(draft, persona));
   parts.push(tool.prompt);
   for (const id of tool.requiresFragments) parts.push(getFragment(id));
 
@@ -33,6 +37,9 @@ export function assemblePrompt(input: AssemblePromptInput): string {
   if (session.constraints) parts.push(`## Constraints\n${session.constraints}`);
   if (session.dislikes) parts.push(`## Avoid\n${session.dislikes}`);
 
+  const personaBlock = formatPersonaBlock(persona);
+  if (personaBlock) parts.push(personaBlock);
+
   const slice = tool.contextSlice(draft);
   if (Object.keys(slice).length > 0) {
     parts.push(`## Current Draft (relevant slice)\n${JSON.stringify(slice, null, 2)}`);
@@ -43,6 +50,28 @@ export function assemblePrompt(input: AssemblePromptInput): string {
   }
 
   return parts.join("\n\n");
+}
+
+function loadPersona(session: DreamWeaverSession): Persona | null {
+  if (!session.persona_id) return null;
+  try {
+    return personasSvc.getPersona(session.user_id, session.persona_id);
+  } catch {
+    return null;
+  }
+}
+
+function formatPersonaBlock(persona: Persona | null): string {
+  if (!persona) return "";
+  const lines: string[] = [`Name: ${persona.name}`];
+  if (persona.title?.trim()) lines.push(`Title: ${persona.title.trim()}`);
+  const pronouns = [persona.subjective_pronoun, persona.objective_pronoun, persona.possessive_pronoun]
+    .map((p) => p?.trim())
+    .filter(Boolean)
+    .join("/");
+  if (pronouns) lines.push(`Pronouns: ${pronouns}`);
+  if (persona.description?.trim()) lines.push("", persona.description.trim());
+  return `## User Persona ({{user}})\n${lines.join("\n")}`;
 }
 
 export interface ExecuteToolInput {
@@ -135,23 +164,32 @@ function stripCodeFence(s: string): string {
   return m ? m[1] : s;
 }
 
-function getWorkspaceFrame(workspace: DreamWeaverWorkspace): string {
+function getWorkspaceFrame(workspace: DreamWeaverWorkspace, persona: Persona | null): string {
   if (workspace.kind === "scenario") {
+    const personaHook = persona
+      ? `The card's main character should pair with {{user}} (see "User Persona" below) — they are the protagonist NPC who interacts with ${persona.name} directly, not a copy of them.`
+      : `The card's main character should pair with {{user}} — they are the protagonist NPC who interacts with {{user}} directly, not a copy of them.`;
     return [
       "## Workspace Kind: Scenario Card",
-      "Build a scenario/narrator card, not a protagonist card.",
-      "Do not invent a main character unless the accepted sources explicitly ask for one.",
-      "Interpret name as the scenario title.",
-      "Interpret appearance as the setting and sensory presentation.",
-      "Interpret personality as narrator/world behavior and interaction rules.",
-      "Interpret scenario as the current situation, tension, and premise.",
-      "Interpret first_mes as opening narration or an opening scene prompt.",
+      "Build a SCENARIO card: a populated world with a main character, supporting NPCs, and lorebook entries.",
+      personaHook,
+      "Field interpretation for this kind:",
+      "- name: the scenario title.",
+      "- appearance / personality / voice: describe the MAIN CHARACTER (the protagonist NPC paired with {{user}}), not {{user}}.",
+      "- scenario: the premise — current situation, tension, and how the main character relates to {{user}}.",
+      "- first_mes: the opening scene that introduces the world, establishes the main character, and hands action to {{user}}.",
+      "- NPCs: the supporting cast around the main character (allies, rivals, authority figures, minor recurring faces). Never duplicate the main character here.",
+      "- Lorebook entries: world-level knowledge (places, factions, rules, history, organizations, customs, signature objects) that activates when referenced.",
+      "Treat the world as inhabited and specific. Do not write a generic narrator-only card.",
     ].join("\n");
   }
   return [
     "## Workspace Kind: Character Card",
-    "Build a character card. Interpret name, appearance, personality, scenario, voice, and first message as character-card fields.",
-  ].join("\n");
+    "Build a single-character card. Interpret name, appearance, personality, scenario, voice, and first message as fields describing ONE protagonist character who interacts with {{user}}.",
+    persona
+      ? `The character should make sense paired with {{user}} (see "User Persona" below), but is a distinct individual — not a copy of ${persona.name}.`
+      : "",
+  ].filter(Boolean).join("\n");
 }
 
 function formatSources(sources: DreamWeaverWorkspace["sources"]): string {

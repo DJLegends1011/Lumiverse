@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 import { dreamWeaverToolingApi } from "@/api/dream-weaver-tooling";
+import type { DreamWeaverSession } from "@/api/dream-weaver";
 
-const SUITE_TOOLS = [
+const CHARACTER_SUITE_TOOLS = [
   "set_name",
   "set_appearance",
   "set_personality",
@@ -10,12 +11,24 @@ const SUITE_TOOLS = [
   "set_voice_guidance",
 ] as const;
 
+const SCENARIO_SUITE_TOOLS = [
+  "set_name",
+  "set_scenario",
+  "set_appearance",
+  "set_personality",
+  "set_voice_guidance",
+  "set_first_message",
+  "add_npc_batch",
+  "add_lorebook_batch",
+] as const;
+
 type SuiteState = "idle" | "running" | "done" | "error";
 
-export function useSuiteRunner(sessionId: string) {
+export function useSuiteRunner(sessionId: string, workspaceKind: DreamWeaverSession["workspace_kind"]) {
   const [state, setState] = useState<SuiteState>("idle");
   const [queued, setQueued] = useState(0);
-  const [total] = useState(SUITE_TOOLS.length);
+  const suiteTools = workspaceKind === "scenario" ? SCENARIO_SUITE_TOOLS : CHARACTER_SUITE_TOOLS;
+  const total = suiteTools.length;
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const start = useCallback(async () => {

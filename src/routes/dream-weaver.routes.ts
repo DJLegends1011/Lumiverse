@@ -3,7 +3,7 @@ import * as dreamWeaverSvc from "../services/dream-weaver/dream-weaver.service";
 import * as messagesSvc from "../services/dream-weaver/messages.service";
 import { listTools, getTool } from "../services/dream-weaver/tools/registry";
 import { normalizeComfyUIWorkflow } from "../image-gen/comfyui-import";
-import { discoverCapabilities, getComfyUIObjectInfo } from "../image-gen/comfyui-discovery";
+import { discoverCapabilities, getComfyUIObjectInfo, resolveComfyTarget } from "../image-gen/comfyui-discovery";
 import { detectInjectionPoints } from "../image-gen/comfyui-workflow-parser";
 import {
   readComfyUIConfig,
@@ -418,11 +418,15 @@ app.post("/visual/workflows/import", async (c) => {
   const connection = getConnection(userId, connectionId);
   if (!connection) return c.json({ error: "Connection not found" }, 404);
 
-  if (connection.provider !== "comfyui") {
-    return c.json({ error: "Connection is not a ComfyUI connection" }, 400);
+  if (connection.provider !== "comfyui" && connection.provider !== "swarmui") {
+    return c.json({ error: "Connection does not support ComfyUI workflows" }, 400);
   }
 
-  const objectInfo = await getComfyUIObjectInfo(connection.api_url || "http://localhost:8188");
+  const dwApiKey = connection.provider === "swarmui"
+    ? await secretsSvc.getSecret(userId, imageGenConnectionSecretKey(connection.id))
+    : undefined;
+  const dwTarget = resolveComfyTarget(connection, dwApiKey ?? undefined);
+  const objectInfo = await getComfyUIObjectInfo(dwTarget.baseUrl, false, { cookie: dwTarget.cookie });
 
   let normalized: ReturnType<typeof normalizeComfyUIWorkflow>;
   try {
@@ -502,13 +506,18 @@ app.get("/visual/comfyui/:connectionId/capabilities", async (c) => {
 
   const connection = getConnection(userId, connectionId);
   if (!connection) return c.json({ error: "Connection not found" }, 404);
-  if (connection.provider !== "comfyui") {
-    return c.json({ error: "Connection is not a ComfyUI connection" }, 400);
+  if (connection.provider !== "comfyui" && connection.provider !== "swarmui") {
+    return c.json({ error: "Connection does not support ComfyUI workflows" }, 400);
   }
 
+  const capsApiKey = connection.provider === "swarmui"
+    ? await secretsSvc.getSecret(userId, imageGenConnectionSecretKey(connection.id))
+    : undefined;
+  const capsTarget = resolveComfyTarget(connection, capsApiKey ?? undefined);
   const capabilities = await discoverCapabilities(
-    connection.api_url || "http://localhost:8188",
+    capsTarget.baseUrl,
     forceRefresh,
+    { cookie: capsTarget.cookie },
   );
 
   return c.json({ capabilities });

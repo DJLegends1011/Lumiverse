@@ -16,7 +16,7 @@ import { evaluate as evaluateMacros, registry as macroRegistry } from "../macros
 import { eventBus } from "../ws/bus";
 import { EventType } from "../ws/events";
 import { getImageProvider, getImageProviderList } from "../image-gen/registry";
-import { getComfyUIObjectInfo } from "../image-gen/comfyui-discovery";
+import { getComfyUIObjectInfo, resolveComfyTarget } from "../image-gen/comfyui-discovery";
 import { normalizeComfyUIWorkflow } from "../image-gen/comfyui-import";
 import { readComfyUIConfig } from "../image-gen/comfyui-workflow-storage";
 import { patchWorkflow, type ComfyUIPatchValues } from "../image-gen/comfyui-workflow-patch";
@@ -349,8 +349,8 @@ export async function generateSceneBackground(
       }
     }
 
-    if (connection.provider === "comfyui") {
-      await applyComfyUIWorkflowConfig(connection, params, promptResult.prompt, promptResult.negativePrompt, characterLora);
+    if (connection.provider === "comfyui" || connection.provider === "swarmui") {
+      await applyComfyUIWorkflowConfig(connection, params, promptResult.prompt, promptResult.negativePrompt, characterLora, apiKey ?? undefined);
     }
 
     const generationTimeoutSecs = resolveTimeoutSeconds(opts?.generationTimeoutSeconds, settings.generationTimeoutSeconds ?? 300);
@@ -644,6 +644,7 @@ async function applyComfyUIWorkflowConfig(
   prompt: string,
   negativePrompt?: string,
   characterLora?: characterLoraSvc.CharacterLoraBinding | null,
+  apiKey?: string,
 ): Promise<void> {
   if (params.workflow && typeof params.workflow === "object") return;
 
@@ -656,7 +657,8 @@ async function applyComfyUIWorkflowConfig(
     throw new Error("Imported ComfyUI workflow must map at least one positive prompt field");
   }
 
-  const objectInfo = await getComfyUIObjectInfo(connection.api_url || "http://localhost:8188");
+  const target = resolveComfyTarget(connection, apiKey);
+  const objectInfo = await getComfyUIObjectInfo(target.baseUrl, false, { cookie: target.cookie });
   const normalizedWorkflow = normalizeComfyUIWorkflow(
     config.workflow_api_json || config.workflow_json,
     objectInfo ?? undefined,

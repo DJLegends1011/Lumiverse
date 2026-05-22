@@ -23,7 +23,7 @@ export function StudioTab({ sessionId, hasSource, workspaceKind, progressFields,
   const [suiteVisible, setSuiteVisible] = useState(true);
   const { messages, invoke, accept, reject, cancel, updateSource } = useDreamWeaverMessages(sessionId);
 
-  const suite = useSuiteRunner(sessionId);
+  const suite = useSuiteRunner(sessionId, workspaceKind);
 
   const prevSuiteState = useRef(suite.state);
   useEffect(() => {
@@ -76,7 +76,7 @@ export function StudioTab({ sessionId, hasSource, workspaceKind, progressFields,
     <div className={styles.region}>
       <ProgressBadges fields={progressFields} workspaceKind={workspaceKind} />
       {showSuite && (
-        <SuiteRunner suite={suite} onDismiss={() => setSuiteVisible(false)} />
+        <SuiteRunner suite={suite} workspaceKind={workspaceKind} onDismiss={() => setSuiteVisible(false)} />
       )}
       <ChatLog messages={messages} onAccept={acceptAndRefresh} onReject={rejectAndRefresh} onCancel={cancel} onRetry={onRetry} onSaveDream={saveDream} />
       <Composer catalog={catalog} hasSource={hasSource} onSubmit={onSubmit} />

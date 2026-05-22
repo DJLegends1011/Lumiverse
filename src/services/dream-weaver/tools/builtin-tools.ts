@@ -295,6 +295,88 @@ const addNpc: DreamWeaverTool<NpcEntry> = {
   apply: (draft, output) => ({ ...draft, npcs: [...draft.npcs, output] }),
 };
 
+const addNpcBatch: DreamWeaverTool<{ entries: NpcEntry[] }> = {
+  name: "add_npc_batch",
+  displayName: "Add NPC Batch",
+  category: "world",
+  userInvocable: true,
+  slashCommand: "/add_npcs",
+  description: "Add a batch of supporting NPCs to the world in one call.",
+  prompt: `Tool: add_npc_batch. Generate a batch of 3-6 distinct supporting NPCs that fit the scenario. None of them is the main character or {{user}} — these are the surrounding cast (allies, rivals, authority figures, bystanders with hooks). Mix major and minor roles. Output JSON: { "entries": [{ "name": "<string>", "description": "<2-3 sentences>", "voice_notes": "<optional>" }, ...] }.`,
+  validate(input): ValidateResult<{ entries: NpcEntry[] }> {
+    const o = asObject(input);
+    if (!o) return { ok: false, error: "expected object" };
+    const arr = o["entries"];
+    if (!Array.isArray(arr)) return { ok: false, error: "entries: expected array" };
+    if (arr.length < 1 || arr.length > 10) return { ok: false, error: "entries: length 1..10" };
+    const out: NpcEntry[] = [];
+    for (let i = 0; i < arr.length; i++) {
+      const ev = asObject(arr[i]);
+      if (!ev) return { ok: false, error: `entries[${i}]: expected object` };
+      const name = reqString(ev, "name", 1);
+      if (!name.ok) return { ok: false, error: `entries[${i}].${name.error}` };
+      const description = reqString(ev, "description", 20);
+      if (!description.ok) return { ok: false, error: `entries[${i}].${description.error}` };
+      const entry: NpcEntry = { name: name.data, description: description.data };
+      if ("voice_notes" in ev && ev["voice_notes"] !== undefined) {
+        if (typeof ev["voice_notes"] !== "string")
+          return { ok: false, error: `entries[${i}].voice_notes: expected string` };
+        entry.voice_notes = ev["voice_notes"] as string;
+      }
+      out.push(entry);
+    }
+    return { ok: true, data: { entries: out } };
+  },
+  conflictMode: "append",
+  requiresFragments: ["anti-slop", "format:npc"],
+  contextSlice: (d) => ({
+    name: d.name,
+    scenario: d.scenario,
+    personality: d.personality,
+    npcs: d.npcs.map((n) => ({ name: n.name, description: "", voice_notes: undefined })) as NpcEntry[],
+  }),
+  apply: (draft, output) => ({ ...draft, npcs: [...draft.npcs, ...output.entries] }),
+};
+
+const addLorebookBatch: DreamWeaverTool<{ entries: LorebookEntry[] }> = {
+  name: "add_lorebook_batch",
+  displayName: "Add Lorebook Batch",
+  category: "world",
+  userInvocable: true,
+  slashCommand: "/add_lorebooks",
+  description: "Add a batch of lorebook entries that flesh out the world.",
+  prompt: `Tool: add_lorebook_batch. Generate a batch of 4-8 distinct lorebook entries that flesh out the world: places, factions, rules, history, organizations, customs, signature objects, recurring threats. Each entry must be distinct from the others — no overlap. Output JSON: { "entries": [{ "key": ["<trigger 1>", ...], "comment": "<short title>", "content": "<entry body>" }, ...] }.`,
+  validate(input): ValidateResult<{ entries: LorebookEntry[] }> {
+    const o = asObject(input);
+    if (!o) return { ok: false, error: "expected object" };
+    const arr = o["entries"];
+    if (!Array.isArray(arr)) return { ok: false, error: "entries: expected array" };
+    if (arr.length < 1 || arr.length > 12) return { ok: false, error: "entries: length 1..12" };
+    const out: LorebookEntry[] = [];
+    for (let i = 0; i < arr.length; i++) {
+      const ev = asObject(arr[i]);
+      if (!ev) return { ok: false, error: `entries[${i}]: expected object` };
+      const key = reqStringArray(ev, "key", { min: 1, max: 4 });
+      if (!key.ok) return { ok: false, error: `entries[${i}].${key.error}` };
+      const comment = reqString(ev, "comment", 1);
+      if (!comment.ok) return { ok: false, error: `entries[${i}].${comment.error}` };
+      if (comment.data.length > 80) return { ok: false, error: `entries[${i}].comment: too long (max 80)` };
+      const content = reqString(ev, "content", 20);
+      if (!content.ok) return { ok: false, error: `entries[${i}].${content.error}` };
+      out.push({ key: key.data, comment: comment.data, content: content.data });
+    }
+    return { ok: true, data: { entries: out } };
+  },
+  conflictMode: "append",
+  requiresFragments: ["anti-slop", "format:lorebook"],
+  contextSlice: (d) => ({
+    name: d.name,
+    scenario: d.scenario,
+    lorebooks: d.lorebooks.map((e) => ({ key: e.key, comment: e.comment, content: "" })) as LorebookEntry[],
+  }),
+  apply: (draft, output) => ({ ...draft, lorebooks: [...draft.lorebooks, ...output.entries] }),
+};
+
 export const BUILTIN_TOOLS: AnyDreamWeaverTool[] = [
   setName,
   setAppearance,
@@ -305,4 +387,6 @@ export const BUILTIN_TOOLS: AnyDreamWeaverTool[] = [
   setGreeting,
   addLorebookEntry,
   addNpc,
+  addLorebookBatch,
+  addNpcBatch,
 ];

@@ -72,12 +72,12 @@ async function generateWithOptionalStreaming(
 
   const resolvedAsset = resolveVisualAssetPrompts(input.asset, input.draft);
 
-  const validationErrors = await adapter.validate(resolvedAsset, input.connection);
+  const validationErrors = await adapter.validate(resolvedAsset, input.connection, input.apiKey);
   if (validationErrors.length > 0) {
     throw new Error(validationErrors.join(" "));
   }
 
-  const buildResult = await adapter.build(resolvedAsset, input.connection);
+  const buildResult = await adapter.build(resolvedAsset, input.connection, input.apiKey);
   const finalSettingsSnapshot = {
     connectionId: input.connection.id,
     provider: input.connection.provider,

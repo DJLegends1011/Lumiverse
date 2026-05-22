@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import * as svc from "../services/image-gen-connections.service";
 import { getImageProviderList } from "../image-gen/registry";
 import { normalizeComfyUIWorkflow } from "../image-gen/comfyui-import";
-import { discoverCapabilities, getComfyUIObjectInfo } from "../image-gen/comfyui-discovery";
+import { discoverCapabilities, getComfyUIObjectInfo, resolveComfyTarget } from "../image-gen/comfyui-discovery";
 import { detectInjectionPoints } from "../image-gen/comfyui-workflow-parser";
 import {
   readComfyUIConfig,
@@ -11,6 +11,22 @@ import {
 import { buildComfyUIWorkflowFieldOptions } from "../services/dream-weaver/visual-studio/comfyui-workflow-field-options";
 import type { ComfyUIFieldMapping } from "../image-gen/comfyui-workflow-patch";
 import { parsePagination } from "../services/pagination";
+import * as secretsSvc from "../services/secrets.service";
+import { imageGenConnectionSecretKey } from "../services/image-gen-connections.service";
+
+function isComfyCapableConnection(provider: string): boolean {
+  return provider === "comfyui" || provider === "swarmui";
+}
+
+async function resolveComfyConnectionTarget(
+  userId: string,
+  connection: { id: string; provider: string; api_url?: string | null },
+) {
+  const apiKey = connection.provider === "swarmui"
+    ? await secretsSvc.getSecret(userId, imageGenConnectionSecretKey(connection.id))
+    : undefined;
+  return resolveComfyTarget(connection, apiKey ?? undefined);
+}
 
 // Side-effect import: registers all image gen providers in the registry
 import "../image-gen/index";
@@ -105,11 +121,12 @@ app.post("/:id/comfyui/workflow/import", async (c) => {
 
   const connection = svc.getConnection(userId, connectionId);
   if (!connection) return c.json({ error: "Connection not found" }, 404);
-  if (connection.provider !== "comfyui") {
-    return c.json({ error: "Connection is not a ComfyUI connection" }, 400);
+  if (!isComfyCapableConnection(connection.provider)) {
+    return c.json({ error: "Connection does not support ComfyUI workflows" }, 400);
   }
 
-  const objectInfo = await getComfyUIObjectInfo(connection.api_url || "http://localhost:8188");
+  const target = await resolveComfyConnectionTarget(userId, connection);
+  const objectInfo = await getComfyUIObjectInfo(target.baseUrl, false, { cookie: target.cookie });
   let normalized: ReturnType<typeof normalizeComfyUIWorkflow>;
   try {
     normalized = normalizeComfyUIWorkflow(workflow, objectInfo ?? undefined);
@@ -147,8 +164,8 @@ app.get("/:id/comfyui/workflow", (c) => {
   const userId = c.get("userId");
   const connection = svc.getConnection(userId, c.req.param("id"));
   if (!connection) return c.json({ error: "Connection not found" }, 404);
-  if (connection.provider !== "comfyui") {
-    return c.json({ error: "Connection is not a ComfyUI connection" }, 400);
+  if (!isComfyCapableConnection(connection.provider)) {
+    return c.json({ error: "Connection does not support ComfyUI workflows" }, 400);
   }
   return c.json({ config: readComfyUIConfig(connection.metadata) });
 });
@@ -163,8 +180,8 @@ app.put("/:id/comfyui/workflow/mappings", async (c) => {
 
   const connection = svc.getConnection(userId, connectionId);
   if (!connection) return c.json({ error: "Connection not found" }, 404);
-  if (connection.provider !== "comfyui") {
-    return c.json({ error: "Connection is not a ComfyUI connection" }, 400);
+  if (!isComfyCapableConnection(connection.provider)) {
+    return c.json({ error: "Connection does not support ComfyUI workflows" }, 400);
   }
 
   const existing = readComfyUIConfig(connection.metadata);
@@ -182,13 +199,15 @@ app.get("/:id/comfyui/capabilities", async (c) => {
   const userId = c.get("userId");
   const connection = svc.getConnection(userId, c.req.param("id"));
   if (!connection) return c.json({ error: "Connection not found" }, 404);
-  if (connection.provider !== "comfyui") {
-    return c.json({ error: "Connection is not a ComfyUI connection" }, 400);
+  if (!isComfyCapableConnection(connection.provider)) {
+    return c.json({ error: "Connection does not support ComfyUI workflows" }, 400);
   }
 
+  const target = await resolveComfyConnectionTarget(userId, connection);
   const capabilities = await discoverCapabilities(
-    connection.api_url || "http://localhost:8188",
+    target.baseUrl,
     c.req.query("refresh") === "1",
+    { cookie: target.cookie },
   );
   return c.json({ capabilities });
 });

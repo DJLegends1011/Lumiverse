@@ -523,7 +523,7 @@ export interface RunSuiteResult {
   errorMessage?: string;
 }
 
-const DEFAULT_SUITE_TOOLS = [
+const CHARACTER_SUITE_TOOLS = [
   "set_name",
   "set_appearance",
   "set_personality",
@@ -531,6 +531,21 @@ const DEFAULT_SUITE_TOOLS = [
   "set_first_message",
   "set_voice_guidance",
 ] as const;
+
+const SCENARIO_SUITE_TOOLS = [
+  "set_name",
+  "set_scenario",
+  "set_appearance",
+  "set_personality",
+  "set_voice_guidance",
+  "set_first_message",
+  "add_npc_batch",
+  "add_lorebook_batch",
+] as const;
+
+export function getSuiteToolsForKind(kind: DreamWeaverWorkspaceKind): readonly string[] {
+  return kind === "scenario" ? SCENARIO_SUITE_TOOLS : CHARACTER_SUITE_TOOLS;
+}
 
 export function publicToolErrorMessage(err: unknown): string {
   if (err instanceof Error) {
@@ -550,9 +565,10 @@ export async function runDefaultSuite(userId: string, sessionId: string): Promis
     throw new Error("Add source material with /dream before running generation tools.");
   }
 
+  const suiteTools = getSuiteToolsForKind(session.workspace_kind);
   const cardIds: string[] = [];
 
-  for (const toolName of DEFAULT_SUITE_TOOLS) {
+  for (const toolName of suiteTools) {
     const tool = getTool(toolName);
     if (!tool) continue;
 
@@ -605,7 +621,7 @@ export async function runDefaultSuite(userId: string, sessionId: string): Promis
         status: "error",
         cardIds,
         queued: cardIds.length,
-        total: DEFAULT_SUITE_TOOLS.length,
+        total: suiteTools.length,
         failedCardId: card.id,
         errorMessage,
       };
@@ -620,7 +636,7 @@ export async function runDefaultSuite(userId: string, sessionId: string): Promis
     status: "done",
     cardIds,
     queued: cardIds.length,
-    total: DEFAULT_SUITE_TOOLS.length,
+    total: suiteTools.length,
   };
 }
 

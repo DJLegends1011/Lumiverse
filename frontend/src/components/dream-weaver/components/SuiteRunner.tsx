@@ -1,5 +1,6 @@
 import { Sparkles, X } from "lucide-react";
 import { Spinner } from "@/components/shared/Spinner";
+import type { DreamWeaverSession } from "@/api/dream-weaver";
 import type { useSuiteRunner } from "../hooks/useSuiteRunner";
 import styles from "./SuiteRunner.module.css";
 
@@ -7,10 +8,19 @@ type SuiteRunnerState = ReturnType<typeof useSuiteRunner>;
 
 interface Props {
   suite: SuiteRunnerState;
+  workspaceKind: DreamWeaverSession["workspace_kind"];
   onDismiss: () => void;
 }
 
-export function SuiteRunner({ suite, onDismiss }: Props) {
+const SUITE_DESCRIPTIONS: Record<"character" | "scenario", string> = {
+  character:
+    "Runs name, appearance, personality, scenario, first message, and voice in sequence — or run tools individually below.",
+  scenario:
+    "Runs title, premise, main character (appearance/personality/voice), opening scene, then batches a supporting cast and lorebook entries — or run tools individually below.",
+};
+
+export function SuiteRunner({ suite, workspaceKind, onDismiss }: Props) {
+  const description = SUITE_DESCRIPTIONS[workspaceKind === "scenario" ? "scenario" : "character"];
   if (suite.state === "idle") {
     return (
       <div className={styles.banner}>
@@ -21,7 +31,7 @@ export function SuiteRunner({ suite, onDismiss }: Props) {
           <div className={styles.bannerText}>
             <span className={styles.bannerTitle}>Generate everything at once?</span>
             <span className={styles.bannerDesc}>
-              Runs name, appearance, personality, scenario, first message, and voice in sequence — or run tools individually below.
+              {description}
             </span>
           </div>
         </div>

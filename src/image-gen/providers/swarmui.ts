@@ -3,6 +3,8 @@ import type { ImageProviderCapabilities, ImageParameterSchemaMap } from "../para
 import type { ImageGenRequest, ImageGenResponse } from "../types"
 import { applyRawOverride } from "../types"
 import { ProviderRequestError, throwProviderResponseError } from "../../utils/provider-errors"
+import { openWebSocket } from "./ws-helpers"
+import { executeComfyWorkflow, executeComfyWorkflowStream } from "./comfy-runner"
 
 const PARAMETERS: ImageParameterSchemaMap = {
   width: {
@@ -287,52 +289,84 @@ export class SwarmUIImageProvider implements ImageProvider {
     const base = this.baseUrl(apiUrl)
     const token = apiKey || undefined
 
+    // Workflow mode: route to ComfyUI via SwarmUI's /ComfyBackendDirect proxy.
+    const workflow = request.parameters?.workflow
+    if (workflow && typeof workflow === "object") {
+      const { imageDataUrl } = await executeComfyWorkflow(
+        `${base}/ComfyBackendDirect`,
+        workflow as Record<string, any>,
+        request.signal,
+        { label: "SwarmUI/ComfyBackendDirect", cookie: token ? `swarm_token=${token}` : undefined, wsTimeoutMs: 15_000 },
+      )
+      return {
+        imageDataUrl,
+        model: request.model || "comfyui-workflow",
+        provider: this.name,
+      }
+    }
+
     let sessionId = await this.getSession(base, token, request.signal)
     let body = this.buildBody(sessionId, request)
 
-    let res = await fetch(`${base}/API/GenerateText2Image`, {
-      method: "POST",
-      headers: this.buildHeaders(token),
-      body: JSON.stringify(body),
-      signal: request.signal,
-    })
+    // sessionId can change after an invalid_session_id retry, so the abort
+    // handler reads it through a closure that follows reassignment.
+    const abortHandler = () => {
+      fetch(`${base}/API/InterruptAll`, {
+        method: "POST",
+        headers: this.buildHeaders(token),
+        body: JSON.stringify({ session_id: sessionId }),
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {})
+    }
+    request.signal?.addEventListener("abort", abortHandler, { once: true })
 
-    // Retry once on invalid session
-    if (!res.ok) {
-      const text = await res.text().catch(() => "")
-      if (text.includes("invalid_session_id") || text.includes("Invalid session")) {
-        this.invalidateSession(base, token)
-        sessionId = await this.getSession(base, token, request.signal)
-        body = this.buildBody(sessionId, request)
-        res = await fetch(`${base}/API/GenerateText2Image`, {
-          method: "POST",
-          headers: this.buildHeaders(token),
-          body: JSON.stringify(body),
-          signal: request.signal,
-        })
-      }
+    try {
+      let res = await fetch(`${base}/API/GenerateText2Image`, {
+        method: "POST",
+        headers: this.buildHeaders(token),
+        body: JSON.stringify(body),
+        signal: request.signal,
+      })
+
+      // Retry once on invalid session
       if (!res.ok) {
-        throw new Error(`SwarmUI generation error ${res.status}: ${text || await res.text().catch(() => "Unknown")}`)
+        const text = await res.text().catch(() => "")
+        if (text.includes("invalid_session_id") || text.includes("Invalid session")) {
+          this.invalidateSession(base, token)
+          sessionId = await this.getSession(base, token, request.signal)
+          body = this.buildBody(sessionId, request)
+          res = await fetch(`${base}/API/GenerateText2Image`, {
+            method: "POST",
+            headers: this.buildHeaders(token),
+            body: JSON.stringify(body),
+            signal: request.signal,
+          })
+        }
+        if (!res.ok) {
+          throw new Error(`SwarmUI generation error ${res.status}: ${text || await res.text().catch(() => "Unknown")}`)
+        }
       }
-    }
 
-    const data = (await res.json()) as Record<string, any>
+      const data = (await res.json()) as Record<string, any>
 
-    if (data.error || data.error_id) {
-      throw new Error(`SwarmUI error: ${data.error || data.error_id}`)
-    }
+      if (data.error || data.error_id) {
+        throw new Error(`SwarmUI error: ${data.error || data.error_id}`)
+      }
 
-    const images: string[] = Array.isArray(data.images) ? data.images : []
-    if (images.length === 0) {
-      throw new Error("SwarmUI returned no images")
-    }
+      const images: string[] = Array.isArray(data.images) ? data.images : []
+      if (images.length === 0) {
+        throw new Error("SwarmUI returned no images")
+      }
 
-    const imageDataUrl = await this.fetchImage(base, images[0], token, request.signal)
+      const imageDataUrl = await this.fetchImage(base, images[0], token, request.signal)
 
-    return {
-      imageDataUrl,
-      model: request.model || "unknown",
-      provider: this.name,
+      return {
+        imageDataUrl,
+        model: request.model || "unknown",
+        provider: this.name,
+      }
+    } finally {
+      request.signal?.removeEventListener("abort", abortHandler)
     }
   }
 
@@ -347,20 +381,54 @@ export class SwarmUIImageProvider implements ImageProvider {
   > {
     const base = this.baseUrl(apiUrl)
     const token = apiKey || undefined
+
+    // Workflow mode: stream via /ComfyBackendDirect.
+    const workflow = request.parameters?.workflow
+    if (workflow && typeof workflow === "object") {
+      const stream = executeComfyWorkflowStream(
+        `${base}/ComfyBackendDirect`,
+        workflow as Record<string, any>,
+        request.signal,
+        { label: "SwarmUI/ComfyBackendDirect", cookie: token ? `swarm_token=${token}` : undefined, wsTimeoutMs: 15_000 },
+      )
+      while (true) {
+        const next = await stream.next()
+        if (next.done) {
+          return {
+            imageDataUrl: next.value.imageDataUrl,
+            model: request.model || "comfyui-workflow",
+            provider: this.name,
+          }
+        }
+        const event = next.value
+        if (event.type === "progress") {
+          yield { step: event.step, totalSteps: event.totalSteps }
+        } else if (event.type === "executing") {
+          yield { nodeId: event.nodeId }
+        } else if (event.type === "preview") {
+          yield { preview: event.imageBase64 }
+        }
+      }
+    }
+
     const sessionId = await this.getSession(base, token, request.signal)
 
     const wsUrl = base.replace(/^http/, "ws") + "/API/GenerateText2ImageWS"
-    const ws = new WebSocket(wsUrl)
-
-    await new Promise<void>((resolve, reject) => {
-      ws.addEventListener("open", () => resolve())
-      ws.addEventListener("error", (e) => reject(new Error(`SwarmUI WebSocket error: ${e}`)))
-      setTimeout(() => reject(new Error("SwarmUI WebSocket connection timeout")), 15_000)
-    })
+    const ws = await openWebSocket(wsUrl, { label: "SwarmUI", timeoutMs: 15_000 })
 
     // Send the generation parameters as the initial message
     const body = this.buildBody(sessionId, request)
     ws.send(JSON.stringify(body))
+
+    const abortHandler = () => {
+      fetch(`${base}/API/InterruptAll`, {
+        method: "POST",
+        headers: this.buildHeaders(token),
+        body: JSON.stringify({ session_id: sessionId }),
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {})
+    }
+    request.signal?.addEventListener("abort", abortHandler, { once: true })
 
     let imagePath: string | null = null
 
@@ -381,6 +449,7 @@ export class SwarmUIImageProvider implements ImageProvider {
         }
       }
     } finally {
+      request.signal?.removeEventListener("abort", abortHandler)
       ws.close()
     }
 
@@ -400,7 +469,15 @@ export class SwarmUIImageProvider implements ImageProvider {
   async validateKey(apiKey: string, apiUrl: string): Promise<boolean> {
     try {
       const base = this.baseUrl(apiUrl)
-      await this.getSession(base, apiKey || undefined)
+      const token = apiKey || undefined
+      const sessionId = await this.getSession(base, token)
+      const res = await fetch(`${base}/API/GetCurrentStatus`, {
+        method: "POST",
+        headers: this.buildHeaders(token),
+        body: JSON.stringify({ session_id: sessionId }),
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!res.ok) await throwProviderResponseError(this.displayName, "connection check", res)
       return true
     } catch (err) {
       if (err instanceof ProviderRequestError) throw err
