@@ -1096,6 +1096,34 @@ export function consolidateEdgeTypes(chatId: string): number {
  *  recency, type-evidence metadata) reset to zero so live ingestion can
  *  rebuild those without double-counting against the prior pre-rebuild run.
  */
+/**
+ * Hard-delete an entity and all its mentions and relations. Skips
+ * user-edited entities (user_edited_at IS NOT NULL) to preserve manual work.
+ *
+ * Used by the sidecar arbiter to remove graph records the sidecar judged as
+ * invalid (e.g., a verb that was incorrectly captured as an entity in a prior
+ * heuristic pass).
+ *
+ * @returns true if the entity was deleted; false if not found or preserved.
+ */
+export function deleteEntityIfNotUserEdited(entityId: string): boolean {
+  const db = getDb();
+  const row = db.query("SELECT user_edited_at FROM memory_entities WHERE id = ?").get(entityId) as
+    | { user_edited_at: number | null }
+    | null;
+  if (!row) return false;
+  if (row.user_edited_at !== null) return false;
+
+  db.transaction(() => {
+    db.query("DELETE FROM memory_mentions WHERE entity_id = ?").run(entityId);
+    db.query(
+      "DELETE FROM memory_relations WHERE source_entity_id = ? OR target_entity_id = ?",
+    ).run(entityId, entityId);
+    db.query("DELETE FROM memory_entities WHERE id = ?").run(entityId);
+  })();
+  return true;
+}
+
 export function deleteEntitiesForChat(
   chatId: string,
   opts: { preserveUserEdited?: boolean } = {},
@@ -1656,6 +1684,18 @@ export function pruneStaleEntities(
   }
 
   return totalArchived;
+}
+
+/**
+ * Get all provisional (unconfirmed) entity names for a chat. Used to ensure
+ * the arbiter batch always sees provisionals for grading, regardless of the
+ * mention-count-based cap on getActiveEntities.
+ */
+export function getProvisionalEntityNames(chatId: string): string[] {
+  const rows = getDb()
+    .query("SELECT name FROM memory_entities WHERE chat_id = ? AND confidence = 'provisional'")
+    .all(chatId) as Array<{ name: string }>;
+  return rows.map((r) => r.name);
 }
 
 /**

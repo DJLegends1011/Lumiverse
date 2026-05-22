@@ -179,6 +179,50 @@ function stripCustomReasoningBlocks(content: string, prefix: string, suffix: str
   return result;
 }
 
+/**
+ * Curated default list of tag names whose inner CONTENT is structured
+ * scaffolding (HUD blocks, status lines, dice rolls, platform embeds,
+ * tracker output, OOC notes, tool call records, etc.) and must be removed
+ * wholesale rather than letting their inner text pollute prose-based
+ * extraction. Lowercase. NOT included: loom_record / loom_ledger /
+ * loom_state / loom_memory / loom_context — those carry authored narrative
+ * continuity that downstream evaluators legitimately need.
+ */
+const DEFAULT_SCAFFOLD_TAGS = [
+  "status", "hud", "scene", "meta", "system", "banner",
+  "embed", "field",
+  "discord", "channel", "server", "guild",
+  "dice", "roll", "d20", "dieroll", "throw",
+  "timestamp", "time", "clock", "date",
+  "tracker", "inventory", "stats", "vitals", "health", "hp", "mp",
+  "notes", "note",
+  "ooc",
+  "tool_call", "tool_response", "tool_use", "tool_result", "tool_invocation",
+];
+
+/**
+ * Strip an explicit list of tag names along with their inner content.
+ *
+ * Used for HUD/status/embed-style scaffolding that wraps structured data
+ * the cortex should not treat as prose. Handles paired tags, self-closing
+ * tags, and unclosed opening tags at end of content (interrupted generation).
+ *
+ * Tag names are matched case-insensitively. Non-identifier characters in the
+ * supplied names are silently discarded.
+ */
+export function stripScaffoldTagBlocks(content: string, tagNames: string[]): string {
+  const cleaned = tagNames
+    .map((t) => (t || "").replace(/[^a-zA-Z0-9_]/g, ""))
+    .filter((t) => t.length > 0);
+  if (cleaned.length === 0) return content;
+  const pattern = `(?:${cleaned.join("|")})`;
+  let result = content;
+  result = result.replace(new RegExp(`<\\s*(${pattern})\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*\\1\\s*>`, "gi"), " ");
+  result = result.replace(new RegExp(`<\\s*${pattern}\\b[^>]*\\/\\s*>`, "gi"), " ");
+  result = result.replace(new RegExp(`<\\s*${pattern}\\b[^>]*>[\\s\\S]*$`, "gi"), "");
+  return result;
+}
+
 export interface StripNonProseOptions {
   /**
    * Preserve `<font color="...">` and `<span style="color: ...">` tags so
@@ -187,16 +231,82 @@ export interface StripNonProseOptions {
    * are rare in practice because color spans are typically paired.
    */
   keepFontTags?: boolean;
+  /**
+   * Additional scaffolding tag names (beyond DEFAULT_SCAFFOLD_TAGS) whose
+   * inner content should be stripped wholesale. Lowercase, no angle brackets.
+   * Used to support user-defined HUD / status / tracker tags without code
+   * changes.
+   */
+  extraScaffoldTags?: string[];
+}
+
+/**
+ * Aggressively strip every XML/HTML tag along with its inner content.
+ *
+ * Authored prose for the cortex is expected to be top-level text — anything
+ * wrapped in tags is treated as scaffolding, UI markup, or a visual element
+ * that should not pollute extraction. Self-closing tags are stripped tag-only
+ * (no content existed). `<br>` is preserved as a newline. Unclosed opening
+ * tags at end of content (truncated generation) and orphan closing tags are
+ * also removed.
+ *
+ * Runs multiple passes so nested same-name tags collapse outward (lazy match
+ * handles innermost first).
+ */
+export function stripAllXmlTagsAndContent(content: string): string {
+  let result = content;
+  // Convert <br> to newlines BEFORE the strip pass (it's a void tag that
+  // semantically equates to whitespace, not a wrapper).
+  result = result.replace(/<\s*br\s*\/?>/gi, "\n");
+
+  let prev: string;
+  let iterations = 0;
+  do {
+    prev = result;
+    // Paired tags with inner content. Lazy match collapses innermost first.
+    result = result.replace(
+      /<\s*([a-zA-Z][\w:-]*)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/g,
+      " ",
+    );
+    iterations++;
+  } while (result !== prev && iterations < 8);
+
+  // Self-closing tags (with or without trailing slash); content N/A.
+  result = result.replace(/<\s*[a-zA-Z][\w:-]*\b[^>]*\/\s*>/g, " ");
+  // Unclosed opening tag at end of content (interrupted generation).
+  result = result.replace(/<\s*[a-zA-Z][\w:-]*\b[^>]*>[\s\S]*$/, "");
+  // Orphan closing tags left over from mismatched markup.
+  result = result.replace(/<\s*\/\s*[a-zA-Z][\w:-]*\s*>/g, " ");
+
+  return result;
+}
+
+/** Within a preserved font block, strip any nested tag markers but keep their
+ *  text so inline emphasis (`<b>important</b>`) inside authored colored prose
+ *  passes through as plain text. The outer font tag itself is untouched. */
+function cleanFontBlockInner(fontBlock: string): string {
+  const m = fontBlock.match(/^(<\s*(font|span)\b[^>]*>)([\s\S]*?)(<\s*\/\s*\2\s*>)$/i);
+  if (!m) return fontBlock;
+  const [, open, , inner, close] = m;
+  return open + stripAllHtmlTagsPreserveContent(inner) + close;
 }
 
 /**
  * Strip non-prose markup so Memory Cortex evaluators (entity / relationship /
  * salience extraction, sidecar LLM prompts) only see narrative text.
  *
- * Removes `<details>` blocks, lumia_ooc and other meta loom tags, reasoning
- * blocks, and HTML formatting wrappers (preserving inner text where the tag
- * itself is decorative). When `options.keepFontTags` is true, font color tags
- * are stashed through the pass so they survive for font-color attribution.
+ * Removes `<details>`, lumia_ooc + other meta loom tags, reasoning blocks,
+ * scaffold tags (status / hud / embed / dice / tool_call / etc.), and — as of
+ * the strict-prose pass — every remaining XML/HTML tag along with its inner
+ * content. Authored prose for the cortex is top-level text; anything wrapped
+ * in a tag is treated as a visual element that doesn't belong in extraction.
+ *
+ * When `options.keepFontTags` is true, `<font color="...">` and
+ * `<span style="color: ...">` blocks are stashed before the aggressive strip
+ * and restored after, so font-color attribution still has tags to read.
+ * Inline emphasis tags INSIDE those preserved blocks (e.g. `<b>` inside a
+ * font block) are stripped tag-only with their text preserved — emphasis
+ * inside authored colored prose still flows as natural text.
  */
 export function stripNonProseTags(content: string, options?: StripNonProseOptions): string {
   let result = content;
@@ -206,29 +316,48 @@ export function stripNonProseTags(content: string, options?: StripNonProseOption
 
   result = stripDetailsBlocks(result);
   result = stripLoomTags(result);
+  result = stripScaffoldTagBlocks(result, [
+    ...DEFAULT_SCAFFOLD_TAGS,
+    ...(options?.extraScaffoldTags ?? []),
+  ]);
 
   if (options?.keepFontTags) {
-    // Pair-stash whole color blocks so orphan opens/closes from non-color spans
-    // are still stripped by the catch-all below.
+    // Pair-stash whole color blocks (with their inner formatting tags
+    // collapsed to plain text) so the aggressive strip below can't touch
+    // them, and so any structural wrappers AROUND them still get destroyed.
     const stash: string[] = [];
     const stashPair = (re: RegExp) => {
       result = result.replace(re, (match) => {
-        stash.push(match);
+        stash.push(cleanFontBlockInner(match));
         return `\x00FT${stash.length - 1}\x00`;
       });
     };
     stashPair(/<font\b[^>]*>[\s\S]*?<\/font\s*>/gi);
     stashPair(/<span\s+style\s*=\s*["'][^"']*color\s*:[^"']*["'][^>]*>[\s\S]*?<\/span\s*>/gi);
 
-    result = stripHtmlFormattingTags(result);
-    result = stripAllHtmlTagsPreserveContent(result);
+    result = stripAllXmlTagsAndContent(result);
 
     result = result.replace(/\x00FT(\d+)\x00/g, (_, idx) => stash[Number(idx)]);
   } else {
-    result = stripHtmlFormattingTags(result);
-    result = stripAllHtmlTagsPreserveContent(result);
+    // Even when not preserving font tags, the inner colored prose is still
+    // authored narrative text and must flow through. Replace each font /
+    // colored-span block with its inner text (with nested formatting tags
+    // also collapsed) BEFORE the aggressive strip wipes it out.
+    result = result.replace(/<font\b[^>]*>([\s\S]*?)<\/font\s*>/gi, (_, inner) =>
+      stripAllHtmlTagsPreserveContent(inner));
+    result = result.replace(
+      /<span\s+style\s*=\s*["'][^"']*color\s*:[^"']*["'][^>]*>([\s\S]*?)<\/span\s*>/gi,
+      (_, inner) => stripAllHtmlTagsPreserveContent(inner),
+    );
+
+    result = stripAllXmlTagsAndContent(result);
   }
 
+  // Aggressive strip leaves runs of spaces where stripped blocks used to live.
+  // Collapse horizontal whitespace runs to a single space and trim around
+  // newlines so structural breaks survive but accidental gaps don't.
+  result = result.replace(/[ \t\f\v]+/g, " ");
+  result = result.replace(/ ?\n ?/g, "\n");
   return collapseExcessiveNewlines(result).trim();
 }
 

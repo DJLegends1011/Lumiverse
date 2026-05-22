@@ -78,11 +78,59 @@ describe("stripNonProseTags", () => {
     ).toBe("Prose. More.");
   });
 
-  test("strips non-color spans and other HTML wrappers while preserving inner text", () => {
+  test("strips non-font tags AND their inner content (strict prose mode)", () => {
+    // Authored prose is expected to be top-level text. Any wrapping is treated
+    // as scaffolding/UI/visual element and gets removed wholesale.
     expect(
       stripNonProseTags("A <b>bold</b> and <span>plain</span> and <em>italic</em>.", {
         keepFontTags: true,
       }),
-    ).toBe("A bold and plain and italic.");
+    ).toBe("A and and .");
+  });
+
+  test("preserves inline formatting INSIDE a font block as plain text", () => {
+    // Emphasis tags nested inside an authored font color block should still
+    // pass through as text, otherwise we'd lose color-attributed prose.
+    expect(
+      stripNonProseTags(
+        '<font color="#ff00ff">Hello, said <b>Juniper</b> calmly.</font>',
+        { keepFontTags: true },
+      ),
+    ).toBe('<font color="#ff00ff">Hello, said Juniper calmly.</font>');
+  });
+
+  test("removes div/p UI wrappers and any font inside them", () => {
+    // User example: a structural wrapper indicates a UI/visual element. The
+    // whole block — including a font tag living inside it — gets stripped.
+    const input = '<div class="thing-in-message">\ncontent in here <p> doesn\'t matter what kind </p> <font> get it out </font>\n</div>';
+    expect(stripNonProseTags(input, { keepFontTags: true })).toBe("");
+  });
+
+  test("preserves a top-level font block while killing a sibling UI block", () => {
+    const input = '<div class="badge">UI noise</div> <font color="#abc">colored prose</font> trailing text.';
+    expect(stripNonProseTags(input, { keepFontTags: true })).toBe(
+      '<font color="#abc">colored prose</font> trailing text.',
+    );
+  });
+
+  test("strips Spindle extension XML tags and their inner content", () => {
+    const input = 'Prose before. <spindle_game_state>HP: 50/100\nMana: 30</spindle_game_state> Prose after.';
+    expect(stripNonProseTags(input, { keepFontTags: true })).toBe(
+      "Prose before. Prose after.",
+    );
+  });
+
+  test("strips Spindle tags nested inside a loom narrative block", () => {
+    // loom_state preserves inner text (tag markers stripped), then the
+    // aggressive pass catches the now-top-level extension tags.
+    const input = 'Intro. <loom_state>Context. <ext_tracker>HP: 50</ext_tracker> More context.</loom_state> End.';
+    expect(stripNonProseTags(input, { keepFontTags: true })).toBe(
+      "Intro. Context. More context. End.",
+    );
+  });
+
+  test("strips self-closing and attribute-bearing extension tags", () => {
+    const input = 'A. <ext_ping status="ready" /> B. <ext_data type="json">{"key":"val"}</ext_data> C.';
+    expect(stripNonProseTags(input, { keepFontTags: true })).toBe("A. B. C.");
   });
 });

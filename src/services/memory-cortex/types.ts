@@ -345,6 +345,22 @@ export interface DiscoveredAlias {
   evidence?: string;
 }
 
+/** Sidecar verdict on heuristic candidates and existing graph records for a chunk.
+ *  Only populated when the sidecar was given a candidate list to grade. */
+export interface SidecarGradedHeuristics {
+  /** Heuristic entity names the sidecar judged as not real entities in this chunk. */
+  rejectedHeuristicEntities: string[];
+  /** Heuristic name -> sidecar's canonical name. Heuristic entries are renamed,
+   *  then deduped against the sidecar's own entitiesPresent list. */
+  transformedHeuristicEntities: Array<{ from: string; to: string }>;
+  /** Heuristic relationships the sidecar judged as unsupported by the passage. */
+  rejectedHeuristicRelationships: Array<{ source: string; target: string; type: string }>;
+  /** Existing graph entities (already persisted from prior chunks) the sidecar
+   *  judged as not real entities. Subject to gradesExistingRecords gating and
+   *  user-edit preservation. */
+  rejectedExistingEntities: string[];
+}
+
 export interface SidecarExtractionResult {
   score: number;
   emotionalTags: EmotionalTag[];
@@ -355,6 +371,7 @@ export interface SidecarExtractionResult {
   relationshipsShown: ExtractedRelationship[];
   fontColors: SidecarFontColor[];
   discoveredAliases: DiscoveredAlias[];
+  gradedHeuristics?: SidecarGradedHeuristics;
 }
 
 // ─── Retrieval Types ───────────────────────────────────────────

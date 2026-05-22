@@ -317,13 +317,17 @@ function startTrackedCortexRebuild(options: {
     characterNames,
     generateRawFn,
     sidecarConnectionId,
-    (current, total) => {
+    (rebuildState) => {
       eventBus.emit(EventType.CORTEX_REBUILD_PROGRESS, {
         chatId,
         status: "processing",
-        current,
-        total,
-        percent: Math.round((current / total) * 100),
+        current: rebuildState.current,
+        total: rebuildState.total,
+        percent: rebuildState.percent,
+        phase: rebuildState.phase,
+        inFlightBatches: rebuildState.inFlightBatches,
+        lastProviderRequestAt: rebuildState.lastProviderRequestAt,
+        lastProviderResponseMs: rebuildState.lastProviderResponseMs,
         ...(source ? { source } : {}),
       }, userId);
     },

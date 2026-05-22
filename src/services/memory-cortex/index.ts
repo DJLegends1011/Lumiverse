@@ -31,6 +31,7 @@ import { refineHeuristicDetections } from "./detection-refiner";
 import { filterEntitiesByExtractionFilters } from "./entity-extraction-filters";
 import { isPlausibleAlias, sanitizeAlias } from "./alias-validation";
 import { runHeuristicAnalysisInWorker } from "./heuristic-worker-host";
+import { resolveCounter } from "../tokenizer.service";
 import * as entityGraph from "./entity-graph";
 import * as entityContext from "./entity-context";
 import * as consolidation from "./consolidation";
@@ -38,7 +39,7 @@ import { buildEmotionalContext } from "./emotional-context";
 import { queryCortex as queryCortexImpl, queryVaultCortex as queryVaultCortexImpl } from "./retrieval";
 import { formatShadowPrompt, type FormatterMode, type ShadowPromptResult } from "./shadow-formatter";
 import { getCortexUsageStats, runMaintenance, debouncedVectorize } from "./gc";
-import { processChunkFontColors, formatColorMapForPrompt, deleteColorMapForChat, getColorMap, recordColorAttribution } from "./font-attribution";
+import { processChunkFontColors, formatColorMapForPrompt, deleteColorMapForChat, getColorMap, recordColorAttribution, stripFontTags, stripThoughtDelimiters } from "./font-attribution";
 import { extractRelationshipsHeuristic } from "./relationship-extractor";
 import { extractNPsFromChunk } from "./np-chunker";
 import { stripNonProseTags } from "../../utils/content-sanitizer";
@@ -865,6 +866,11 @@ export async function processChunk(
   /** Alias → canonical name. Built from character/persona descriptions and world books.
    *  Used to auto-associate nicknames from descriptions to their canonical entity. */
   descriptionAliases?: Map<string, string>,
+  /** Pre-computed heuristic output for this chunk. When provided, processChunk
+   *  skips its own runHeuristicAnalysisInWorker call. Used by the batch rebuild
+   *  path so the heuristic worker doesn't run twice (once to build arbiter
+   *  input, again during ingestion). */
+  precomputedHeuristic?: import("./heuristic-runtime").HeuristicAnalysisOutput,
 ): Promise<void> {
   const config = getCortexConfig(data.userId);
   if (!config.enabled) return;
@@ -895,11 +901,16 @@ export async function processChunk(
     let sidecarFacts: string[] = [];
     let sidecarFontColors: Array<{ hexColor: string; characterName: string; usageType: "speech" | "thought" | "narration" }> = [];
     let sidecarDiscoveredAliases: Array<{ canonicalName: string; alias: string; evidence?: string }> = [];
+    let sidecarGrading: import("./types").SidecarGradedHeuristics | undefined;
 
     const rawChunkContent = hydrateChunkContentFromMessages(data.messageIds, data.content);
-    // Strip non-prose markup (HTML, <details>, <lumia_ooc>, etc.) before any
-    // evaluator sees the chunk — keeps font tags so attribution still works.
-    const proseContent = stripNonProseTags(rawChunkContent, { keepFontTags: true });
+    // Strip non-prose markup (HTML, <details>, <lumia_ooc>, scaffold blocks,
+    // user-defined HUD tags, etc.) before any evaluator sees the chunk —
+    // keeps font tags so attribution still works.
+    const proseContent = stripNonProseTags(rawChunkContent, {
+      keepFontTags: true,
+      extraScaffoldTags: config.nonProseScaffoldTags,
+    });
     const thoughtDelimiters = config.thoughtMarkers;
 
     const knownEntities = entityGraph.getActiveEntities(data.chatId);
@@ -908,6 +919,24 @@ export async function processChunk(
       entityIdByName.set(e.name.toLowerCase(), e.id);
       for (const alias of e.aliases) entityIdByName.set(alias.toLowerCase(), e.id);
     }
+
+    // Allowlist for font color attribution. Only character-type entities and
+    // the canonical chat participants (characters + persona) are eligible — a
+    // word like "Discord" or "gyoza" picked up from a status block will not
+    // match here and the attribution gets dropped instead of polluting the
+    // color table. Aliases from descriptions count too so persona nicknames
+    // resolve correctly even before they're persisted.
+    const allowedColorNames = new Set<string>();
+    for (const n of characterNames) allowedColorNames.add(n.toLowerCase());
+    if (descriptionAliases) {
+      for (const [alias] of descriptionAliases.entries()) allowedColorNames.add(alias.toLowerCase());
+    }
+    for (const e of knownEntities) {
+      if (e.entityType !== "character") continue;
+      allowedColorNames.add(e.name.toLowerCase());
+      for (const alias of e.aliases) allowedColorNames.add(alias.toLowerCase());
+    }
+    const isAllowedColorName = (name: string): boolean => allowedColorNames.has(name.trim().toLowerCase());
 
     const entityContext = knownEntities.map((e) => ({
       name: e.name,
@@ -932,7 +961,11 @@ export async function processChunk(
       !config.salienceScoring ||
       !sidecarActive;
 
-    const heuristicPromise = shouldRunHeuristicWorker
+    // When a precomputed heuristic is supplied (batch rebuild path), skip the
+    // worker call entirely and treat the precomputed value as the resolved
+    // result. shouldRunHeuristicWorker still governs whether heuristic data is
+    // used downstream.
+    const heuristicPromise = shouldRunHeuristicWorker && !precomputedHeuristic
       ? runHeuristicAnalysisInWorker({
           cleanContent,
           knownEntities: knownEntities.map((entity) => ({
@@ -953,51 +986,152 @@ export async function processChunk(
       updateIngestionStatus(data.userId, data.chatId, { phase: "heuristics", chunkId: data.chunkId });
     }
 
-    let heuristicResult = null as Awaited<typeof heuristicPromise>;
-
-    let extraction: Awaited<ReturnType<typeof extractWithSidecar>> | null = null;
-    if (sidecarActive) {
-      updateIngestionStatus(data.userId, data.chatId, { phase: "sidecar", chunkId: data.chunkId });
-      const sidecarStart = performance.now();
-      const sidecarTimeout = config.sidecarTimeoutMs ?? 30000;
-      const ac = sidecarTimeout > 0 ? new AbortController() : null;
-      const timer = ac ? setTimeout(() => {
-        console.warn("[memory-cortex] Sidecar extraction timed out, aborting LLM call");
-        ac.abort();
-      }, sidecarTimeout) : null;
-      const activeGenerateRawFn = generateRawFn!;
-      const activeSidecarConnectionId = sidecarConnectionId!;
-      const boundGenFn: typeof activeGenerateRawFn = ac
-        ? (opts) => activeGenerateRawFn({ ...opts, signal: ac.signal })
-        : activeGenerateRawFn;
-
-      try {
-        extraction = await extractWithSidecar(
-          proseContent,
-          boundGenFn,
-          activeSidecarConnectionId,
-          { characterNames, knownEntities: entityContext },
-        );
-      } catch (err: any) {
-        if (err?.name === "AbortError" || ac?.signal.aborted) {
-          console.warn("[memory-cortex] Sidecar extraction timed out, falling back to heuristic");
-          extraction = null;
-        } else {
-          throw err;
-        }
-      } finally {
-        timings.sidecarMs = performance.now() - sidecarStart;
-        if (timer) clearTimeout(timer);
-      }
+    let heuristicResult = (shouldRunHeuristicWorker && precomputedHeuristic
+      ? precomputedHeuristic
+      : null) as Awaited<typeof heuristicPromise>;
+    if (heuristicResult && precomputedHeuristic) {
+      timings.heuristicMs = heuristicResult.timings.totalMs;
+      timings.heuristicSalienceMs = heuristicResult.timings.salienceMs;
+      timings.heuristicEntityMs = heuristicResult.timings.entityMs;
+      timings.heuristicRelationshipMs = heuristicResult.timings.relationshipMs;
+      timings.heuristicAliasMs = heuristicResult.timings.aliasMs;
     }
 
-    if (heuristicPromise) {
+    // Arbiter mode needs heuristic candidates BEFORE the sidecar call so the
+    // sidecar can grade them. We pay a small serial cost (heuristic worker
+    // typically ~1-50ms) in exchange for sidecar-as-arbiter semantics.
+    const arbiterActive = sidecarActive
+      && config.sidecarReliability.arbitratesHeuristics
+      && !!heuristicPromise;
+    let arbiterInput: {
+      heuristicEntities: Array<{ name: string; type: string }>;
+      heuristicRelationships: Array<{ source: string; target: string; type: string }>;
+      existingGraphEntities: string[];
+    } | undefined;
+    if (arbiterActive && heuristicPromise) {
       heuristicResult = await heuristicPromise;
       timings.heuristicMs = heuristicResult.timings.totalMs;
       timings.heuristicSalienceMs = heuristicResult.timings.salienceMs;
       timings.heuristicEntityMs = heuristicResult.timings.entityMs;
       timings.heuristicRelationshipMs = heuristicResult.timings.relationshipMs;
       timings.heuristicAliasMs = heuristicResult.timings.aliasMs;
+      arbiterInput = {
+        heuristicEntities: heuristicResult.entities.map((e) => ({ name: e.name, type: e.type })),
+        heuristicRelationships: heuristicResult.relationships.map((r) => ({
+          source: r.source, target: r.target, type: r.type,
+        })),
+        existingGraphEntities: config.sidecarReliability.gradesExistingRecords
+          ? knownEntities.map((e) => e.name)
+          : [],
+      };
+    }
+
+    let extraction: Awaited<ReturnType<typeof extractWithSidecar>> | null = null;
+    let skipChunkPersistence = false;
+    let liveSidecarTokenCounter: ((text: string) => number) | undefined;
+    if (sidecarActive) {
+      updateIngestionStatus(data.userId, data.chatId, { phase: "sidecar", chunkId: data.chunkId });
+      // Resolve a tokenizer once per processChunk for diagnostic log lines.
+      // Falls back to char/4 inside resolveCounter when no model-specific
+      // tokenizer is available — never throws.
+      try {
+        const resolved = await resolveCounter(config.sidecar.model || "");
+        liveSidecarTokenCounter = resolved.count;
+      } catch {
+        liveSidecarTokenCounter = undefined;
+      }
+      const sidecarStart = performance.now();
+      const maxAttempts = 1 + (config.sidecarReliability.maxRetries ?? 0);
+      const baseDelayMs = config.sidecarReliability.retryDelayMs ?? 500;
+      let lastErr: any = null;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (attempt > 0) {
+          const delay = baseDelayMs * Math.pow(2, attempt - 1);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          console.info(`[memory-cortex] Sidecar retry attempt ${attempt + 1}/${maxAttempts} after ${delay}ms`);
+        }
+
+        const sidecarTimeout = config.sidecarTimeoutMs ?? 30000;
+        const ac = sidecarTimeout > 0 ? new AbortController() : null;
+        const timer = ac ? setTimeout(() => {
+          console.warn("[memory-cortex] Sidecar extraction timed out, aborting LLM call");
+          ac.abort();
+        }, sidecarTimeout) : null;
+
+        try {
+          extraction = await extractWithSidecar(
+            proseContent,
+            generateRawFn!,
+            sidecarConnectionId!,
+            {
+              characterNames,
+              knownEntities: entityContext,
+              arbiter: arbiterInput,
+              descriptionAliases: descriptionAliases
+                ? [...descriptionAliases.entries()].map(([alias, canonicalName]) => ({ alias, canonicalName }))
+                : undefined,
+              samplingParameters: buildSidecarSamplingParameters(config.sidecar),
+              tokenCounter: liveSidecarTokenCounter,
+              logTag: `live chunk=${data.chunkId.slice(0, 8)} attempt=${attempt + 1}/${maxAttempts}`,
+              throwOnFailure: true,
+              signal: ac?.signal,
+            },
+          );
+          lastErr = null;
+          break;
+        } catch (err: any) {
+          lastErr = err;
+          const isAbort = err?.name === "AbortError" || ac?.signal.aborted;
+          if (!isAbort) {
+            console.warn(`[memory-cortex] Sidecar attempt ${attempt + 1}/${maxAttempts} failed:`, err?.message ?? err);
+          }
+        } finally {
+          if (timer) clearTimeout(timer);
+        }
+      }
+      timings.sidecarMs = performance.now() - sidecarStart;
+
+      if (!extraction && lastErr) {
+        if (config.sidecarReliability.fallback === "skip") {
+          console.warn(
+            `[memory-cortex] Sidecar failed after ${maxAttempts} attempt(s); skipping chunk persistence ` +
+            `(warmup signature left null so next warmup will retry)`,
+          );
+          skipChunkPersistence = true;
+        } else {
+          console.warn(`[memory-cortex] Sidecar failed after ${maxAttempts} attempt(s); falling back to heuristic`);
+        }
+      }
+    }
+
+    if (heuristicPromise && !heuristicResult) {
+      heuristicResult = await heuristicPromise;
+      timings.heuristicMs = heuristicResult.timings.totalMs;
+      timings.heuristicSalienceMs = heuristicResult.timings.salienceMs;
+      timings.heuristicEntityMs = heuristicResult.timings.entityMs;
+      timings.heuristicRelationshipMs = heuristicResult.timings.relationshipMs;
+      timings.heuristicAliasMs = heuristicResult.timings.aliasMs;
+    }
+
+    if (skipChunkPersistence) {
+      const skippedTimings: CortexIngestionTimings = {
+        mode: "sidecar",
+        fontMs: timings.fontMs,
+        heuristicMs: timings.heuristicMs,
+        heuristicSalienceMs: timings.heuristicSalienceMs,
+        heuristicEntityMs: timings.heuristicEntityMs,
+        heuristicRelationshipMs: timings.heuristicRelationshipMs,
+        heuristicAliasMs: timings.heuristicAliasMs,
+        sidecarMs: timings.sidecarMs,
+        graphMs: timings.graphMs,
+        dbMs: timings.dbMs,
+        totalMs: performance.now() - pipelineStartedAt,
+        completedAt: Date.now(),
+        chunkId: data.chunkId,
+      };
+      completeIngestionTracking(data.userId, data.chatId, data.chunkId, skippedTimings);
+      return;
     }
 
     if (extraction) {
@@ -1017,11 +1151,19 @@ export async function processChunk(
       sidecarFacts = extraction.keyFacts;
       sidecarFontColors = extraction.fontColors;
       sidecarDiscoveredAliases = extraction.discoveredAliases;
+      sidecarGrading = extraction.gradedHeuristics;
 
       if (extraction.fontColors.length > 0) {
         const dbStart = performance.now();
         for (const fc of extraction.fontColors) {
-          const entityId = entityIdByName.get(fc.characterName.toLowerCase()) || null;
+          if (!isAllowedColorName(fc.characterName)) continue;
+          // Only write here if the character is already persisted. Otherwise
+          // skip and let the post-ingest transactional write below handle it
+          // once the entity has been created — that avoids stamping a
+          // null-entity ("Unattributed") row that the later write can't always
+          // reliably replace.
+          const entityId = entityIdByName.get(fc.characterName.toLowerCase());
+          if (!entityId) continue;
           recordColorAttribution(data.chatId, fc.hexColor, entityId, fc.usageType as any, null);
         }
         timings.dbMs += performance.now() - dbStart;
@@ -1127,17 +1269,28 @@ export async function processChunk(
 
         const refinedEntities = refinedFallback?.entities ?? heuristicEntities;
 
+        // Sidecar arbiter: drop heuristic entities the sidecar rejected and
+        // rename heuristic entities the sidecar transformed to a canonical
+        // form. Done before merge so sidecar's own list naturally dedupes
+        // with the transformed names.
+        const arbitratedHeuristicEntities = sidecarGrading
+          ? applyEntityGrading(refinedEntities, sidecarGrading)
+          : refinedEntities;
+
         const mergedEntities = filterEntitiesByExtractionFilters(
-          mergeExtractedEntities(refinedEntities, sidecarEntities),
+          mergeExtractedEntities(arbitratedHeuristicEntities, sidecarEntities),
           cleanContent,
           config.entityExtractionFilters,
         );
 
-        const heuristicRelationships = heuristicResult?.relationships ?? refinedFallback?.relationships ?? extractRelationshipsHeuristic(
+        const heuristicRelationshipsRaw = heuristicResult?.relationships ?? refinedFallback?.relationships ?? extractRelationshipsHeuristic(
           cleanContent,
           mergedEntities.map((e) => e.name),
           salienceResult.emotionalTags,
         );
+        const heuristicRelationships = sidecarGrading
+          ? applyRelationshipGrading(heuristicRelationshipsRaw, sidecarGrading)
+          : heuristicRelationshipsRaw;
 
         const allowedEntityNames = new Set(mergedEntities.map((entity) => entity.name.toLowerCase()));
         const allRelationships = mergeRelationships(heuristicRelationships, sidecarRelationships).filter(
@@ -1165,13 +1318,23 @@ export async function processChunk(
 
         const dbStart = performance.now();
         db.query("UPDATE chat_chunks SET entity_ids = ? WHERE id = ?").run(JSON.stringify(entityIds), data.chunkId);
+        // Allowlist (characterNames + description aliases + persisted
+        // character-type entities) is the authoritative gate. Don't add an
+        // entityType check here: resolveEntityTypeFromEvidence can promote or
+        // demote a freshly-extracted character entity to a different type
+        // based on accumulated metadata, and that would silently drop
+        // legitimate attributions. If the name passes the allowlist, we know
+        // it's a real character regardless of what the graph's evidence
+        // resolution currently says about its type.
         for (const attr of fontResult.attributions) {
           if (!attr.entityName) continue;
+          if (!isAllowedColorName(attr.entityName)) continue;
           const entity = entityGraph.findEntityByName(data.chatId, attr.entityName);
           if (!entity) continue;
           recordColorAttribution(data.chatId, attr.hexColor, entity.id, attr.usageType, null);
         }
         for (const fc of sidecarFontColors) {
+          if (!isAllowedColorName(fc.characterName)) continue;
           const entity = entityGraph.findEntityByName(data.chatId, fc.characterName);
           if (!entity) continue;
           recordColorAttribution(data.chatId, fc.hexColor, entity.id, fc.usageType, null);
@@ -1315,6 +1478,26 @@ export async function processChunk(
         }
       }
 
+      // Sidecar arbiter: delete existing graph entities the sidecar judged as
+      // invalid (e.g., a verb erroneously persisted in an earlier chunk).
+      // Gated on gradesExistingRecords. User-edited entities are preserved by
+      // deleteEntityIfNotUserEdited regardless of sidecar verdict.
+      if (sidecarGrading
+        && config.sidecarReliability.gradesExistingRecords
+        && sidecarGrading.rejectedExistingEntities.length > 0) {
+        let deletedCount = 0;
+        for (const rejectedName of sidecarGrading.rejectedExistingEntities) {
+          const entity = entityGraph.findEntityByName(data.chatId, rejectedName);
+          if (!entity) continue;
+          if (entityGraph.deleteEntityIfNotUserEdited(entity.id)) deletedCount++;
+        }
+        if (deletedCount > 0) {
+          console.info(
+            `[memory-cortex] Sidecar graded ${deletedCount} existing entit${deletedCount === 1 ? "y" : "ies"} as invalid; removed from graph.`,
+          );
+        }
+      }
+
       db.query(
         "UPDATE chat_chunks SET cortex_warmup_signature = ?, cortex_warmup_completed_at = ? WHERE id = ?",
       ).run(warmupSignature, now, data.chunkId);
@@ -1357,6 +1540,8 @@ export async function processChunk(
         generateRawFn,
         sidecarConnectionId,
         config.sidecarTimeoutMs,
+        buildSidecarSamplingParameters(config.sidecar, { includeMaxTokens: false }),
+        config.nonProseScaffoldTags,
       )
       .catch((err) => {
         console.warn("[memory-cortex] Consolidation failed:", err);
@@ -1374,12 +1559,33 @@ export async function processChunk(
  */
 // ─── Rebuild State (in-memory, survives browser close) ─────────
 
+/** What the rebuild is doing right now. Surfaced so the UI can show "Awaiting
+ *  provider response..." instead of a frozen 0% during long LLM calls. */
+export type RebuildPhase =
+  | "starting"
+  | "heuristic_only"
+  | "precompute"
+  | "awaiting_provider"
+  | "ingesting"
+  | "idle_between_batches";
+
 interface RebuildState {
   chatId: string;
   status: "processing" | "complete" | "error";
   current: number;
   total: number;
   percent: number;
+  /** Coarse-grained phase of the most recently active batch worker. With
+   *  multiple concurrent batch workers, this reflects the latest transition;
+   *  the more accurate "is anything in flight" signal is inFlightBatches. */
+  phase: RebuildPhase;
+  /** Number of batches currently awaiting a provider response. > 0 means at
+   *  least one LLM call is in flight. */
+  inFlightBatches: number;
+  /** Epoch ms of the most recent batch dispatched to the provider. */
+  lastProviderRequestAt: number | null;
+  /** Wall-clock ms of the most recent completed batch response. */
+  lastProviderResponseMs: number | null;
   result?: { chunksProcessed: number; entitiesFound: number; relationsFound: number };
   error?: string;
   startedAt: number;
@@ -1395,6 +1601,11 @@ export function getRebuildStatus(chatId: string): RebuildState | null {
 /** Default concurrency for sidecar calls during rebuild */
 const REBUILD_CONCURRENCY = 5;
 
+/** Minimum cleaned-content length to bother pre-computing heuristics for the
+ *  arbiter prompt during rebuild. Chunks below this almost never contain
+ *  graphable entities; skipping the worker call shortens the critical path. */
+const ARBITER_PRECOMPUTE_MIN_CHARS = 80;
+
 export async function rebuildCortex(
   userId: string,
   chatId: string,
@@ -1407,7 +1618,11 @@ export async function rebuildCortex(
     signal?: AbortSignal;
   }) => Promise<{ content: string; tool_calls?: Array<{ name: string; args: Record<string, unknown> }> }>,
   sidecarConnectionId?: string,
-  onProgress?: (current: number, total: number) => void,
+  /** Called whenever the rebuild's state changes meaningfully (progress tick,
+   *  phase transition, batch dispatch/response). Receives a snapshot of the
+   *  full RebuildState so callers can relay phase + in-flight info to the
+   *  frontend, not just current/total. */
+  onProgress?: (state: Readonly<RebuildState>) => void,
   descriptionAliases?: Map<string, string>,
   options: CortexRebuildOptions = {},
 ): Promise<{ chunksProcessed: number; entitiesFound: number; relationsFound: number }> {
@@ -1464,15 +1679,23 @@ export async function rebuildCortex(
     current: completedBeforeStart,
     total: totalChunks,
     percent: totalChunks > 0 ? Math.round((completedBeforeStart / totalChunks) * 100) : 100,
+    phase: "starting",
+    inFlightBatches: 0,
+    lastProviderRequestAt: null,
+    lastProviderResponseMs: null,
     startedAt: Date.now(),
   };
   activeRebuilds.set(chatId, state);
+  const emit = () => { if (onProgress) onProgress(state); };
+  emit();
 
   try {
     const concurrency = config.sidecar?.rebuildConcurrency ?? 3;
 
     if (!sidecarAnalysisActive) {
       // Heuristic-only: sequential, ~1-2ms per chunk — no concurrency needed
+      state.phase = "heuristic_only";
+      emit();
       for (let i = 0; i < chunks.length; i++) {
         await processChunkFromRaw(
           chunks[i],
@@ -1486,7 +1709,7 @@ export async function rebuildCortex(
         const current = completedBeforeStart + i + 1;
         state.current = current;
         state.percent = totalChunks > 0 ? Math.round((current / totalChunks) * 100) : 100;
-        if (onProgress) onProgress(current, totalChunks);
+        emit();
         await yieldToEventLoop();
       }
     } else {
@@ -1498,12 +1721,27 @@ export async function rebuildCortex(
       const activeGenerateRawFn = generateRawFn!;
       const activeSidecarConnectionId = sidecarConnectionId!;
 
+      // Resolve a token counter once for the whole rebuild. The same counter
+      // is shared across all batches because they all use the same sidecar
+      // connection / model.
+      let rebuildTokenCounter: ((text: string) => number) | undefined;
+      try {
+        const resolved = await resolveCounter(config.sidecar.model || "");
+        rebuildTokenCounter = resolved.count;
+        console.info(`[memory-cortex] Rebuild dispatch logging using tokenizer=${resolved.name}`);
+      } catch {
+        rebuildTokenCounter = undefined;
+      }
+      let batchCounter = 0;
+
       const tickProgress = () => {
         completed++;
         state.current = completed;
         state.percent = totalChunks > 0 ? Math.round((completed / totalChunks) * 100) : 100;
-        if (onProgress) onProgress(completed, totalChunks);
+        emit();
       };
+
+      const arbiterMode = config.sidecarReliability.arbitratesHeuristics === true;
 
       async function processNextBatch(): Promise<void> {
         while (nextChunkIdx < chunks.length) {
@@ -1514,8 +1752,104 @@ export async function rebuildCortex(
           const batch = chunks.slice(start, end);
           const batchInput = batch.map((chunk, i) => ({
             index: i,
-            content: hydrateChunkContentFromMessages(safeJsonArray(chunk.message_ids), chunk.content),
+            // Strip non-prose content before the sidecar sees it — matching what
+            // the live processChunk path does. Without this, Spindle extension
+            // tags, HUD blocks, scaffold markup, and other XML-wrapped content
+            // would leak into the batch prompt and pollute extraction/salience.
+            // keepFontTags: true so the sidecar can still do color attribution.
+            content: stripNonProseTags(
+              hydrateChunkContentFromMessages(safeJsonArray(chunk.message_ids), chunk.content),
+              { keepFontTags: true, extraScaffoldTags: config.nonProseScaffoldTags },
+            ),
           }));
+
+          // Arbiter mode: pre-compute heuristics for the whole batch so the
+          // batched LLM call can grade them. Heuristic results are forwarded
+          // to processChunkWithPrecomputedSidecar to avoid running the worker
+          // a second time during ingestion.
+          let perChunkHeuristic: Array<import("./heuristic-runtime").HeuristicAnalysisOutput | null> = new Array(batch.length).fill(null);
+          let perChunkArbiter: Array<import("./salience-sidecar").BatchArbiterChunk | null> | undefined;
+          let batchExistingEntities: string[] | undefined;
+          if (arbiterMode) {
+            state.phase = "precompute";
+            emit();
+            const batchKnownEntities = entityGraph.getActiveEntities(chatId);
+            if (config.sidecarReliability.gradesExistingRecords) {
+              // Merge top confirmed entities + ALL provisionals. Provisionals
+              // sort last by mention_count and would otherwise be cut by the
+              // cap — but they're exactly the entries most likely to be junk
+              // that the arbiter should grade.
+              const confirmedNames = batchKnownEntities.slice(0, 60).map((e) => e.name);
+              const provisionalNames = entityGraph.getProvisionalEntityNames(chatId);
+              const seen = new Set(confirmedNames.map((n) => n.toLowerCase()));
+              for (const pn of provisionalNames) {
+                if (!seen.has(pn.toLowerCase())) {
+                  confirmedNames.push(pn);
+                  seen.add(pn.toLowerCase());
+                }
+              }
+              batchExistingEntities = confirmedNames;
+            }
+            const heuristicKnownEntities = batchKnownEntities.map((e) => ({
+              name: e.name,
+              entityType: e.entityType,
+              aliases: e.aliases,
+            }));
+            const heuristicAliases = descriptionAliases
+              ? [...descriptionAliases.entries()].map(([alias, canonicalName]) => ({ alias, canonicalName }))
+              : undefined;
+
+            perChunkHeuristic = await Promise.all(
+              batch.map((_, i) => {
+                const raw = batchInput[i].content;
+                // Approximate processChunk's cleanContent: strip non-prose
+                // tags, then font tags, then thought delimiters. Pure (no DB
+                // writes). Slight divergence from processChunk's full
+                // processChunkFontColors path is acceptable for grading input.
+                const proseContent = stripNonProseTags(raw, {
+                  keepFontTags: true,
+                  extraScaffoldTags: config.nonProseScaffoldTags,
+                });
+                const cleanContent = stripThoughtDelimiters(stripFontTags(proseContent), config.thoughtMarkers);
+
+                // Skip the worker entirely for chunks too small/empty to plausibly
+                // contain entities. Proper nouns are title-cased (Capital +
+                // lowercase) — chunks lacking that pattern, or below the length
+                // threshold, will produce empty heuristic output. Returning null
+                // omits the <arbiter> block for that passage (saving prompt
+                // tokens) and lets processChunk run its own heuristic worker
+                // during ingestion if needed.
+                if (cleanContent.length < ARBITER_PRECOMPUTE_MIN_CHARS || !/[A-Z][a-z]/.test(cleanContent)) {
+                  return Promise.resolve(null);
+                }
+
+                return runHeuristicAnalysisInWorker({
+                  cleanContent,
+                  knownEntities: heuristicKnownEntities,
+                  characterNames,
+                  entityWhitelist: config.entityWhitelist,
+                  minConfidence: config.entityPruning.minConfidence,
+                  entityExtractionFilters: config.entityExtractionFilters,
+                  descriptionAliases: heuristicAliases,
+                }).catch(() => null);
+              }),
+            );
+
+            perChunkArbiter = perChunkHeuristic.map((h) => {
+              if (!h) return null;
+              return {
+                heuristicEntities: h.entities.map((e) => ({ name: e.name, type: e.type })),
+                heuristicRelationships: h.relationships.map((r) => ({ source: r.source, target: r.target, type: r.type })),
+              };
+            });
+          }
+
+          const batchIdx = ++batchCounter;
+          const requestStart = Date.now();
+          state.inFlightBatches += 1;
+          state.lastProviderRequestAt = requestStart;
+          state.phase = "awaiting_provider";
+          emit();
 
           let sidecarResults: Array<import("./types").SidecarExtractionResult | null>;
           try {
@@ -1523,10 +1857,28 @@ export async function rebuildCortex(
               batchInput,
               activeGenerateRawFn,
               activeSidecarConnectionId,
-              { characterNames },
+              {
+                characterNames,
+                perChunkArbiter,
+                batchExistingEntities,
+                descriptionAliases: descriptionAliases
+                  ? [...descriptionAliases.entries()].map(([alias, canonicalName]) => ({ alias, canonicalName }))
+                  : undefined,
+                samplingParameters: buildSidecarSamplingParameters(config.sidecar),
+                tokenCounter: rebuildTokenCounter,
+                logTag: `rebuild:batch-${batchIdx} chat=${chatId.slice(0, 8)}`,
+              },
             );
-          } catch {
+          } catch (err: any) {
+            console.warn(`[memory-cortex] rebuild:batch-${batchIdx} threw, all chunks falling back to heuristic:`, err?.message ?? err);
             sidecarResults = new Array(batch.length).fill(null);
+          } finally {
+            state.inFlightBatches = Math.max(0, state.inFlightBatches - 1);
+            state.lastProviderResponseMs = Date.now() - requestStart;
+            // Other concurrent workers may still be awaiting the provider, so
+            // only flip back to "ingesting" if nothing else is in flight.
+            state.phase = state.inFlightBatches > 0 ? "awaiting_provider" : "ingesting";
+            emit();
           }
 
           for (let i = 0; i < batch.length; i++) {
@@ -1534,7 +1886,10 @@ export async function rebuildCortex(
             try {
               const sidecarResult = sidecarResults[i];
               if (sidecarResult) {
-                await processChunkWithPrecomputedSidecar(chunk, chatId, userId, characterNames, sidecarResult, descriptionAliases);
+                await processChunkWithPrecomputedSidecar(
+                  chunk, chatId, userId, characterNames, sidecarResult, descriptionAliases,
+                  perChunkHeuristic[i] ?? undefined,
+                );
               } else {
                 await processChunkFromRaw(chunk, chatId, userId, characterNames, undefined, undefined, descriptionAliases);
               }
@@ -1619,10 +1974,13 @@ async function processChunkWithPrecomputedSidecar(
   characterNames: string[],
   sidecarResult: import("./types").SidecarExtractionResult,
   descriptionAliases?: Map<string, string>,
+  /** Pre-computed heuristic output for this chunk. Forwarded to processChunk
+   *  so the heuristic worker doesn't run a second time during batched rebuild. */
+  precomputedHeuristic?: import("./heuristic-runtime").HeuristicAnalysisOutput,
 ): Promise<void> {
   // Build a fake generateRawFn that returns pre-computed tool_calls so processChunk's
   // sidecar branch gets structured data without making an actual API call.
-  const fakeToolCalls = [
+  const fakeToolCalls: Array<{ name: string; args: Record<string, unknown> }> = [
     {
       name: "score_salience",
       args: {
@@ -1664,6 +2022,21 @@ async function processChunkWithPrecomputedSidecar(
     },
   ];
 
+  // Forward the batched arbiter's verdict so processChunk's merge logic can
+  // drop/rename heuristic candidates and prune existing graph entities.
+  if (sidecarResult.gradedHeuristics) {
+    const g = sidecarResult.gradedHeuristics;
+    fakeToolCalls.push({
+      name: "grade_heuristic_candidates",
+      args: {
+        rejected_heuristic_entities: g.rejectedHeuristicEntities,
+        transformed_heuristic_entities: g.transformedHeuristicEntities.map((t) => ({ from: t.from, to: t.to })),
+        rejected_heuristic_relationships: g.rejectedHeuristicRelationships,
+        rejected_existing_entities: g.rejectedExistingEntities,
+      },
+    });
+  }
+
   const fakeGenerateRaw = async () => ({
     content: "",
     tool_calls: fakeToolCalls,
@@ -1684,6 +2057,7 @@ async function processChunkWithPrecomputedSidecar(
     fakeGenerateRaw as any,
     "precomputed",
     descriptionAliases,
+    precomputedHeuristic,
   );
 }
 
@@ -1775,6 +2149,85 @@ export function getRelations(chatId: string) {
 }
 
 // ─── Helpers ───────────────────────────────────────────────────
+
+/**
+ * Build LLM sampling parameters from the user-configured sidecar settings.
+ *
+ * The cortex settings UI exposes temperature, topP, and maxTokens; these need
+ * to flow through to the underlying LLM call. Without this, the sidecar
+ * silently fell back to the legacy hardcoded {temperature: 0.1} and ignored
+ * the user's configuration entirely.
+ *
+ * `includeMaxTokens` is opt-out for consolidation, which manages max_tokens
+ * per-call from config.maxTokensPerSummary.
+ */
+function buildSidecarSamplingParameters(
+  sidecar: MemoryCortexConfig["sidecar"],
+  opts: { includeMaxTokens?: boolean } = {},
+): Record<string, unknown> {
+  const params: Record<string, unknown> = {};
+  if (typeof sidecar.temperature === "number" && Number.isFinite(sidecar.temperature)) {
+    params.temperature = sidecar.temperature;
+  } else {
+    params.temperature = 0.1;
+  }
+  if (typeof sidecar.topP === "number" && Number.isFinite(sidecar.topP) && sidecar.topP > 0 && sidecar.topP < 1) {
+    params.top_p = sidecar.topP;
+  }
+  if (opts.includeMaxTokens !== false
+    && typeof sidecar.maxTokens === "number"
+    && Number.isFinite(sidecar.maxTokens)
+    && sidecar.maxTokens > 0) {
+    params.max_tokens = sidecar.maxTokens;
+  }
+  return params;
+}
+
+/**
+ * Apply sidecar arbiter verdict to heuristic entity candidates.
+ * - Drops entries whose name is in rejectedHeuristicEntities (case-insensitive).
+ * - Renames entries per transformedHeuristicEntities mapping (from→to).
+ *
+ * Confirmation is by omission: candidates the sidecar didn't mention remain.
+ */
+function applyEntityGrading<T extends { name: string }>(
+  heuristic: T[],
+  grading: import("./types").SidecarGradedHeuristics,
+): T[] {
+  if (heuristic.length === 0) return heuristic;
+  const rejected = new Set(grading.rejectedHeuristicEntities.map((n) => n.toLowerCase()));
+  const renames = new Map<string, string>();
+  for (const t of grading.transformedHeuristicEntities) {
+    renames.set(t.from.toLowerCase(), t.to);
+  }
+  const out: T[] = [];
+  for (const e of heuristic) {
+    if (rejected.has(e.name.toLowerCase())) continue;
+    const rename = renames.get(e.name.toLowerCase());
+    out.push(rename ? { ...e, name: rename } : e);
+  }
+  return out;
+}
+
+/**
+ * Apply sidecar arbiter verdict to heuristic relationship candidates.
+ * Drops triples (source, target, type) that the sidecar judged as unsupported.
+ * Comparison is case-insensitive on all three fields.
+ */
+function applyRelationshipGrading<T extends { source: string; target: string; type: string }>(
+  heuristic: T[],
+  grading: import("./types").SidecarGradedHeuristics,
+): T[] {
+  if (heuristic.length === 0 || grading.rejectedHeuristicRelationships.length === 0) return heuristic;
+  const rejected = new Set(
+    grading.rejectedHeuristicRelationships.map(
+      (r) => `${r.source.toLowerCase()}→${r.target.toLowerCase()}:${r.type.toLowerCase()}`,
+    ),
+  );
+  return heuristic.filter(
+    (r) => !rejected.has(`${r.source.toLowerCase()}→${r.target.toLowerCase()}:${r.type.toLowerCase()}`),
+  );
+}
 
 function mergeExtractedEntities(
   heuristic: Array<{ name: string; type: string; aliases: string[]; confidence: number; mentionRole?: string; role?: string }>,

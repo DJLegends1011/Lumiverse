@@ -29,6 +29,13 @@ export interface CortexConfig {
   contextTokenBudget: number;
   retrievalTimeoutMs: number;
   sidecarTimeoutMs: number;
+  sidecarReliability: {
+    fallback: "heuristic" | "skip";
+    maxRetries: number;
+    retryDelayMs: number;
+    arbitratesHeuristics: boolean;
+    gradesExistingRecords: boolean;
+  };
   consolidation: {
     enabled: boolean;
     chunkThreshold: number;
@@ -59,6 +66,7 @@ export interface CortexConfig {
     minConfidence: number;
   };
   entityWhitelist: string[];
+  nonProseScaffoldTags: string[];
   entityExtractionFilters: Record<
     "character" | "location" | "item" | "faction" | "concept" | "event",
     {

@@ -75,6 +75,38 @@ const THOUGHT_MARKER_PRESETS = [
   { label: "<reasoning>", prefix: "<reasoning>\n", suffix: "\n</reasoning>" },
 ];
 
+const REBUILD_PHASE_LABEL: Record<string, string> = {
+  starting: "Starting…",
+  heuristic_only: "Running heuristics",
+  precompute: "Preparing arbiter input",
+  awaiting_provider: "Awaiting provider response",
+  ingesting: "Ingesting batch results",
+  idle_between_batches: "Between batches",
+};
+
+function formatRebuildStatusLine(progress: {
+  phase?: string;
+  inFlightBatches?: number;
+  lastProviderRequestAt?: number | null;
+  lastProviderResponseMs?: number | null;
+}): string {
+  const parts: string[] = [];
+  if (progress.phase) {
+    parts.push(REBUILD_PHASE_LABEL[progress.phase] ?? progress.phase);
+  }
+  if (typeof progress.inFlightBatches === "number" && progress.inFlightBatches > 0) {
+    parts.push(`${progress.inFlightBatches} batch${progress.inFlightBatches === 1 ? "" : "es"} in flight`);
+  }
+  if (progress.lastProviderRequestAt) {
+    const seconds = Math.max(0, Math.round((Date.now() - progress.lastProviderRequestAt) / 1000));
+    parts.push(`last request ${seconds}s ago`);
+  }
+  if (typeof progress.lastProviderResponseMs === "number") {
+    parts.push(`last response ${(progress.lastProviderResponseMs / 1000).toFixed(1)}s`);
+  }
+  return parts.join(" · ") || "Working…";
+}
+
 export default function MemoryCortexSettings() {
   const addToast = useStore((s) => s.addToast);
   const openModal = useStore((s) => s.openModal);
@@ -82,9 +114,26 @@ export default function MemoryCortexSettings() {
   const [stats, setStats] = useState<CortexUsageStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [rebuilding, setRebuilding] = useState(false);
-  const [rebuildProgress, setRebuildProgress] = useState<{ current: number; total: number; percent: number } | null>(null);
+  const [rebuildProgress, setRebuildProgress] = useState<{
+    current: number;
+    total: number;
+    percent: number;
+    phase?: string;
+    inFlightBatches?: number;
+    lastProviderRequestAt?: number | null;
+    lastProviderResponseMs?: number | null;
+  } | null>(null);
+  // Wall-clock "now" tick driving the "X seconds ago" subtext so it updates
+  // while a long LLM call is mid-flight even without new WS events.
+  const [, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!rebuilding) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [rebuilding]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [whitelistInput, setWhitelistInput] = useState("");
+  const [scaffoldInput, setScaffoldInput] = useState("");
 
   // Connection profiles for sidecar picker
   const profiles = useStore((s) => s.profiles);
@@ -160,6 +209,10 @@ export default function MemoryCortexSettings() {
           current: status.current ?? 0,
           total: status.total ?? 0,
           percent: status.percent ?? 0,
+          phase: (status as any).phase,
+          inFlightBatches: (status as any).inFlightBatches,
+          lastProviderRequestAt: (status as any).lastProviderRequestAt,
+          lastProviderResponseMs: (status as any).lastProviderResponseMs,
         });
       } else if (status.status === "complete") {
         // Silently refresh stats — the WS event handles the live toast notification.
@@ -174,7 +227,15 @@ export default function MemoryCortexSettings() {
     const unsub = wsClient.on(EventType.CORTEX_REBUILD_PROGRESS, (payload: any) => {
       if (!payload || payload.chatId !== activeChatId) return;
       if (payload.status === "processing") {
-        setRebuildProgress({ current: payload.current, total: payload.total, percent: payload.percent });
+        setRebuildProgress({
+          current: payload.current,
+          total: payload.total,
+          percent: payload.percent,
+          phase: payload.phase,
+          inFlightBatches: payload.inFlightBatches,
+          lastProviderRequestAt: payload.lastProviderRequestAt,
+          lastProviderResponseMs: payload.lastProviderResponseMs,
+        });
       } else if (payload.status === "complete") {
         setRebuilding(false);
         setRebuildProgress(null);
@@ -261,6 +322,27 @@ export default function MemoryCortexSettings() {
   const removeWhitelistTerm = (term: string) => {
     if (!config) return;
     updateConfig({ entityWhitelist: config.entityWhitelist.filter((t) => t !== term) });
+  };
+
+  const addScaffoldTag = () => {
+    if (!config) return;
+    const tag = scaffoldInput.trim().toLowerCase().replace(/^<|>$|\//g, "");
+    if (!tag || !/^[a-z0-9_]+$/.test(tag)) {
+      addToast({ type: "warning", message: "Tag names must be lowercase letters, digits, or underscores only." });
+      return;
+    }
+    const existing = config.nonProseScaffoldTags ?? [];
+    if (existing.includes(tag)) {
+      addToast({ type: "warning", message: `"${tag}" is already in the scaffold list` });
+      return;
+    }
+    updateConfig({ nonProseScaffoldTags: [...existing, tag] });
+    setScaffoldInput("");
+  };
+
+  const removeScaffoldTag = (tag: string) => {
+    if (!config) return;
+    updateConfig({ nonProseScaffoldTags: (config.nonProseScaffoldTags ?? []).filter((t) => t !== tag) });
   };
 
   const parseFilterLines = (value: string) => value
@@ -499,6 +581,18 @@ export default function MemoryCortexSettings() {
                   <NumericInput className={styles.numberInput} value={config.sidecar.topP} min={0} max={1} step={0.05} onChange={(value) => updateConfig({ sidecar: { ...config.sidecar, topP: value ?? 1.0 } })} />
                 </div>
                 <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>Max output tokens</span>
+                  <NumericInput
+                    className={styles.numberInput}
+                    value={config.sidecar.maxTokens ?? 4096}
+                    min={512}
+                    max={65536}
+                    step={256}
+                    integer
+                    onChange={(value) => updateConfig({ sidecar: { ...config.sidecar, maxTokens: value ?? 4096 } })}
+                  />
+                </div>
+                <div className={styles.infoRow}>
                   <span className={styles.infoLabel}>Entity extraction</span>
                   <select className={styles.selectInput} value={config.entityExtractionMode} onChange={(e) => updateConfig({ entityExtractionMode: e.target.value as any })}>
                     <option value="heuristic">Heuristic (free)</option>
@@ -541,12 +635,79 @@ export default function MemoryCortexSettings() {
                   <span className={styles.infoLabel}>Retrieval timeout (seconds)</span>
                   <NumericInput className={styles.numberInput} value={Math.round((config.retrievalTimeoutMs ?? 60000) / 1000)} min={0} max={300} step={5} integer onChange={(value) => updateConfig({ retrievalTimeoutMs: (value ?? 60) * 1000 })} />
                 </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>On sidecar failure</span>
+                  <select
+                    className={styles.selectInput}
+                    value={config.sidecarReliability?.fallback ?? "heuristic"}
+                    onChange={(e) => updateConfig({
+                      sidecarReliability: {
+                        ...config.sidecarReliability,
+                        fallback: e.target.value as "heuristic" | "skip",
+                      },
+                    })}
+                  >
+                    <option value="heuristic">Fall back to heuristic</option>
+                    <option value="skip">AI Only — skip chunk, retry on warmup</option>
+                  </select>
+                </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>Retry attempts</span>
+                  <NumericInput
+                    className={styles.numberInput}
+                    value={config.sidecarReliability?.maxRetries ?? 0}
+                    min={0}
+                    max={10}
+                    step={1}
+                    integer
+                    onChange={(value) => updateConfig({
+                      sidecarReliability: { ...config.sidecarReliability, maxRetries: value ?? 0 },
+                    })}
+                  />
+                </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>Retry delay (ms)</span>
+                  <NumericInput
+                    className={styles.numberInput}
+                    value={config.sidecarReliability?.retryDelayMs ?? 500}
+                    min={0}
+                    max={10000}
+                    step={100}
+                    integer
+                    onChange={(value) => updateConfig({
+                      sidecarReliability: { ...config.sidecarReliability, retryDelayMs: value ?? 500 },
+                    })}
+                  />
+                </div>
+                <div className={styles.toggleRow}>
+                  <Toggle.Checkbox
+                    checked={config.sidecarReliability?.arbitratesHeuristics ?? false}
+                    onChange={(v) => updateConfig({
+                      sidecarReliability: { ...config.sidecarReliability, arbitratesHeuristics: v },
+                    })}
+                    label="Sidecar arbitrates heuristics"
+                    hint="When the sidecar succeeds, it sees the heuristic candidates for this chunk and can drop bad ones or rename them to a canonical form before merging."
+                  />
+                </div>
+                <div className={styles.toggleRow}>
+                  <Toggle.Checkbox
+                    checked={config.sidecarReliability?.gradesExistingRecords ?? false}
+                    onChange={(v) => updateConfig({
+                      sidecarReliability: { ...config.sidecarReliability, gradesExistingRecords: v },
+                    })}
+                    label="Sidecar can prune existing graph entities"
+                    hint="The sidecar may flag entities already in the graph as invalid (e.g. a verb captured by an earlier heuristic pass). Flagged entities are deleted; user-edited entities are always preserved."
+                  />
+                </div>
                 <div className={styles.hintText}>
+                  Max output tokens: ceiling on what the sidecar can emit per call. Each chunk's result JSON is ~400-600 tokens with arbiter on, so a chunks-per-request value of N needs roughly N × 600 tokens of headroom. If responses get truncated mid-JSON the whole batch falls back to per-chunk extraction — much slower. Raise this if you increase chunks per request.
                   Chunks per request: how many memory chunks to analyze in a single LLM call. Higher = fewer API calls but larger prompts.
                   Parallel requests: how many LLM calls to run simultaneously during rebuild.
                   RPM limit: cap Cortex sidecar requests per minute for this provider. 0 disables throttling.
                   Sidecar timeout: max wait per sidecar call. Increase for thinking/reasoning models that need more processing time. 0 = no limit.
                   Retrieval timeout: max wait for cortex retrieval during generation. If exceeded, falls back to plain vector search. 0 = no limit.
+                  On sidecar failure: "AI Only" mode skips writing anything for this chunk (heuristic noise stays out of the graph) — the next cortex warmup will retry it.
+                  Retry attempts/delay: extra sidecar tries with exponential backoff before falling back. 0 = no retry (legacy behavior).
                 </div>
               </>
             )}
@@ -581,6 +742,43 @@ export default function MemoryCortexSettings() {
                   <span key={term} className={styles.tag}>
                     {term}
                     <button onClick={() => removeWhitelistTerm(term)} className={styles.tagRemove}>&times;</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Non-prose Scaffold Tags ── */}
+          <div className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <Shield size={14} />
+              <span>Scaffold tags</span>
+            </div>
+            <div className={styles.whitelistHint}>
+              Tag names (XML/HTML-style, lowercase) whose inner content is structured scaffolding — HUD panels,
+              status lines, dice rolls, embeds — that should be removed wholesale before entity extraction. Common
+              ones (status, embed, hud, dice, tracker, ooc, tool_call, etc.) are stripped by default; add anything
+              custom your cards use here. Example: "rpgstats", "encounter", "questlog".
+            </div>
+            <div className={styles.whitelistInput}>
+              <input
+                type="text"
+                value={scaffoldInput}
+                onChange={(e) => setScaffoldInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addScaffoldTag()}
+                placeholder="e.g. encounter (no angle brackets)"
+                className={styles.textInput}
+              />
+              <button onClick={addScaffoldTag} className={styles.addBtn} disabled={!scaffoldInput.trim()}>
+                Add
+              </button>
+            </div>
+            {(config.nonProseScaffoldTags ?? []).length > 0 && (
+              <div className={styles.whitelistTags}>
+                {(config.nonProseScaffoldTags ?? []).map((tag) => (
+                  <span key={tag} className={styles.tag}>
+                    &lt;{tag}&gt;
+                    <button onClick={() => removeScaffoldTag(tag)} className={styles.tagRemove}>&times;</button>
                   </span>
                 ))}
               </div>
@@ -724,6 +922,11 @@ export default function MemoryCortexSettings() {
                   </button>
                 </div>
               </div>
+              {rebuilding && rebuildProgress && (
+                <div className={styles.hintText}>
+                  {formatRebuildStatusLine(rebuildProgress)}
+                </div>
+              )}
               <div className={styles.grid}>
                 <div className={styles.infoRow}>
                   <span className={styles.infoLabel}>Memory chunks</span>

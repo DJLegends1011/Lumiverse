@@ -49,6 +49,31 @@ export interface ConsolidationConfig {
   maxTokensPerSummary: number;
 }
 
+export interface SidecarReliabilityConfig {
+  /** What to do when the sidecar fails after exhausting retries.
+   *  - "heuristic": persist heuristic output for this chunk (legacy behavior).
+   *    Heuristic salience/entities/relations leak into the graph even though the
+   *    user asked for sidecar-quality results.
+   *  - "skip": do not persist anything for this chunk and do not mark its
+   *    warmup signature. The next cortex warmup re-processes it. Equivalent to
+   *    the "AI Only" mode users have asked for. */
+  fallback: "heuristic" | "skip";
+  /** Additional sidecar attempts after the first call (0 = no retry, legacy). */
+  maxRetries: number;
+  /** Base backoff in ms between sidecar attempts. Doubled per retry. */
+  retryDelayMs: number;
+  /** When true and the sidecar succeeded, the sidecar judges heuristic entities
+   *  and relationships extracted for this chunk: rejected heuristics are
+   *  dropped, transformed ones are renamed to the sidecar's canonical form
+   *  before merging. */
+  arbitratesHeuristics: boolean;
+  /** When true and the sidecar marks an *existing* graph entity as invalid for
+   *  this chunk's context, that entity is removed from the graph (mentions and
+   *  relations included). User-edited entities are preserved regardless of
+   *  sidecar grading. */
+  gradesExistingRecords: boolean;
+}
+
 export interface ThoughtMarkerConfig {
   /** Prefix marking a character thought block, e.g. <thinking> */
   prefix: string;
@@ -119,6 +144,14 @@ export interface MemoryCortexConfig {
    *  0 = no timeout. Default: 60000 (60s). */
   sidecarTimeoutMs: number;
 
+  /** Sidecar reliability + arbitration policy. Controls what happens when the
+   *  sidecar fails, and how its output relates to heuristic candidates and
+   *  existing graph records on success.
+   *
+   *  See SidecarReliabilityConfig for field-level docs.
+   */
+  sidecarReliability: SidecarReliabilityConfig;
+
   /** Retrieval pipeline tuning */
   retrieval: {
     /** Use multi-signal score fusion vs. pure vector similarity */
@@ -164,6 +197,14 @@ export interface MemoryCortexConfig {
   /** Custom proper noun whitelist (fantasy terms that shouldn't be filtered) */
   entityWhitelist: string[];
 
+  /** Additional XML/HTML-style tag names (beyond the curated default set)
+   *  whose inner content is structured scaffolding — HUD blocks, status
+   *  lines, dice rolls, custom embed wrappers, etc. — and must be removed
+   *  wholesale before any cortex evaluator sees the chunk. Lowercase, no
+   *  angle brackets, no leading slashes. Example values: "rpgstats",
+   *  "encounter", "questlog". */
+  nonProseScaffoldTags: string[];
+
   /** Per-entity-type heuristics controls for header noise and guided extraction */
   entityExtractionFilters: MemoryEntityExtractionFilters;
 }
@@ -206,6 +247,13 @@ export const DEFAULT_CORTEX_CONFIG: MemoryCortexConfig = {
   contextTokenBudget: 600,
   retrievalTimeoutMs: 60000,
   sidecarTimeoutMs: 60000,
+  sidecarReliability: {
+    fallback: "heuristic",
+    maxRetries: 0,
+    retryDelayMs: 500,
+    arbitratesHeuristics: false,
+    gradesExistingRecords: false,
+  },
   consolidation: { ...DEFAULT_CONSOLIDATION_CONFIG },
   retrieval: {
     useFusedScoring: true,
@@ -229,6 +277,7 @@ export const DEFAULT_CORTEX_CONFIG: MemoryCortexConfig = {
     minConfidence: 0.4,
   },
   entityWhitelist: [],
+  nonProseScaffoldTags: [],
   entityExtractionFilters: getDefaultEntityExtractionFilters(),
 };
 
@@ -400,6 +449,21 @@ export function normalizeCortexConfig(
     contextTokenBudget: input.contextTokenBudget ?? defaults.contextTokenBudget,
     retrievalTimeoutMs: input.retrievalTimeoutMs ?? defaults.retrievalTimeoutMs,
     sidecarTimeoutMs: input.sidecarTimeoutMs ?? defaults.sidecarTimeoutMs,
+    sidecarReliability: {
+      fallback: input.sidecarReliability?.fallback === "skip" ? "skip" : defaults.sidecarReliability.fallback,
+      maxRetries: normalizeNonNegativeInt(
+        input.sidecarReliability?.maxRetries,
+        defaults.sidecarReliability.maxRetries,
+      ),
+      retryDelayMs: normalizeNonNegativeInt(
+        input.sidecarReliability?.retryDelayMs,
+        defaults.sidecarReliability.retryDelayMs,
+      ),
+      arbitratesHeuristics: input.sidecarReliability?.arbitratesHeuristics
+        ?? defaults.sidecarReliability.arbitratesHeuristics,
+      gradesExistingRecords: input.sidecarReliability?.gradesExistingRecords
+        ?? defaults.sidecarReliability.gradesExistingRecords,
+    },
     consolidation: {
       enabled: input.consolidation?.enabled ?? defaults.consolidation.enabled,
       chunkThreshold: input.consolidation?.chunkThreshold ?? defaults.consolidation.chunkThreshold,
@@ -430,11 +494,21 @@ export function normalizeCortexConfig(
       minConfidence: input.entityPruning?.minConfidence ?? defaults.entityPruning.minConfidence,
     },
     entityWhitelist: input.entityWhitelist ?? defaults.entityWhitelist,
+    nonProseScaffoldTags: Array.isArray(input.nonProseScaffoldTags)
+      ? input.nonProseScaffoldTags
+          .map((s) => (typeof s === "string" ? s.trim().toLowerCase() : ""))
+          .filter((s) => s.length > 0 && /^[a-z0-9_]+$/.test(s))
+      : defaults.nonProseScaffoldTags,
     entityExtractionFilters: normalizeEntityExtractionFilters(input.entityExtractionFilters),
   };
 }
 
 function normalizeRequestsPerMinute(value: number | null | undefined, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.floor(value));
+}
+
+function normalizeNonNegativeInt(value: number | null | undefined, fallback: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
   return Math.max(0, Math.floor(value));
 }
