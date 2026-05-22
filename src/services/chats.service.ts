@@ -1558,6 +1558,28 @@ export function updateMessage(userId: string, id: string, input: UpdateMessageIn
     });
   }
 
+  // Drop any cached council deliberation when the user edits message content.
+  // The fingerprint hash in generate.service already invalidates stale reuse,
+  // but actively clearing the metadata avoids carrying dead state on the chat
+  // row and frees space. Gated on existence to avoid spurious CHAT_CHANGED
+  // events when no cache is present (which would re-render the frontend on
+  // every edit).
+  if (activeContentChanged) {
+    try {
+      const chatRow = getChat(userId, updated.chat_id);
+      if (chatRow?.metadata?.last_council_results !== undefined) {
+        mergeChatMetadata(userId, updated.chat_id, {
+          last_council_results: undefined,
+        });
+      }
+    } catch (err) {
+      console.warn(
+        "[chats] Failed to clear council cache after message edit:",
+        err,
+      );
+    }
+  }
+
   return updated;
 }
 

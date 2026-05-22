@@ -48,8 +48,6 @@ cd Lumiverse
     .\start.ps1
     ```
 
-    Alternatively, double-click `lumiverse.bat` — it launches `start.ps1` automatically.
-
 === "Termux (Android)"
 
     ```bash
@@ -138,6 +136,21 @@ The start scripts accept flags to control behavior:
 ## Docker
 
 Lumiverse provides pre-built Docker images for the simplest possible deployment.
+
+### Available Image Tags
+
+Pre-built images are published to GitHub Container Registry under `ghcr.io/prolix-oc/lumiverse`:
+
+| Tag | Built From | Cadence | Audience |
+|-----|------------|---------|----------|
+| `latest` | `main` branch | Tagged releases | Default for everyone. Most stable. |
+| `staging` | `staging` branch | **Daily at 05:00 UTC** | Users who want a daily preview of upcoming work. May ship rough edges. |
+| `staging-<sha>` | `staging` branch | Daily | Specific commit pins of the staging branch — useful for rolling back if a fresh staging build regresses. |
+
+Switching between tags is just a matter of editing the `image:` line in `docker-compose.yml` and running `docker-compose pull && docker-compose up -d`. Your `lumiverse-data` volume is untouched, so your database and settings carry over between tags.
+
+!!! tip "Tracking staging without rebuilding"
+    Before the daily-build workflow existed, the only way to follow `staging` in Docker was to rebuild from source with `docker-compose.build.yml`. That still works, but if you just want the latest staging changes once a day, swap the image to `ghcr.io/prolix-oc/lumiverse:staging` and run `docker-compose pull` — no local build required.
 
 ### Quick Start (Pre-Built Image)
 
@@ -394,7 +407,12 @@ If you launched Lumiverse with one of the start scripts, the runner is attached 
 The `--build` / `-Build` flag rebuilds the frontend before launching — important when switching branches because the precompiled assets differ.
 
 !!! warning "Docker users"
-    The Operator Panel's branch switch and the `git checkout` flow both assume Lumiverse is running from a git checkout. If you're using the pre-built Docker image (`ghcr.io/prolix-oc/lumiverse:latest`), there is no working tree to switch — you'd need to either rebuild from source against the `staging` branch (`docker-compose -f docker-compose.build.yml up -d` after `git checkout staging`) or wait for the next image tag. When rebuilding to follow `staging`, pass `FRONTEND_REFRESH=$(date -u +%s)` so the Vite bundle is regenerated from your fresh checkout — see [Forcing a fresh frontend bundle](#forcing-a-fresh-frontend-bundle).
+    The Operator Panel's branch switch and the `git checkout` flow both assume Lumiverse is running from a git checkout. If you're using a pre-built Docker image, there is no working tree to switch — instead, change the `image:` line in `docker-compose.yml`:
+
+    * `ghcr.io/prolix-oc/lumiverse:latest` → `main` branch (tagged releases)
+    * `ghcr.io/prolix-oc/lumiverse:staging` → `staging` branch (rebuilt daily at 05:00 UTC)
+
+    Then `docker-compose pull && docker-compose up -d`. If you need staging changes published *between* daily builds, fall back to rebuilding from source with `docker-compose -f docker-compose.build.yml up -d` after `git checkout staging` — and pass `FRONTEND_REFRESH=$(date -u +%s)` so the Vite bundle is regenerated from your fresh checkout (see [Forcing a fresh frontend bundle](#forcing-a-fresh-frontend-bundle)).
 
 !!! tip "Roll back to main if staging breaks"
     Staging can occasionally ship a regression. Switching back to `main` from the Operator Panel (or `git checkout main && ./start.sh --build`) returns you to the last stable release without touching your `data/` folder.
@@ -517,8 +535,22 @@ The web UI wizard walks you through these steps:
     - Everything (recommended)
     - Custom selection
 5. **Select target** — Choose which Lumiverse account receives the data.
-6. **Confirm & import** — Review the summary and start the migration. Progress and logs stream in real time.
-7. **Results** — See counts of imported, skipped, and failed items.
+6. **(Optional) TagLibrary Backup** — If you used the [SillyTavern-TagLibrary](https://github.com/Inkbottle007/SillyTavern-TagLibrary) extension and exported a JSON backup, upload it here. Lumiverse will re-apply your tags to the imported characters once the main migration finishes. See [TagLibrary Re-Apply](#tag-library-re-apply) below.
+7. **Confirm & import** — Review the summary and start the migration. Progress and logs stream in real time.
+8. **Results** — See counts of imported, skipped, and failed items.
+
+### TagLibrary Re-Apply
+
+The standalone **TagLibrary** extension for SillyTavern stores its character tags outside the character card itself, so they are *not* part of a normal SillyTavern export. Lumiverse can pull them back in:
+
+1. In SillyTavern, open the TagLibrary extension and export your backup as JSON
+2. On the **Confirm** step of the Migration wizard, expand **Optional: TagLibrary Backup** and upload the JSON file
+3. After the main migration completes, Lumiverse automatically runs the TagLibrary import and matches tags to imported characters using their source filenames and original image filenames
+
+A toast reports the results — how many tags were applied, how many were skipped because no matching character was found, and how many failed to parse. Existing character tags are preserved; the import only *adds* tags, it never removes them.
+
+!!! tip "When to use this"
+    Only relevant if you ran the SillyTavern-TagLibrary extension. Tags stored directly on character cards via SillyTavern's built-in tag system come across automatically with the character import and don't need this step.
 
 ### What Gets Imported
 

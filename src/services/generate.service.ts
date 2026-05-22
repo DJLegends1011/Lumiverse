@@ -864,12 +864,32 @@ function stableJson(value: unknown): string {
     .join(",")}}`;
 }
 
+// Hash the council's view of the chat — the (id, content) pairs of the last
+// `contextWindow` messages, the same slice council members consume in
+// buildContextMessages. Mixed into the cache fingerprint so that editing or
+// deleting any in-window message invalidates a stale deliberation block.
+function hashCouncilContextMessages(
+  messages: Message[],
+  contextWindow: number,
+): string {
+  const window = messages.slice(-contextWindow);
+  const hasher = new Bun.CryptoHasher("sha256");
+  for (const m of window) {
+    hasher.update(m.id);
+    hasher.update("\0");
+    hasher.update(m.content);
+    hasher.update("\0");
+  }
+  return hasher.digest("hex");
+}
+
 function buildCouncilCacheFingerprint(
   councilSettings: import("lumiverse-spindle-types").CouncilSettings,
   sidecarSettings: import("lumiverse-spindle-types").SidecarConfig,
+  contextHash: string,
 ): string {
   return stableJson({
-    version: 1,
+    version: 2,
     members: councilSettings.members.map((member) => ({
       id: member.id,
       itemId: member.itemId,
@@ -895,6 +915,7 @@ function buildCouncilCacheFingerprint(
       topP: sidecarSettings.topP,
       maxTokens: sidecarSettings.maxTokens,
     },
+    context: contextHash,
   });
 }
 
@@ -1715,6 +1736,10 @@ export async function startGeneration(
         );
         const councilSettings = resolvedCouncilProfile.council_settings;
         let councilResult: CouncilExecutionResultWithHistory | null = null;
+        // Hash of the council's view of the chat at fingerprint time. Hoisted
+        // so the cache-store site (outside the if/else below) can stamp the
+        // same value the cache-check used into the persisted entry.
+        let councilContextHash: string | undefined;
         let inlineTools: ToolDefinition[] | undefined;
         let inlineToolDefsByName:
           | Map<string, RuntimeCouncilToolDefinition>
@@ -1791,6 +1816,27 @@ export async function startGeneration(
               }
             }
           } else {
+            // Load the council's view of the chat now so we can both fingerprint
+            // it for the cache check AND reuse the same list for enrichment if
+            // we miss. The hash of these messages is mixed into the cache
+            // fingerprint so editing or deleting any in-window message
+            // invalidates a stale cached deliberation block.
+            const fullCharacter = chat
+              ? charactersSvc.getCharacter(
+                  input.userId,
+                  targetCharId || chat.character_id,
+                )
+              : null;
+            const councilMessages = chatsSvc
+              .getMessages(input.userId, input.chat_id)
+              .filter(
+                (m) => m.id !== excludeMessageId && m.id !== stagedMessageId,
+              );
+            councilContextHash = hashCouncilContextMessages(
+              councilMessages,
+              councilSettings.toolsSettings.sidecarContextWindow,
+            );
+
             // Check if we can reuse cached council results for regens/swipes/continues
             const shouldRetain =
               councilSettings.toolsSettings.retainResultsForRegens &&
@@ -1801,6 +1847,7 @@ export async function startGeneration(
             const councilCacheFingerprint = buildCouncilCacheFingerprint(
               councilSettings,
               resolvedCouncilProfile.sidecar_settings,
+              councilContextHash,
             );
             const cached = shouldRetain
               ? (chat?.metadata?.last_council_results as
@@ -1866,28 +1913,18 @@ export async function startGeneration(
               checkAborted();
 
               // Yield before the heavy council enrichment phase — the next section
-              // loads all messages, collects world info entries, and runs keyword
-              // activation synchronously. Without a yield here the event loop is
-              // blocked from the setTimeout at the top of the IIFE through all of
-              // this sync work until the first real `await` (embedding API call).
+              // collects world info entries and runs keyword activation
+              // synchronously. Without a yield here the event loop is blocked
+              // from the setTimeout at the top of the IIFE through all of this
+              // sync work until the first real `await` (embedding API call).
               await new Promise<void>((r) => setTimeout(r, 0));
               checkAborted();
 
               // Pre-compute enrichment for council tools — resolve world info at the
               // top of the generation chain so tools receive proper world book context.
-              // Also filters out the staged empty message and excluded (regenerated)
-              // message so council doesn't see blank assistant turns.
-              const fullCharacter = chat
-                ? charactersSvc.getCharacter(
-                    input.userId,
-                    targetCharId || chat.character_id,
-                  )
-                : null;
-              const councilMessages = chatsSvc
-                .getMessages(input.userId, input.chat_id)
-                .filter(
-                  (m) => m.id !== excludeMessageId && m.id !== stagedMessageId,
-                );
+              // councilMessages was already loaded above (with the same
+              // staged/excluded filter the council expects) so the fingerprint
+              // and the enrichment see an identical view.
               const { entries: wiEntries, worldBookIds: wiBookIds } =
                 collectWorldInfoForCouncil(
                   input.userId,
@@ -2197,7 +2234,8 @@ export async function startGeneration(
           // poison later regens and prevent council tools from re-firing.
           if (
             councilResult.totalDurationMs > 0 &&
-            councilResult.results.every((result) => result.success)
+            councilResult.results.every((result) => result.success) &&
+            councilContextHash !== undefined
           ) {
             const cachedResult: CouncilResultCache = {
               results: councilResult.results,
@@ -2210,6 +2248,7 @@ export async function startGeneration(
               fingerprint: buildCouncilCacheFingerprint(
                 councilSettings,
                 resolvedCouncilProfile.sidecar_settings,
+                councilContextHash,
               ),
             };
             try {
