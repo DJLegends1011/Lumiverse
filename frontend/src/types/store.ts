@@ -356,6 +356,28 @@ export interface CustomCSSSettings {
   bundleId: string | null
 }
 
+// ---- Saved Theme Library ----
+/** A user-saved theme made from a plain ThemeConfig JSON import or "Save current". */
+export interface SavedThemeConfigEntry {
+  kind: 'config'
+  id: string
+  name: string
+  createdAt: number
+  theme: import('./theme').ThemeConfig
+}
+/** A user-saved theme made from a .lumitheme bundle import — preserves CSS, components, and assets. */
+export interface SavedThemePackEntry {
+  kind: 'pack'
+  id: string
+  name: string
+  createdAt: number
+  pack: import('@/lib/themePack').ThemePack
+}
+export type SavedTheme = SavedThemeConfigEntry | SavedThemePackEntry
+export type SavedThemeInput =
+  | Omit<SavedThemeConfigEntry, 'id' | 'createdAt'>
+  | Omit<SavedThemePackEntry, 'id' | 'createdAt'>
+
 export type WorldBookEntrySortBy = 'custom' | 'priority' | 'created' | 'updated' | 'name'
 export type WorldBookEntrySortDir = 'asc' | 'desc'
 export type WorldBookEntryPageSize = 50 | 100 | 200 | 'all'
@@ -425,6 +447,7 @@ export interface SettingsSlice {
   } | null
   customCSS: CustomCSSSettings
   componentOverrides: Record<string, import('@/lib/componentOverrides').ComponentOverride>
+  savedThemes: SavedTheme[]
   spindleSettings: SpindleSettings
   voiceSettings: VoiceSettings
   hydrateStartupSettings: (settings: StartupSettings) => void
@@ -441,6 +464,10 @@ export interface SettingsSlice {
   toggleComponentOverride: (componentName: string, enabled: boolean) => void
   resetAllOverrides: () => void
   applyThemePack: (pack: import('@/lib/themePack').ThemePack) => void
+  addSavedTheme: (input: SavedThemeInput) => SavedTheme
+  renameSavedTheme: (id: string, name: string) => void
+  deleteSavedTheme: (id: string) => Promise<void>
+  applySavedTheme: (id: string) => void
   loadSettings: () => Promise<void>
 }
 

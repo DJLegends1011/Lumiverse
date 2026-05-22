@@ -161,6 +161,7 @@ export default function CustomCSSModal() {
   const toggleComponentOverride = useStore((s) => s.toggleComponentOverride)
   const resetAllOverrides = useStore((s) => s.resetAllOverrides)
   const applyThemePack = useStore((s) => s.applyThemePack)
+  const addSavedTheme = useStore((s) => s.addSavedTheme)
   const theme = useStore((s) => s.theme)
   const openModal = useStore((s) => s.openModal)
 
@@ -336,6 +337,7 @@ export default function CustomCSSModal() {
       }
       const summary = packSummary(localizedPack)
       applyThemePack(localizedPack)
+      addSavedTheme({ kind: 'pack', name: pack.name || 'Imported Theme', pack: localizedPack })
       const disabledNote = imported.disabledCount > 0
         ? ` TSX overrides were imported disabled for manual review (${imported.disabledCount}).`
         : ''
@@ -343,7 +345,7 @@ export default function CustomCSSModal() {
     } catch (err: any) {
       toast.error(err?.body?.error || err?.message || 'Failed to import bundled theme assets')
     }
-  }, [applyThemePack])
+  }, [applyThemePack, addSavedTheme])
 
   const handleResetAll = useCallback(() => {
     openModal('confirm', {

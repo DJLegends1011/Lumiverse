@@ -226,19 +226,84 @@ export default function VoiceSettings() {
         </div>
 
         {voiceSettings.narrationVoice !== null && (
-          <div className={styles.row} style={{ alignItems: 'flex-start' }}>
-            <span className={styles.label} style={{ paddingTop: 6 }}>Narrator</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <VoicePicker
-                value={voiceSettings.narrationVoice}
-                onChange={(next) => setVoiceSettings({ narrationVoice: next })}
+          <>
+            <div className={styles.row} style={{ alignItems: 'flex-start' }}>
+              <span className={styles.label} style={{ paddingTop: 6 }}>Narrator</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <VoicePicker
+                  value={voiceSettings.narrationVoice}
+                  onChange={(next) => setVoiceSettings({ narrationVoice: next })}
+                  disabled={!voiceSettings.ttsEnabled}
+                  ariaLabel="Narrator"
+                  clearLabel="Use speech voice for narration"
+                  portal
+                />
+              </div>
+            </div>
+
+            <div className={styles.toggleRow}>
+              <Toggle.Checkbox
+                checked={voiceSettings.narrationVoice.parameters?.speed !== undefined}
+                onChange={(v) => {
+                  const current = voiceSettings.narrationVoice
+                  if (!current) return
+                  if (v) {
+                    setVoiceSettings({
+                      narrationVoice: {
+                        ...current,
+                        parameters: { ...current.parameters, speed: voiceSettings.ttsSpeed },
+                      },
+                    })
+                  } else {
+                    // Drop only the speed key; preserve any other future parameters.
+                    const { speed: _drop, ...rest } = current.parameters ?? {}
+                    setVoiceSettings({
+                      narrationVoice: {
+                        ...current,
+                        parameters: Object.keys(rest).length > 0 ? rest : undefined,
+                      },
+                    })
+                  }
+                }}
                 disabled={!voiceSettings.ttsEnabled}
-                ariaLabel="Narrator"
-                clearLabel="Use speech voice for narration"
-                portal
+                label="Use a separate narrator speed"
+                hint="Speak narration at its own pace instead of inheriting the Speed setting above."
               />
             </div>
-          </div>
+
+            {voiceSettings.narrationVoice.parameters?.speed !== undefined && (
+              <div className={styles.row}>
+                <span className={styles.label}>
+                  Narrator speed ({voiceSettings.narrationVoice.parameters.speed.toFixed(1)}x)
+                </span>
+                <div className={styles.rangeRow}>
+                  <input
+                    type="range"
+                    className={styles.rangeSlider}
+                    min={0.5}
+                    max={2.0}
+                    step={0.1}
+                    value={voiceSettings.narrationVoice.parameters.speed}
+                    disabled={!voiceSettings.ttsEnabled}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value)
+                      const current = voiceSettings.narrationVoice
+                      if (!current) return
+                      setVoiceSettings({
+                        narrationVoice: {
+                          ...current,
+                          parameters: { ...current.parameters, speed: v },
+                        },
+                      })
+                    }}
+                  />
+                  <span className={styles.rangeValue}>
+                    {voiceSettings.narrationVoice.parameters.speed.toFixed(1)}x
+                  </span>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* ── Speech Detection Rules ────────────────────────────────── */}

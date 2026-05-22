@@ -105,6 +105,8 @@ const DATA_KEYS: ReadonlySet<string> = new Set([
   'pushNotificationPreferences',
   'customCSS',
   'componentOverrides',
+  // Saved theme library (My Themes)
+  'savedThemes',
   'chatHeadsEnabled',
   'chatHeadsSize',
   'chatHeadsDirection',
@@ -329,6 +331,7 @@ export const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> 
   chatHeadsCustomCompletionSound: null,
   customCSS: { css: '', enabled: false, revision: 0, bundleId: null },
   componentOverrides: {},
+  savedThemes: [],
   spindleSettings: {
     interceptorTimeoutMs: 10_000,
     dockPanelDesktopSide: 'right',
@@ -499,6 +502,61 @@ export const createSettingsSlice: StateCreator<AppStore, [], [], SettingsSlice> 
     persistKey('componentOverrides', componentOverrides)
 
     set(patch as any)
+  },
+
+  addSavedTheme: (input) => {
+    const entry = {
+      ...input,
+      id: generateUUID(),
+      createdAt: Math.floor(Date.now() / 1000),
+    } as import('@/types/store').SavedTheme
+    const savedThemes = [...get().savedThemes, entry]
+    set({ savedThemes })
+    persistKey('savedThemes', savedThemes)
+    return entry
+  },
+
+  renameSavedTheme: (id, name) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    const savedThemes = get().savedThemes.map((entry) =>
+      entry.id === id ? { ...entry, name: trimmed.slice(0, 200) } : entry
+    )
+    set({ savedThemes })
+    persistKey('savedThemes', savedThemes)
+  },
+
+  deleteSavedTheme: async (id) => {
+    const entry = get().savedThemes.find((e) => e.id === id)
+    if (!entry) return
+    const savedThemes = get().savedThemes.filter((e) => e.id !== id)
+    set({ savedThemes })
+    persistKey('savedThemes', savedThemes)
+    // Clean up bundle assets for pack entries, unless the bundle is still the
+    // active customCSS bundle (i.e. the user is currently using it).
+    if (entry.kind === 'pack') {
+      const activeBundleId = get().customCSS.bundleId
+      const packBundleId = entry.pack.bundleId
+      if (packBundleId && packBundleId !== activeBundleId) {
+        try {
+          const { themeAssetsApi } = await import('@/api/theme-assets')
+          const assets = await themeAssetsApi.list(packBundleId)
+          await Promise.all(assets.map((a) => themeAssetsApi.delete(a.id).catch(() => {})))
+        } catch {
+          // Swallow — orphaned assets are non-fatal; the user can prune manually.
+        }
+      }
+    }
+  },
+
+  applySavedTheme: (id) => {
+    const entry = get().savedThemes.find((e) => e.id === id)
+    if (!entry) return
+    if (entry.kind === 'config') {
+      get().setTheme(entry.theme)
+    } else {
+      get().applyThemePack(entry.pack)
+    }
   },
 
   loadSettings: async () => {
