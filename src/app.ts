@@ -130,6 +130,14 @@ app.use("/api/*", async (c, next) => {
   })(c, next);
 });
 
+// Routes that handle multi-megabyte uploads enforce their own per-file caps
+// (e.g. images.routes.ts: 50 MB/image, expressions.routes.ts: 100 MB/ZIP,
+// character-gallery.routes.ts: 50 MB/image × up to 100 files). Letting them
+// through here is what keeps the gallery /bulk endpoint from 413-ing on the
+// sum of all images even though every individual file is well under the cap.
+const GALLERY_PATH_RE = /^\/api\/v1\/characters\/[^/]+\/gallery(?:\/.*)?$/;
+const EXPRESSIONS_ZIP_PATH_RE =
+  /^\/api\/v1\/characters\/[^/]+\/expressions\/(?:groups\/[^/]+\/)?upload-zip$/;
 app.use("/api/*", async (c, next) => {
   const path = c.req.path;
   if (
@@ -140,7 +148,8 @@ app.use("/api/*", async (c, next) => {
     path === "/api/v1/images" ||
     path === "/api/v1/theme-assets" ||
     path === "/api/v1/notification-sounds/completion" ||
-    path.endsWith("/expressions/upload-zip") ||
+    GALLERY_PATH_RE.test(path) ||
+    EXPRESSIONS_ZIP_PATH_RE.test(path) ||
     path === "/api/v1/stt/transcribe" ||
     path === "/api/v1/chats/import" ||
     path === "/api/v1/chats/import-st" ||

@@ -86,17 +86,31 @@ export async function uploadToGallery(
   return addToGallery(userId, characterId, image.id, caption);
 }
 
+export interface BulkGallerySkippedFile {
+  name: string;
+  reason: string;
+}
+
+export interface BulkGalleryUploadResult {
+  items: CharacterGalleryItem[];
+  skipped: BulkGallerySkippedFile[];
+}
+
 /**
  * Upload multiple images to a character's gallery in one call.
  * Emits IMPORT_GALLERY_PROGRESS WS events so the frontend can track progress.
+ * Returns both successful items and any files that were skipped (oversized,
+ * runtime failure, etc.) so the caller can surface them to the user.
  */
 export async function uploadBulkToGallery(
   userId: string,
   characterId: string,
   files: File[],
-): Promise<CharacterGalleryItem[]> {
+  preSkipped: BulkGallerySkippedFile[] = [],
+): Promise<BulkGalleryUploadResult> {
   const total = files.length;
   const items: CharacterGalleryItem[] = [];
+  const skipped: BulkGallerySkippedFile[] = [...preSkipped];
 
   for (let i = 0; i < total; i++) {
     eventBus.emit(
@@ -107,12 +121,15 @@ export async function uploadBulkToGallery(
     try {
       const item = await uploadToGallery(userId, characterId, files[i]);
       items.push(item);
-    } catch {
-      // skip individual failures
+    } catch (err: any) {
+      skipped.push({
+        name: files[i].name || "unknown",
+        reason: err?.message ?? "upload failed",
+      });
     }
   }
 
-  return items;
+  return { items, skipped };
 }
 
 export function removeFromGallery(userId: string, itemId: string): boolean {

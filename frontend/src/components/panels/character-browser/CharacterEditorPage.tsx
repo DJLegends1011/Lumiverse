@@ -260,12 +260,22 @@ export default function CharacterEditorPage() {
       e.target.value = ''
       setGalleryUploading(true)
       try {
-        const items = files.length === 1
-          ? [await characterGalleryApi.upload(editingCharacterId, files[0])]
-          : await characterGalleryApi.uploadMany(editingCharacterId, files)
+        let items: CharacterGalleryItem[]
+        let skipped: { name: string; reason: string }[] = []
+        if (files.length === 1) {
+          items = [await characterGalleryApi.upload(editingCharacterId, files[0])]
+        } else {
+          const result = await characterGalleryApi.uploadMany(editingCharacterId, files)
+          items = result.items
+          skipped = result.skipped
+        }
         if (items.length > 0) setGalleryItems((prev) => [...prev, ...items])
-      } catch {
-        // upload failed
+        if (skipped.length > 0) {
+          const names = skipped.map((s) => s.name).join(', ')
+          toast.error(`Skipped ${skipped.length} ${skipped.length === 1 ? 'file' : 'files'}: ${names}`)
+        }
+      } catch (err: any) {
+        toast.error(err?.body?.error || err?.message || 'Gallery upload failed')
       } finally {
         setGalleryUploading(false)
       }
