@@ -476,7 +476,16 @@ if (env.frontendDir) {
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 
 app.onError((err, c) => {
-  console.error(err);
+  const path = `${c.req.method} ${c.req.path}`;
+  // DOMException has an empty stack, so a raw console.error(err) prints a
+  // contextless object dump. Demote client-disconnect aborts to a warn line
+  // tagged with the route so they're traceable, and surface real errors with
+  // a stack when one is available.
+  if (err instanceof DOMException && err.name === "AbortError") {
+    console.warn(`[abort] ${path}: ${err.message}`);
+    return c.json({ error: "Client disconnected" }, 499);
+  }
+  console.error(`[onError] ${path}:`, err instanceof Error ? err.stack || err.message : err);
   return c.json({ error: "Internal server error" }, 500);
 });
 

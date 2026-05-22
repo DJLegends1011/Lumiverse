@@ -574,8 +574,15 @@ async function runExport(
     }
     if (chunk && chunk.byteLength > 0) {
       // ZipDeflate emits the empty trailing chunk before `final`; copy chunk
-      // so fflate is free to reuse the underlying buffer.
-      controller.enqueue(new Uint8Array(chunk));
+      // so fflate is free to reuse the underlying buffer. Guard the enqueue
+      // because fflate keeps pushing chunks asynchronously after the client
+      // disconnects, and an unguarded enqueue surfaces as an opaque
+      // AbortError in app.onError.
+      try {
+        controller.enqueue(new Uint8Array(chunk));
+      } catch {
+        /* client disconnected */
+      }
     }
     if (final) {
       try {

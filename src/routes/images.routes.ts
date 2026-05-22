@@ -49,8 +49,16 @@ app.post("/rebuild-thumbnails", async (c) => {
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
+        let closed = false;
         const send = (event: string, data: any) => {
-          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+          if (closed) return;
+          try {
+            controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+          } catch {
+            // Client disconnected; stop pushing progress instead of letting
+            // the AbortError surface as an untagged DOMException.
+            closed = true;
+          }
         };
 
         send("progress", { total: 0, current: 0, generated: 0, skipped: 0, failed: 0 });
@@ -63,7 +71,11 @@ app.post("/rebuild-thumbnails", async (c) => {
         } catch (err: any) {
           send("error", { error: err.message || "Rebuild failed" });
         }
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
       },
     });
 
