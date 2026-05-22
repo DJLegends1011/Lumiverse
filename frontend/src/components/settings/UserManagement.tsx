@@ -231,7 +231,7 @@ export default function UserManagement() {
                   <div className={styles.userName}>
                     {user.username || user.name}
                     {isSelf && <span className={styles.youBadge}>You</span>}
-                    {user.banned && <span className={styles.bannedBadge}>Banned</span>}
+                    {!!user.banned && <span className={styles.bannedBadge}>Banned</span>}
                   </div>
                   <div className={styles.userEmail}>{user.email}</div>
                 </div>
