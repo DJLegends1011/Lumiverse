@@ -115,6 +115,8 @@ export default function AlternateFieldSwitcher({ chatId }: { chatId: string }) {
               <div key={field} className={styles.fieldRow}>
                 <span className={styles.fieldLabel}>{FIELD_LABELS[field]}</span>
                 <select
+                  name={`alt-field-${field}`}
+                  aria-label={FIELD_LABELS[field]}
                   className={styles.fieldSelect}
                   value={selectedId || ''}
                   onChange={(e) => handleSelect(field, e.target.value || null)}

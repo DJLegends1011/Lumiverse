@@ -50,6 +50,8 @@ export default function MessageEditArea({
           </div>
           <textarea
             ref={reasoningRef}
+            name="message-edit-reasoning"
+            aria-label="Reasoning"
             className={`${styles.editTextarea} ${styles.reasoningTextarea}`}
             value={editReasoning}
             onChange={handleReasoningChange}
@@ -65,6 +67,8 @@ export default function MessageEditArea({
         )}
         <textarea
           ref={contentRef}
+          name="message-edit-content"
+          aria-label="Message content"
           className={styles.editTextarea}
           value={editContent}
           onChange={handleContentChange}

@@ -160,6 +160,8 @@ export default function AddGroupMemberModal() {
               <Search size={14} className={styles.searchIcon} />
               <input
                 type="text"
+                name="group-member-search"
+                aria-label="Search characters"
                 className={styles.searchInput}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}

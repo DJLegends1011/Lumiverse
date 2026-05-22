@@ -53,6 +53,8 @@ export default function SpindleSettings() {
         <div className={styles.inputGroup}>
           <input
             type="number"
+            name="spindle-interceptor-timeout"
+            aria-label="Interceptor timeout (seconds)"
             min={MIN_SECONDS}
             max={MAX_SECONDS}
             step={1}

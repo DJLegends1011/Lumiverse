@@ -2507,6 +2507,8 @@ export default function InputArea({ chatId }: InputAreaProps) {
                               <label key={field} style={{ display: 'grid', gridTemplateColumns: '82px minmax(0, 1fr)', gap: 8, alignItems: 'center' }}>
                                 <span style={{ textTransform: 'capitalize', fontSize: 'calc(11px * var(--lumiverse-font-scale, 1))', color: selectedId ? 'var(--lumiverse-primary)' : 'var(--lumiverse-text-dim)' }}>{field}</span>
                                 <select
+                                  name={`group-alt-${field}`}
+                                  aria-label={`${field} variant for ${char.name}`}
                                   style={{
                                     minWidth: 0,
                                     padding: '3px 6px',
@@ -2576,6 +2578,8 @@ export default function InputArea({ chatId }: InputAreaProps) {
                           {field}
                         </span>
                         <select
+                          name={`alt-${field}`}
+                          aria-label={`${field} variant`}
                           style={{
                             marginLeft: 8,
                             flex: 1,
@@ -2627,12 +2631,16 @@ export default function InputArea({ chatId }: InputAreaProps) {
                 <div className={styles.addonCreateForm}>
                   <input
                     type="text"
+                    name="addon-name"
+                    aria-label="Add-on name"
                     className={styles.addonCreateInput}
                     value={newAddonLabel}
                     onChange={(e) => setNewAddonLabel(e.target.value)}
                     placeholder="Add-on name"
                   />
                   <textarea
+                    name="addon-content"
+                    aria-label="Add-on content"
                     className={styles.addonCreateTextarea}
                     value={newAddonContent}
                     onChange={(e) => setNewAddonContent(e.target.value)}
@@ -2808,6 +2816,10 @@ export default function InputArea({ chatId }: InputAreaProps) {
       <input
         ref={fileInputRef}
         type="file"
+        name="chat-attachment"
+        aria-label="Attach files"
+        aria-hidden="true"
+        tabIndex={-1}
         accept="image/*,audio/*,.txt,.md,.markdown,.csv,.tsv,.json,.xml,.html,.htm,.yaml,.yml,.log,.rst,.rtf"
         multiple
         style={{ display: 'none' }}
@@ -2902,6 +2914,8 @@ export default function InputArea({ chatId }: InputAreaProps) {
             </div>
             <textarea
               ref={textareaRef}
+              name="chat-message"
+              aria-label="Message"
               className={styles.textarea}
               value={text}
               onChange={handleInput}

@@ -104,6 +104,8 @@ export default function PresetManager() {
           <div className={styles.fieldGroup}>
             <span className={styles.label}>Prefix</span>
             <input
+              name="reasoning-prefix"
+              aria-label="Reasoning prefix"
               className={styles.input}
               value={reasoningSettings.prefix}
               onChange={(e) => updateReasoning({ prefix: e.target.value })}
@@ -113,6 +115,8 @@ export default function PresetManager() {
           <div className={styles.fieldGroup}>
             <span className={styles.label}>Suffix</span>
             <input
+              name="reasoning-suffix"
+              aria-label="Reasoning suffix"
               className={styles.input}
               value={reasoningSettings.suffix}
               onChange={(e) => updateReasoning({ suffix: e.target.value })}
@@ -153,6 +157,8 @@ export default function PresetManager() {
             {!isToggleOnly && isApiReasoningDisabled && <span className={styles.toggleOnlyHint}> (disabled while API reasoning is off)</span>}
           </span>
           <select
+            name="reasoning-effort"
+            aria-label="Reasoning effort"
             className={clsx(styles.select, (isToggleOnly || isApiReasoningDisabled) && styles.selectDisabled)}
             value={reasoningSettings.reasoningEffort}
             onChange={(e) => updateReasoning({ reasoningEffort: e.target.value as ReasoningEffort })}
@@ -174,6 +180,8 @@ export default function PresetManager() {
           <div className={clsx(styles.fieldGroup, isApiReasoningDisabled && styles.fieldGroupDisabled)}>
             <span className={styles.label}>Thinking Display</span>
             <select
+              name="thinking-display"
+              aria-label="Thinking display"
               className={clsx(styles.select, isApiReasoningDisabled && styles.selectDisabled)}
               value={reasoningSettings.thinkingDisplay ?? 'auto'}
               onChange={(e) => updateReasoning({ thinkingDisplay: e.target.value as ThinkingDisplay })}
@@ -219,6 +227,8 @@ export default function PresetManager() {
         <div className={styles.fieldGroup}>
           <span className={styles.label}>Start Reply With</span>
           <textarea
+            name="prompt-bias"
+            aria-label="Start reply with"
             className={styles.textarea}
             value={promptBias}
             onChange={(e) => setSetting('promptBias', e.target.value)}

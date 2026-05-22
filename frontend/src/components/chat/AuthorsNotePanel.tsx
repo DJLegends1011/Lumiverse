@@ -122,6 +122,8 @@ export default function AuthorsNotePanel({ chatId, isOpen, onClose }: AuthorsNot
       <div className={styles.body}>
         <div className={styles.field}>
           <textarea
+            name="authors-note"
+            aria-label="Author's note"
             className={styles.textarea}
             rows={3}
             value={noteText}
@@ -144,7 +146,13 @@ export default function AuthorsNotePanel({ chatId, isOpen, onClose }: AuthorsNot
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Role</label>
-            <select className={styles.select} value={role} onChange={handleRoleChange}>
+            <select
+              name="authors-note-role"
+              aria-label="Role"
+              className={styles.select}
+              value={role}
+              onChange={handleRoleChange}
+            >
               {ROLES.map((r) => (
                 <option key={r.value} value={r.value}>{r.label}</option>
               ))}
