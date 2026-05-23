@@ -20,9 +20,19 @@ export function rememberRegistration(reg: ServiceWorkerRegistration | undefined)
   // flag so the connection-lost overlay can switch to "Updating…" copy and
   // stay mounted until the controllerchange listener in main.tsx reloads.
   reg.addEventListener('updatefound', () => {
-    if (reg.installing) {
-      useStore.getState().setWsUpdatePending(true)
-    }
+    const installing = reg.installing
+    if (!installing) return
+    useStore.getState().setWsUpdatePending(true)
+
+    // If the new worker fails to install (e.g. precache fetch fails), clear
+    // the flag so the user isn't stuck behind a spinner that never resolves.
+    // The success path runs through controllerchange in main.tsx, which
+    // reloads the page and wipes React state anyway.
+    installing.addEventListener('statechange', () => {
+      if (installing.state === 'redundant') {
+        useStore.getState().setWsUpdatePending(false)
+      }
+    })
   })
 }
 
