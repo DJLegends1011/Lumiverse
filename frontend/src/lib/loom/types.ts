@@ -1,5 +1,11 @@
 export type LoomInjectTag = 'user_append' | 'assistant_append'
 
+export interface PromptVariableOption {
+  id: string
+  label: string
+  value: string
+}
+
 export type PromptVariableDef =
   | {
       id: string
@@ -40,9 +46,36 @@ export type PromptVariableDef =
       step?: number
       description?: string
     }
+  | {
+      id: string
+      name: string
+      label: string
+      type: 'select'
+      defaultValue: string
+      options: PromptVariableOption[]
+      description?: string
+    }
+  | {
+      id: string
+      name: string
+      label: string
+      type: 'switch'
+      defaultValue: 0 | 1
+      description?: string
+    }
+  | {
+      id: string
+      name: string
+      label: string
+      type: 'multiselect'
+      defaultValue: string[]
+      options: PromptVariableOption[]
+      separator?: string
+      description?: string
+    }
 
 export type PromptVariableType = PromptVariableDef['type']
-export type PromptVariableValue = string | number
+export type PromptVariableValue = string | number | string[]
 export type PromptVariableValues = Record<string /* blockId */, Record<string /* varName */, PromptVariableValue>>
 
 export interface PromptBlock {

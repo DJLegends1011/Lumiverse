@@ -424,7 +424,23 @@ type RuntimeWorkerToHost =
       processId: string;
       options?: { userId?: string; reason?: string };
     }
-  | { type: "backend_process_send"; processId: string; payload: unknown; userId?: string };
+  | { type: "backend_process_send"; processId: string; payload: unknown; userId?: string }
+  | { type: "ui_get_drawer_tabs"; requestId: string; userId?: string }
+  | { type: "ui_get_settings_tabs"; requestId: string; userId?: string }
+  | {
+      type: "ui_navigate";
+      requestId: string;
+      action:
+        | "open_drawer_tab"
+        | "close_drawer"
+        | "open_settings"
+        | "close_settings"
+        | "open_command_palette"
+        | "close_command_palette";
+      tabId?: string;
+      viewId?: string;
+      userId?: string;
+    };
 
 type RuntimeHostToWorker =
   | HostToWorker
@@ -456,7 +472,12 @@ type RuntimeHostToWorker =
   | { type: "backend_process_lifecycle"; event: BackendProcessLifecycleEvent }
   | { type: "backend_process_message"; processId: string; payload: unknown; userId: string };
 
-type RuntimeSpindleAPI = SpindleAPI & {
+// `presets` is replaced wholesale (not intersected) because the local
+// PromptBlock type adds variants (select, switch, multiselect) that the
+// published PromptBlockDTO doesn't carry. Intersection would require the
+// implementation to satisfy both shapes — which is impossible since the
+// local type is strictly broader.
+type RuntimeSpindleAPI = Omit<SpindleAPI, "presets"> & {
   registerMessageContentProcessor(
     handler: (ctx: {
       chatId: string;
@@ -646,6 +667,31 @@ type RuntimeSpindleAPI = SpindleAPI & {
   };
   users: SpindleAPI["users"] & {
     getRole(userId?: string): Promise<SpindleUserRole>;
+  };
+  ui: {
+    getDrawerTabs(options?: { userId?: string }): Promise<Array<{
+      id: string;
+      shortName: string;
+      tabName: string;
+      tabDescription: string;
+      keywords: string[];
+      source: "builtin" | "extension";
+      extensionId?: string;
+    }>>;
+    getSettingsTabs(options?: { userId?: string }): Promise<Array<{
+      id: string;
+      shortName: string;
+      tabName: string;
+      tabDescription: string;
+      keywords: string[];
+      role?: "admin" | "owner";
+    }>>;
+    openDrawerTab(tabId: string, options?: { userId?: string }): Promise<void>;
+    closeDrawer(options?: { userId?: string }): Promise<void>;
+    openSettings(viewId?: string, options?: { userId?: string }): Promise<void>;
+    closeSettings(options?: { userId?: string }): Promise<void>;
+    openCommandPalette(options?: { userId?: string }): Promise<void>;
+    closeCommandPalette(options?: { userId?: string }): Promise<void>;
   };
 };
 
@@ -3213,6 +3259,73 @@ const spindleApi: RuntimeSpindleAPI = {
     },
     error(msg: string) {
       post({ type: "log", level: "error", message: msg });
+    },
+  },
+
+  ui: {
+    async getDrawerTabs(options?: { userId?: string }): Promise<Array<{
+      id: string;
+      shortName: string;
+      tabName: string;
+      tabDescription: string;
+      keywords: string[];
+      source: "builtin" | "extension";
+      extensionId?: string;
+    }>> {
+      const requestId = crypto.randomUUID();
+      const result = await request({ type: "ui_get_drawer_tabs", requestId, userId: options?.userId });
+      return result as Array<{
+        id: string;
+        shortName: string;
+        tabName: string;
+        tabDescription: string;
+        keywords: string[];
+        source: "builtin" | "extension";
+        extensionId?: string;
+      }>;
+    },
+    async getSettingsTabs(options?: { userId?: string }): Promise<Array<{
+      id: string;
+      shortName: string;
+      tabName: string;
+      tabDescription: string;
+      keywords: string[];
+      role?: "admin" | "owner";
+    }>> {
+      const requestId = crypto.randomUUID();
+      const result = await request({ type: "ui_get_settings_tabs", requestId, userId: options?.userId });
+      return result as Array<{
+        id: string;
+        shortName: string;
+        tabName: string;
+        tabDescription: string;
+        keywords: string[];
+        role?: "admin" | "owner";
+      }>;
+    },
+    async openDrawerTab(tabId: string, options?: { userId?: string }): Promise<void> {
+      const requestId = crypto.randomUUID();
+      await request({ type: "ui_navigate", requestId, action: "open_drawer_tab", tabId, userId: options?.userId });
+    },
+    async closeDrawer(options?: { userId?: string }): Promise<void> {
+      const requestId = crypto.randomUUID();
+      await request({ type: "ui_navigate", requestId, action: "close_drawer", userId: options?.userId });
+    },
+    async openSettings(viewId?: string, options?: { userId?: string }): Promise<void> {
+      const requestId = crypto.randomUUID();
+      await request({ type: "ui_navigate", requestId, action: "open_settings", viewId, userId: options?.userId });
+    },
+    async closeSettings(options?: { userId?: string }): Promise<void> {
+      const requestId = crypto.randomUUID();
+      await request({ type: "ui_navigate", requestId, action: "close_settings", userId: options?.userId });
+    },
+    async openCommandPalette(options?: { userId?: string }): Promise<void> {
+      const requestId = crypto.randomUUID();
+      await request({ type: "ui_navigate", requestId, action: "open_command_palette", userId: options?.userId });
+    },
+    async closeCommandPalette(options?: { userId?: string }): Promise<void> {
+      const requestId = crypto.randomUUID();
+      await request({ type: "ui_navigate", requestId, action: "close_command_palette", userId: options?.userId });
     },
   },
 

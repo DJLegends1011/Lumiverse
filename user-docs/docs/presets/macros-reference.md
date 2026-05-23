@@ -579,9 +579,16 @@ Here `.roll` is a temporary local variable (used for the current evaluation only
 
 Prompt variables are preset-defined inputs that are seeded into local scope before block evaluation. That means `{{var::tone}}`, `{{getvar::tone}}`, and `{{.tone}}` can all resolve to the same runtime value.
 
+Variables come in seven types — **Text**, **Text Area**, **Number**, **Slider**, **Dropdown**, **On/Off**, and **Multi-select** — and each resolves to its **rendered value** when read:
+
+- **Dropdown** → the selected option's value string (the long, expanded text the creator wrote).
+- **On/Off** → `1` when on, `0` when off. Use directly in `{{if::...}}` gates.
+- **Multi-select** → the selected options' values, joined by the variable's separator (default `\n\n`).
+
 | Macro | Aliases | Description | Args |
 |-------|---------|-------------|------|
 | `{{var::name}}` | `{{promptVar}}`, `{{presetVar}}` | Read the runtime prompt-variable value, then the user override, then the creator default | Variable name |
+| `{{var::name::ison::keyA,keyB,...}}` | — | **Multi-select only.** Returns `"true"` if every listed option key is currently selected (AND match), `"false"` otherwise. Empty key list is vacuously `"true"`. | Variable name, the literal `ison`, comma-separated option keys |
 | `{{hasVar::name}}` | `{{hasPromptVar}}`, `{{hasPresetVar}}` | Check whether a prompt variable is resolvable | Variable name |
 | `{{varDefault::name}}` | `{{promptVarDefault}}`, `{{presetVarDefault}}` | Read the creator-declared default only | Variable name |
 
@@ -592,6 +599,20 @@ Tone: {{default::{{var::tone}}::neutral}}
 
 {{if::{{hasPromptVar::violence}}}}
 Violence level: {{var::violence}}
+{{/if}}
+
+// On/Off switches resolve to 1 or 0 — drop them straight into {{if::...}}.
+{{if::{{var::strict_canon}}}}
+Strictly adhere to established canon.
+{{/if}}
+
+// Multi-select: the rendered value is the joined block of selected option values.
+Style guidelines:
+{{var::style_guides}}
+
+// Multi-select: branch on WHICH options are selected with the ison sub-syntax.
+{{if::{{var::style_guides::ison::concise,polite}}}}
+Stay tight and respectful — no throat-clearing.
 {{/if}}
 ```
 
@@ -765,6 +786,7 @@ These macros return `"yes"` / `"no"` or `"true"` / `"false"` and are designed fo
 | `{{haschatvar::key}}` | Chat-persisted variable exists |
 | `{{hasgvar::key}}` | Global variable exists |
 | `{{hasPromptVar::name}}` | A prompt variable is available |
+| `{{var::name::ison::keyA,keyB}}` | All listed option keys are selected on a multi-select prompt variable |
 | `{{charTag::tag}}` | Character has the specified tag |
 | `{{regexInstalled::id}}` | Regex script with that ID is installed and enabled |
 | `{{and::a::b}}` | All arguments are truthy |

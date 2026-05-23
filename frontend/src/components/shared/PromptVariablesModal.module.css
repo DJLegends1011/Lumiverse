@@ -216,6 +216,31 @@
   justify-content: space-between;
 }
 
+/* ---- Switch toggle wrapper (uses shared Toggle.Switch) ---- */
+
+.switchRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.switchStateLabel {
+  font-size: calc(12.5px * var(--lumiverse-font-scale, 1));
+  color: var(--lumiverse-text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+}
+
+/* ---- Multiselect / select empty-state ---- */
+
+.multiselectEmpty {
+  padding: 8px 10px;
+  font-size: calc(11.5px * var(--lumiverse-font-scale, 1));
+  color: var(--lumiverse-text-dim);
+  font-style: italic;
+}
+
 .footer {
   display: flex;
   align-items: center;

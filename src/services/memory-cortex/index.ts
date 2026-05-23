@@ -297,6 +297,13 @@ export function migrateLegacyChunkSignature(stored: string): string | null {
   });
 }
 
+// Chats whose legacy chunk signatures have been resolved in this process.
+// The migration is idempotent and reads every signature row on each call —
+// after the first hit, every subsequent warmup can skip the scan. Cleared
+// only on process restart (legacy formats can't reappear without a code
+// change, which itself requires a restart).
+const legacyChunkSignaturesMigrated = new Set<string>();
+
 /**
  * Lazy per-chat migration: rewrite legacy chunk warmup signatures to the
  * narrowed structural format. Idempotent. Called at the start of warmup so
@@ -305,11 +312,16 @@ export function migrateLegacyChunkSignature(stored: string): string | null {
  * that would nuke entities). Returns the number of rows rewritten.
  */
 export function migrateLegacyChunkSignatures(chatId: string): number {
+  if (legacyChunkSignaturesMigrated.has(chatId)) return 0;
+
   const db = getDb();
   const rows = db
     .query("SELECT id, cortex_warmup_signature FROM chat_chunks WHERE chat_id = ? AND cortex_warmup_signature IS NOT NULL")
     .all(chatId) as Array<{ id: string; cortex_warmup_signature: string }>;
-  if (rows.length === 0) return 0;
+  if (rows.length === 0) {
+    legacyChunkSignaturesMigrated.add(chatId);
+    return 0;
+  }
 
   const updateStmt = db.query("UPDATE chat_chunks SET cortex_warmup_signature = ? WHERE id = ?");
   const clearStmt = db.query("UPDATE chat_chunks SET cortex_warmup_signature = NULL, cortex_warmup_completed_at = NULL WHERE id = ?");
@@ -324,6 +336,7 @@ export function migrateLegacyChunkSignatures(chatId: string): number {
       migrated++;
     }
   }
+  legacyChunkSignaturesMigrated.add(chatId);
   return migrated;
 }
 
@@ -349,20 +362,35 @@ function clearDerivedCortexData(chatId: string, options: { preserveSalience?: bo
 
 export function getCortexWarmupCoverage(chatId: string, warmupSignature: string): CortexWarmupCoverage {
   const db = getDb();
-  const totalRow = db.query("SELECT COUNT(*) as c FROM chat_chunks WHERE chat_id = ?").get(chatId) as { c?: number } | null;
-  const completedRow = db
-    .query("SELECT COUNT(*) as c FROM chat_chunks WHERE chat_id = ? AND cortex_warmup_signature = ?")
-    .get(chatId, warmupSignature) as { c?: number } | null;
+  // Single query: 2 chunk counts + 4 EXISTS probes for "has any derived
+  // data?". EXISTS short-circuits on the first matching row (O(1) on indexed
+  // chat_id), so this replaces the 8-COUNT getCortexUsageStats call where
+  // we only need 4 booleans for the requiresFullRebuild decision.
+  const row = db.query(`
+    SELECT
+      (SELECT COUNT(*) FROM chat_chunks WHERE chat_id = ?) AS total,
+      (SELECT COUNT(*) FROM chat_chunks WHERE chat_id = ? AND cortex_warmup_signature = ?) AS completed,
+      EXISTS(SELECT 1 FROM memory_entities WHERE chat_id = ?) AS has_entities,
+      EXISTS(SELECT 1 FROM memory_relations WHERE chat_id = ?) AS has_relations,
+      EXISTS(SELECT 1 FROM memory_salience WHERE chat_id = ?) AS has_salience,
+      EXISTS(SELECT 1 FROM memory_consolidations WHERE chat_id = ?) AS has_consolidations
+  `).get(chatId, chatId, warmupSignature, chatId, chatId, chatId, chatId) as {
+    total?: number;
+    completed?: number;
+    has_entities?: number;
+    has_relations?: number;
+    has_salience?: number;
+    has_consolidations?: number;
+  } | null;
 
-  const totalChunks = totalRow?.c ?? 0;
-  const completedChunks = completedRow?.c ?? 0;
-  const stats = getCortexUsageStats(chatId);
-  const requiresFullRebuild = completedChunks === 0 && (
-    stats.entityCount > 0 ||
-    stats.relationCount > 0 ||
-    stats.salienceRecordCount > 0 ||
-    stats.consolidationCount > 0
-  );
+  const totalChunks = row?.total ?? 0;
+  const completedChunks = row?.completed ?? 0;
+  const hasDerivedData =
+    !!row?.has_entities ||
+    !!row?.has_relations ||
+    !!row?.has_salience ||
+    !!row?.has_consolidations;
+  const requiresFullRebuild = completedChunks === 0 && hasDerivedData;
 
   return {
     totalChunks,

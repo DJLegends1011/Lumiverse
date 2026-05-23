@@ -106,6 +106,11 @@ seedTokenizers();
 const { initSharpSettings } = await import("./services/sharp-settings.service");
 initSharpSettings();
 
+// Load DNS settings so safe-fetch can pick up the DoH fallback toggle
+// before the first outbound request that needs validation.
+const { initDnsSettings } = await import("./services/dns-settings.service");
+initDnsSettings();
+
 // Start background vectorization maintenance only after the database is ready.
 const { startVectorizationQueueMaintenance } = await import("./services/vectorization-queue.service");
 startVectorizationQueueMaintenance();

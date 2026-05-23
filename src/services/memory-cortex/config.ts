@@ -333,16 +333,31 @@ function applyStandardPreset(config: MemoryCortexConfig): MemoryCortexConfig {
 
 // ─── Settings Resolution ───────────────────────────────────────
 
+// Per-user cortex config cache. Resolving the config requires a settings-table
+// read + normalize on every call; the cortex warmup hot path hits this on
+// every chat open. Cache entries are invalidated by every write path
+// (putCortexConfig, applyCortexPreset). Values are deep-cloned on read so
+// callers can't mutate the cached instance.
+const cortexConfigCache = new Map<string, MemoryCortexConfig>();
+
+function invalidateCortexConfigCache(userId: string): void {
+  cortexConfigCache.delete(userId);
+}
+
 /**
  * Load the cortex configuration for a user.
  * Returns defaults if no config has been saved.
  */
 export function getCortexConfig(userId: string): MemoryCortexConfig {
-  const row = settingsSvc.getSetting(userId, SETTINGS_KEY);
-  if (!row?.value) return { ...DEFAULT_CORTEX_CONFIG };
+  const cached = cortexConfigCache.get(userId);
+  if (cached) return structuredClone(cached);
 
-  const saved = row.value as Partial<MemoryCortexConfig>;
-  return normalizeCortexConfig(saved);
+  const row = settingsSvc.getSetting(userId, SETTINGS_KEY);
+  const resolved = !row?.value
+    ? { ...DEFAULT_CORTEX_CONFIG }
+    : normalizeCortexConfig(row.value as Partial<MemoryCortexConfig>);
+  cortexConfigCache.set(userId, structuredClone(resolved));
+  return resolved;
 }
 
 /**
@@ -355,6 +370,7 @@ export function putCortexConfig(
   const current = getCortexConfig(userId);
   const merged = normalizeCortexConfig({ ...current, ...update });
   settingsSvc.putSetting(userId, SETTINGS_KEY, merged);
+  invalidateCortexConfigCache(userId);
   return merged;
 }
 
@@ -385,6 +401,7 @@ export function applyCortexPreset(
   }
 
   settingsSvc.putSetting(userId, SETTINGS_KEY, config);
+  invalidateCortexConfigCache(userId);
   return config;
 }
 

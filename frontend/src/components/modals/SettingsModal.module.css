@@ -388,10 +388,21 @@
 }
 
 .extensionMount {
-  min-height: 140px;
-  border: 1px dashed var(--lumiverse-border);
-  border-radius: 10px;
-  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.extensionMount > [data-spindle-extension-root] {
+  border: 1px solid var(--lumiverse-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--lumiverse-fill-subtle);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.extensionMount > [data-spindle-extension-root]:empty {
+  display: none;
 }
 
 .extensionMountHost {

@@ -809,23 +809,27 @@ function resolvePromptVariables(
     Record<string, PromptVariableValue>
   >;
 
-  const values: Record<string, PromptVariableValue> = {};
-  const defaults: Record<string, PromptVariableValue> = {};
-  const byBlock: Record<string, Record<string, PromptVariableValue>> = {};
+  const values: Record<string, string | number> = {};
+  const defaults: Record<string, string | number> = {};
+  const byBlock: Record<string, Record<string, string | number>> = {};
+  const selections: Record<string, string[]> = {};
 
   for (const block of blocks) {
     if (!block.enabled || !block.variables?.length) continue;
     const bucket = stored[block.id] ?? {};
-    const perBlock: Record<string, PromptVariableValue> = {};
+    const perBlock: Record<string, string | number> = {};
     for (const def of block.variables) {
       if (!def?.name) continue;
       const override = Object.prototype.hasOwnProperty.call(bucket, def.name)
         ? bucket[def.name]
         : undefined;
-      const resolved = coercePromptVariableValue(def, override);
-      perBlock[def.name] = resolved;
-      values[def.name] = resolved;
-      defaults[def.name] = coercePromptVariableValue(def, undefined);
+      const resolved = coercePromptVariable(def, override);
+      perBlock[def.name] = resolved.rendered;
+      values[def.name] = resolved.rendered;
+      defaults[def.name] = coercePromptVariable(def, undefined).rendered;
+      if (def.type === "multiselect") {
+        selections[def.name] = resolved.selectedIds;
+      }
     }
     if (Object.keys(perBlock).length) byBlock[block.id] = perBlock;
   }
@@ -833,6 +837,7 @@ function resolvePromptVariables(
   env.extra.promptVariables = values;
   env.extra.promptVariablesByBlock = byBlock;
   env.extra.promptVariableDefaults = defaults;
+  env.extra.promptVariableSelections = selections;
 
   // Seed the local-variables Map so {{getvar::name}} resolves to the same
   // value as {{var::name}}. Seeding happens before any block renders, so
@@ -849,29 +854,88 @@ function resolvePromptVariables(
   }
 }
 
-function coercePromptVariableValue(
+interface CoercedPromptVar {
+  /** What {{var::name}} resolves to (or its stringified form). */
+  rendered: string | number;
+  /** Currently selected option ids — only meaningful for multiselect/select; empty otherwise. */
+  selectedIds: string[];
+}
+
+export function coercePromptVariable(
   def: PromptVariableDef,
   raw: unknown,
-): PromptVariableValue {
+): CoercedPromptVar {
   switch (def.type) {
     case "text":
     case "textarea": {
-      if (raw === undefined || raw === null) return def.defaultValue ?? "";
-      return String(raw);
+      if (raw === undefined || raw === null) return { rendered: def.defaultValue ?? "", selectedIds: [] };
+      return { rendered: String(raw), selectedIds: [] };
     }
     case "number": {
       const fallback =
         typeof def.defaultValue === "number" ? def.defaultValue : 0;
       const n = raw === undefined || raw === null ? fallback : Number(raw);
       const v = Number.isFinite(n) ? n : fallback;
-      return clampNumber(v, def.min, def.max);
+      return { rendered: clampNumber(v, def.min, def.max), selectedIds: [] };
     }
     case "slider": {
-      const fallback =
-        typeof def.defaultValue === "number" ? def.defaultValue : def.min;
+      const fallback = def.defaultValue;
       const n = raw === undefined || raw === null ? fallback : Number(raw);
       const v = Number.isFinite(n) ? n : fallback;
-      return clampNumber(v, def.min, def.max);
+      return { rendered: clampNumber(v, def.min, def.max), selectedIds: [] };
+    }
+    case "select": {
+      const options = def.options ?? [];
+      const validIds = new Set(options.map((o) => o.id));
+      const fallback = validIds.has(def.defaultValue)
+        ? def.defaultValue
+        : options[0]?.id ?? "";
+      const candidate =
+        raw === undefined || raw === null ? fallback : String(raw);
+      const selectedId = validIds.has(candidate) ? candidate : fallback;
+      const match = options.find((o) => o.id === selectedId);
+      return {
+        rendered: match?.value ?? "",
+        selectedIds: selectedId ? [selectedId] : [],
+      };
+    }
+    case "switch": {
+      const fallback: 0 | 1 = def.defaultValue === 1 ? 1 : 0;
+      if (raw === undefined || raw === null) {
+        return { rendered: fallback, selectedIds: [] };
+      }
+      // Accept booleans, "0"/"1", "true"/"false", and numeric 0/1.
+      let on = false;
+      if (typeof raw === "boolean") on = raw;
+      else if (typeof raw === "number") on = raw === 1;
+      else {
+        const s = String(raw).trim().toLowerCase();
+        on = s === "1" || s === "true" || s === "on" || s === "yes";
+      }
+      return { rendered: on ? 1 : 0, selectedIds: [] };
+    }
+    case "multiselect": {
+      const options = def.options ?? [];
+      const validIds = new Set(options.map((o) => o.id));
+      let rawIds: string[];
+      if (Array.isArray(raw)) {
+        rawIds = raw.map((v) => String(v));
+      } else if (raw === undefined || raw === null) {
+        rawIds = Array.isArray(def.defaultValue) ? def.defaultValue.slice() : [];
+      } else if (typeof raw === "string" && raw.length > 0) {
+        rawIds = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      } else {
+        rawIds = [];
+      }
+      // Preserve option-declaration order so the joined output is stable
+      // regardless of the order the end user clicked the checkboxes in.
+      const selectedSet = new Set(rawIds.filter((id) => validIds.has(id)));
+      const orderedSelected = options.filter((o) => selectedSet.has(o.id));
+      const separator = typeof def.separator === "string" ? def.separator : "\n\n";
+      return {
+        rendered: orderedSelected.map((o) => o.value).join(separator),
+        selectedIds: orderedSelected.map((o) => o.id),
+      };
     }
   }
 }

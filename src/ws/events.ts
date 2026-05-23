@@ -135,6 +135,9 @@ export enum EventType {
   // Spindle command palette commands
   SPINDLE_COMMANDS_CHANGED = "SPINDLE_COMMANDS_CHANGED",
 
+  // Spindle UI automation (navigate drawer/settings/command palette)
+  SPINDLE_UI_NAVIGATE = "SPINDLE_UI_NAVIGATE",
+
   // Import progress
   IMPORT_GALLERY_PROGRESS = "IMPORT_GALLERY_PROGRESS",
 
