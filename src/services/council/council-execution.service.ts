@@ -918,9 +918,9 @@ Rules:
     connection_id: sidecar.connectionProfileId,
     messages,
     parameters: {
-      temperature: 0,
+      temperature: sidecar.temperature,
       top_p: sidecar.topP,
-      max_tokens: Math.min(sidecar.maxTokens, 96),
+      max_tokens: sidecar.maxTokens,
     },
     signal,
   });
