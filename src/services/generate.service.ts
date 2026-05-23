@@ -51,6 +51,7 @@ import { activateWorldInfo } from "./world-info-activation.service";
 import type {
   CachedCouncilResult,
   CouncilMember,
+  GenerationReasoningOverrideDTO,
 } from "lumiverse-spindle-types";
 import {
   getCouncilSettings,
@@ -348,6 +349,12 @@ export interface RawGenerateInput {
   api_key?: string;
   /** Optional tool/function definitions for inline function calling. */
   tools?: ToolDefinition[];
+  /**
+   * Optional per-request reasoning override. When omitted (or `source: "inherit"`),
+   * the connection's bound reasoning settings are applied, falling back to
+   * the user's global `reasoningSettings`. See `GenerationReasoningOverrideDTO`.
+   */
+  reasoning?: GenerationReasoningOverrideDTO;
 }
 
 export interface QuietGenerateInput {
@@ -364,6 +371,12 @@ export interface QuietGenerateInput {
    * chat-switch. Ignored by `quietGenerate`.
    */
   chat_id?: string;
+  /**
+   * Optional per-request reasoning override. When omitted (or `source: "inherit"`),
+   * the connection's bound reasoning settings are applied, falling back to
+   * the user's global `reasoningSettings`. See `GenerationReasoningOverrideDTO`.
+   */
+  reasoning?: GenerationReasoningOverrideDTO;
 }
 
 export interface DryRunResult {
@@ -957,14 +970,41 @@ function getEffectiveReasoningSettings(
   return (reasoningSetting?.value as ReasoningSettingsSnapshot | undefined) ?? null;
 }
 
+/**
+ * Resolve a per-request reasoning override down to a `ReasoningSettingsSnapshot`
+ * that the existing inject/off-switch helpers can consume. Returns `undefined`
+ * to mean "no override — use the inherited settings".
+ */
+function resolveReasoningOverride(
+  override: GenerationReasoningOverrideDTO | undefined,
+): ReasoningSettingsSnapshot | undefined {
+  if (!override) return undefined;
+  const source = override.source ?? "inherit";
+  if (source === "inherit") return undefined;
+  if (source === "off") {
+    return { apiReasoning: false };
+  }
+  // source === "custom"
+  return {
+    apiReasoning: override.apiReasoning ?? true,
+    reasoningEffort: override.effort ?? "auto",
+    thinkingDisplay: override.thinkingDisplay ?? "auto",
+  };
+}
+
 function applyEffectiveReasoningSettings(
   userId: string,
   connection: { metadata?: Record<string, any> | null },
   providerName: string,
   modelName: string | undefined,
   params: GenerationParameters,
+  override?: GenerationReasoningOverrideDTO,
 ): void {
-  const reasoningSettings = getEffectiveReasoningSettings(userId, connection);
+  const resolvedOverride = resolveReasoningOverride(override);
+  const reasoningSettings =
+    resolvedOverride !== undefined
+      ? resolvedOverride
+      : getEffectiveReasoningSettings(userId, connection);
 
   if (reasoningSettings?.apiReasoning) {
     const effort = reasoningSettings.reasoningEffort || "auto";
@@ -3832,6 +3872,7 @@ async function prepareRawCall(
     provider.name,
     input.model,
     parameters,
+    input.reasoning,
   );
   if (provider.name === "anthropic" && reasoningConnection?.metadata) {
     injectConnectionMetadataFlags(reasoningConnection, parameters);
@@ -3883,6 +3924,7 @@ async function prepareQuietCall(
     provider.name,
     connection.model || undefined,
     mergedParams,
+    input.reasoning,
   );
 
   injectConnectionMetadataFlags(connection, mergedParams);

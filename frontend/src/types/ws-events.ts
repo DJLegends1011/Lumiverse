@@ -58,6 +58,9 @@ export enum EventType {
   // Spindle command palette commands
   SPINDLE_COMMANDS_CHANGED = 'SPINDLE_COMMANDS_CHANGED',
 
+  // Spindle UI automation (extension navigates the user to a tab/settings/etc.)
+  SPINDLE_UI_NAVIGATE = 'SPINDLE_UI_NAVIGATE',
+
   // Spindle theme overrides
   SPINDLE_THEME_OVERRIDES = 'SPINDLE_THEME_OVERRIDES',
 

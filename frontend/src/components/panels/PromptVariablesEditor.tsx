@@ -409,9 +409,7 @@ function VariableRow({
           ) : (
             <NumberStepper
               value={
-                typeof variable.defaultValue === 'number'
-                  ? variable.defaultValue
-                  : Number(variable.defaultValue) || 0
+                Number((variable as { defaultValue?: unknown }).defaultValue) || 0
               }
               onChange={(n) =>
                 onUpdate({ defaultValue: n ?? 0 } as Partial<PromptVariableDef>)

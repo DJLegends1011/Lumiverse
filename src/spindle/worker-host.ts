@@ -7,6 +7,10 @@ import type {
   ToolRegistration,
   ExtensionInfo,
   ConnectionProfileDTO,
+  ConnectionReasoningBindingsDTO,
+  ReasoningSettingsDTO,
+  ReasoningEffortDTO,
+  ThinkingDisplayDTO,
   CharacterDTO,
   CharacterAvatarUploadDTO,
   ChatDTO,
@@ -54,6 +58,11 @@ import {
 } from "./world-info-interceptor";
 import { toolRegistry } from "./tool-registry";
 import * as managerSvc from "./manager.service";
+import {
+  BUILT_IN_DRAWER_TABS,
+  getVisibleSettingsTabs as getVisibleUISettingsTabs,
+} from "./ui-registry";
+import { getUserExtensionDrawerTabs } from "./ui-frontend-state.service";
 import * as generateSvc from "../services/generate.service";
 import * as connectionsSvc from "../services/connections.service";
 import * as charactersSvc from "../services/characters.service";
@@ -526,7 +535,23 @@ type RuntimeWorkerToHost =
       processId: string;
       options?: { userId?: string; reason?: string };
     }
-  | { type: "backend_process_send"; processId: string; payload: unknown; userId?: string };
+  | { type: "backend_process_send"; processId: string; payload: unknown; userId?: string }
+  | { type: "ui_get_drawer_tabs"; requestId: string; userId?: string }
+  | { type: "ui_get_settings_tabs"; requestId: string; userId?: string }
+  | {
+      type: "ui_navigate";
+      requestId: string;
+      action:
+        | "open_drawer_tab"
+        | "close_drawer"
+        | "open_settings"
+        | "close_settings"
+        | "open_command_palette"
+        | "close_command_palette";
+      tabId?: string;
+      viewId?: string;
+      userId?: string;
+    };
 
 type RuntimeHostToWorker =
   | HostToWorker
@@ -766,6 +791,63 @@ function validateFontMagicBytes(data: Uint8Array, _contentType: string): boolean
   if (data[0] === 0x74 && data[1] === 0x74 && data[2] === 0x63 && data[3] === 0x66) return true;
 
   return false;
+}
+
+const REASONING_EFFORT_VALUES = new Set<ReasoningEffortDTO>([
+  "auto",
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "max",
+  "xhigh",
+]);
+
+const THINKING_DISPLAY_VALUES = new Set<ThinkingDisplayDTO>([
+  "auto",
+  "summarized",
+  "omitted",
+]);
+
+function coerceReasoningSettings(raw: unknown): ReasoningSettingsDTO | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const r = raw as Record<string, unknown>;
+  const effort = REASONING_EFFORT_VALUES.has(r.reasoningEffort as ReasoningEffortDTO)
+    ? (r.reasoningEffort as ReasoningEffortDTO)
+    : "auto";
+  const display = THINKING_DISPLAY_VALUES.has(r.thinkingDisplay as ThinkingDisplayDTO)
+    ? (r.thinkingDisplay as ThinkingDisplayDTO)
+    : "auto";
+  return {
+    apiReasoning: r.apiReasoning === true,
+    reasoningEffort: effort,
+    thinkingDisplay: display,
+    prefix: typeof r.prefix === "string" ? r.prefix : "",
+    suffix: typeof r.suffix === "string" ? r.suffix : "",
+    autoParse: r.autoParse !== false,
+    keepInHistory: typeof r.keepInHistory === "number" ? r.keepInHistory : 0,
+  };
+}
+
+/**
+ * Parse the `metadata.reasoningBindings` blob on a connection into a typed
+ * `ConnectionReasoningBindingsDTO`. Returns `null` when the connection has
+ * no binding attached — callers should treat that as "fall back to the
+ * user's global reasoning setting" during generation.
+ */
+function extractReasoningBindingsDTO(
+  metadata: Record<string, any> | null | undefined,
+): ConnectionReasoningBindingsDTO | null {
+  const blob = metadata?.reasoningBindings;
+  if (!blob || typeof blob !== "object" || Array.isArray(blob)) return null;
+  const settings = coerceReasoningSettings((blob as any).settings);
+  if (!settings) return null;
+  const promptBias = (blob as any).promptBias;
+  return {
+    settings,
+    ...(typeof promptBias === "string" ? { promptBias } : {}),
+  };
 }
 
 function concatChunks(chunks: Uint8Array[], total: number): Uint8Array {
@@ -2794,6 +2876,16 @@ export class WorkerHost {
       case "commands_unregister":
         this.handleCommandsUnregister(msg.commandIds);
         break;
+      // ─── UI Automation (free tier) ────────────────────────────────────
+      case "ui_get_drawer_tabs":
+        this.handleUIGetDrawerTabs(msg.requestId, msg.userId);
+        break;
+      case "ui_get_settings_tabs":
+        this.handleUIGetSettingsTabs(msg.requestId, msg.userId);
+        break;
+      case "ui_navigate":
+        this.handleUINavigate(msg.requestId, msg.action, msg.tabId, msg.viewId, msg.userId);
+        break;
       // ─── Version (free tier) ─────────────────────────────────────────
       case "version_get_backend":
         this.handleVersionGetBackend(msg.requestId);
@@ -3316,6 +3408,7 @@ export class WorkerHost {
             parameters: input.parameters,
             connection_id: input.connection_id,
             tools: input.tools,
+            reasoning: input.reasoning,
             signal: abortController.signal,
           });
           break;
@@ -3325,6 +3418,7 @@ export class WorkerHost {
             connection_id: input.connection_id,
             parameters: input.parameters,
             tools: input.tools,
+            reasoning: input.reasoning,
             signal: abortController.signal,
           });
           break;
@@ -3417,6 +3511,7 @@ export class WorkerHost {
             parameters: input.parameters,
             connection_id: input.connection_id,
             tools: input.tools,
+            reasoning: input.reasoning,
             signal: abortController.signal,
           });
           break;
@@ -3426,6 +3521,7 @@ export class WorkerHost {
             connection_id: input.connection_id,
             parameters: input.parameters,
             tools: input.tools,
+            reasoning: input.reasoning,
             signal: abortController.signal,
           });
           break;
@@ -3726,6 +3822,7 @@ export class WorkerHost {
         is_default: c.is_default,
         has_api_key: c.has_api_key,
         metadata: c.metadata,
+        reasoning_bindings: extractReasoningBindingsDTO(c.metadata),
         created_at: c.created_at,
         updated_at: c.updated_at,
       }));
@@ -3776,6 +3873,7 @@ export class WorkerHost {
         is_default: c.is_default,
         has_api_key: c.has_api_key,
         metadata: c.metadata,
+        reasoning_bindings: extractReasoningBindingsDTO(c.metadata),
         created_at: c.created_at,
         updated_at: c.updated_at,
       };
@@ -8963,6 +9061,126 @@ export class WorkerHost {
   /** Expose registered commands for lookup from the WS handler. */
   getRegisteredCommands(): SpindleCommandDTO[] {
     return this.registeredCommands;
+  }
+
+  // ─── UI Automation (free tier) ────────────────────────────────────────
+
+  private handleUIGetDrawerTabs(requestId: string, userId?: string): void {
+    try {
+      const resolvedUserId = this.resolveEffectiveUserId(userId);
+      if (resolvedUserId) this.enforceScopedUser(resolvedUserId);
+
+      const builtIn = BUILT_IN_DRAWER_TABS.map((tab) => ({
+        id: tab.id,
+        shortName: tab.shortName,
+        tabName: tab.tabName,
+        tabDescription: tab.tabDescription,
+        keywords: [...tab.keywords],
+        source: "builtin" as const,
+      }));
+      const extensions = getUserExtensionDrawerTabs(resolvedUserId).map((tab) => ({
+        id: tab.id,
+        shortName: tab.shortName ?? tab.tabName,
+        tabName: tab.tabName,
+        tabDescription: tab.tabDescription ?? `Open ${tab.tabName} extension tab`,
+        keywords: tab.keywords ?? [],
+        source: "extension" as const,
+        extensionId: tab.extensionId,
+      }));
+      this.postToWorker({ type: "response", requestId, result: [...builtIn, ...extensions] });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  private handleUIGetSettingsTabs(requestId: string, userId?: string): void {
+    try {
+      const resolvedUserId = this.resolveEffectiveUserId(userId);
+      if (resolvedUserId) this.enforceScopedUser(resolvedUserId);
+
+      let role: string | null = null;
+      if (resolvedUserId) {
+        const row = getDb()
+          .query('SELECT role FROM "user" WHERE id = ?')
+          .get(resolvedUserId) as { role: string | null } | null;
+        role = row?.role ?? null;
+      }
+
+      const result = getVisibleUISettingsTabs(role).map((tab) => ({
+        id: tab.id,
+        shortName: tab.shortName,
+        tabName: tab.tabName,
+        tabDescription: tab.tabDescription,
+        keywords: [...tab.keywords],
+        ...(tab.role ? { role: tab.role } : {}),
+      }));
+      this.postToWorker({ type: "response", requestId, result });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
+  }
+
+  private handleUINavigate(
+    requestId: string,
+    action:
+      | "open_drawer_tab"
+      | "close_drawer"
+      | "open_settings"
+      | "close_settings"
+      | "open_command_palette"
+      | "close_command_palette",
+    tabId?: string,
+    viewId?: string,
+    userId?: string,
+  ): void {
+    try {
+      const validActions = new Set([
+        "open_drawer_tab",
+        "close_drawer",
+        "open_settings",
+        "close_settings",
+        "open_command_palette",
+        "close_command_palette",
+      ]);
+      if (!validActions.has(action)) {
+        throw new Error(`Invalid UI navigate action: ${action}`);
+      }
+      if (action === "open_drawer_tab") {
+        if (typeof tabId !== "string" || !tabId.trim()) {
+          throw new Error("tabId is required for open_drawer_tab");
+        }
+      }
+
+      let targetUserId: string | undefined;
+      if (this.installScope === "user") {
+        targetUserId = this.installedByUserId ?? undefined;
+      } else if (typeof userId === "string" && userId.trim()) {
+        const resolvedUserId = this.resolveEffectiveUserId(userId);
+        if (resolvedUserId) {
+          this.enforceScopedUser(resolvedUserId);
+          targetUserId = resolvedUserId;
+        }
+      }
+
+      const safeTabId = typeof tabId === "string" ? tabId.slice(0, 100) : undefined;
+      const safeViewId = typeof viewId === "string" ? viewId.slice(0, 100) : undefined;
+
+      eventBus.emit(
+        EventType.SPINDLE_UI_NAVIGATE,
+        {
+          extensionId: this.extensionId,
+          extensionName: this.manifest.name,
+          action,
+          ...(safeTabId !== undefined ? { tabId: safeTabId } : {}),
+          ...(safeViewId !== undefined ? { viewId: safeViewId } : {}),
+        },
+        targetUserId,
+      );
+
+      this.postToWorker({ type: "response", requestId, result: { ok: true } });
+    } catch (err: any) {
+      this.postToWorker({ type: "response", requestId, error: err.message });
+    }
   }
 
   // ─── Logging ─────────────────────────────────────────────────────────

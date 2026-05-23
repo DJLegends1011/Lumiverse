@@ -89,6 +89,32 @@ function fetchLatestMessages(chatId: string) {
   return messagesApi.list(chatId, { limit: pageSize, tail: true })
 }
 
+/**
+ * Push the current extension-registered drawer tab list to the backend so
+ * `spindle.ui.getDrawerTabs()` can enumerate them. Built-in drawer tabs are
+ * mirrored backend-side; only extension tabs need to be synced.
+ */
+function sendDrawerTabRegistrySnapshot(drawerTabs: ReadonlyArray<{
+  id: string
+  extensionId: string
+  title: string
+  shortName?: string
+  description?: string
+  keywords?: string[]
+}>) {
+  wsClient.send({
+    type: 'SPINDLE_UI_REGISTRY_SYNC',
+    drawerTabs: drawerTabs.map((t) => ({
+      id: t.id,
+      extensionId: t.extensionId,
+      tabName: t.title,
+      shortName: t.shortName,
+      tabDescription: t.description,
+      keywords: t.keywords,
+    })),
+  })
+}
+
 async function refreshLoomRegistry() {
   const result = await presetsApi.listRegistry({ provider: 'loom', limit: 200 })
   useStore.getState().setLoomRegistry(Object.fromEntries(
@@ -186,6 +212,9 @@ export function useWebSocket() {
       // back to true (socket open → CONNECTED with role → pong received).
       wsClient.on(WS_OPEN, () => {
         store.getState().setWsConnected(true)
+        // Push the current extension drawer-tab snapshot so the backend's
+        // spindle.ui.getDrawerTabs() can enumerate extension-added tabs.
+        sendDrawerTabRegistrySnapshot(store.getState().drawerTabs)
       }),
       wsClient.on(WS_CLOSE, () => {
         store.getState().setWsConnected(false)
@@ -1070,6 +1099,30 @@ export function useWebSocket() {
         })
       }),
 
+      wsClient.on(EventType.SPINDLE_UI_NAVIGATE, (payload: { extensionId: string; extensionName: string; action: 'open_drawer_tab' | 'close_drawer' | 'open_settings' | 'close_settings' | 'open_command_palette' | 'close_command_palette'; tabId?: string; viewId?: string }) => {
+        const s = store.getState()
+        switch (payload.action) {
+          case 'open_drawer_tab':
+            if (payload.tabId) s.openDrawer(payload.tabId)
+            break
+          case 'close_drawer':
+            s.closeDrawer()
+            break
+          case 'open_settings':
+            s.openSettings(payload.viewId)
+            break
+          case 'close_settings':
+            s.closeSettings()
+            break
+          case 'open_command_palette':
+            s.openCommandPalette()
+            break
+          case 'close_command_palette':
+            s.closeCommandPalette()
+            break
+        }
+      }),
+
       // Legacy/event-bus bridge for message tag intercept notifications.
       // Some extensions emit MESSAGE_TAG_INTERCEPTED over WS and expect it
       // on the backend-message channel (ctx.onBackendMessage).
@@ -1261,10 +1314,24 @@ export function useWebSocket() {
       store.getState().reconcileChatHeads().catch(() => { /* best-effort */ })
     }, 4000)
 
+    // Re-sync the drawer-tab registry whenever extensions register or remove
+    // a tab. Selector compares by id+title shape so unrelated state churn
+    // (e.g. badge updates) doesn't trigger a redundant WS round-trip.
+    const drawerTabsKey = (tabs: ReadonlyArray<{ id: string; title: string; extensionId: string }>) =>
+      tabs.map((t) => `${t.id}:${t.extensionId}:${t.title}`).join('|')
+    let lastDrawerTabsKey = drawerTabsKey(store.getState().drawerTabs)
+    const unsubDrawerTabs = store.subscribe((state) => {
+      const key = drawerTabsKey(state.drawerTabs)
+      if (key === lastDrawerTabsKey) return
+      lastDrawerTabsKey = key
+      sendDrawerTabRegistrySnapshot(state.drawerTabs)
+    })
+
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange)
       clearInterval(recoveryWatchdog)
       clearInterval(chatHeadReconcile)
+      unsubDrawerTabs()
       unsubs.forEach(unsub => unsub())
       wsClient.disconnect()
     }
