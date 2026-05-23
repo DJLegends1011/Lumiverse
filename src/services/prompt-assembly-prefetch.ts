@@ -20,6 +20,8 @@ import * as globalAddonsSvc from "./global-addons.service";
 import { applyPersonaAddonStates } from "./persona-addon-states";
 import { normalizeCortexConfig, DEFAULT_CORTEX_CONFIG } from "./memory-cortex/config";
 import { getCharacterWorldBookIds } from "../utils/character-world-books";
+import { getCharacterDatabankIds } from "../utils/character-databanks";
+import { resolveActiveDatabankIds } from "./databank/scope-resolver.service";
 import type { BookSource } from "./prompt-assembly.service";
 import { createPromptAssemblyProfiler } from "./prompt-assembly-profiler";
 
@@ -138,6 +140,48 @@ export async function prefetchAssemblyData(ctx: AssemblyContext): Promise<Prefet
   );
 
   if (ctx.signal?.aborted) throw ctx.signal.reason ?? new DOMException("Aborted", "AbortError");
+
+  // ── 3a. Pre-warm the databank query embedding (fire-and-forget) ──────
+  // The dominant cost of databank-retrieval is the embed round-trip
+  // (~500ms typical; LanceDB itself returns in <20ms for small corpora).
+  // Starting the embedding here, while the rest of prefetch + the first
+  // ~50ms of assembly run, lets the assembly-side `cachedEmbedTexts` call
+  // hit the in-memory cache instead of waiting on the upstream provider.
+  // The 10-minute cache TTL keeps the entry alive across retries / regens.
+  if (embeddingConfig.enabled && messages.length > 0) {
+    const memoryIsolated = chat.metadata?.memory_isolation === true;
+    const databankCharIds =
+      memoryIsolated || !character.id ? [] : [character.id];
+    const activeDatabankIds = resolveActiveDatabankIds(
+      ctx.userId,
+      ctx.chatId,
+      databankCharIds,
+      {
+        characterDatabankIds: memoryIsolated
+          ? []
+          : getCharacterDatabankIds(character.extensions),
+        chatDatabankIds:
+          (chat.metadata?.chat_databank_ids as string[] | undefined) ?? [],
+      },
+    );
+    if (activeDatabankIds.length > 0) {
+      // Must match the exact string assembly will embed (prompt-assembly.service.ts:1240),
+      // otherwise the cache key won't line up and the warm-up is wasted.
+      const databankQueryPreview = messages
+        .slice(-6)
+        .map((m) => m.content)
+        .join(" ");
+      if (databankQueryPreview.trim().length > 0) {
+        void embeddingsSvc
+          .cachedEmbedTexts(ctx.userId, [databankQueryPreview], {
+            signal: ctx.signal,
+          })
+          .catch(() => {
+            /* Surface errors at the consumer site, not the warm-up. */
+          });
+      }
+    }
+  }
 
   // ── 4. World book entries (2 queries total) ──────────────────────────
   const globalWorldBooks = (allSettings.get("globalWorldBooks") as string[] | undefined) ?? [];

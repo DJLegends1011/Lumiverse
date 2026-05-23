@@ -1279,6 +1279,7 @@ export async function assemblePrompt(
           databankQueryPreview,
           retrievalTopK,
           dbSignal,
+          (phase, ms) => profiler.addPhase(phase, ms),
         );
       })();
 
@@ -1730,6 +1731,7 @@ export async function assemblePrompt(
       databankQueryPreview,
       databankSettings.retrievalTopK,
       ctx.signal,
+      (phase, ms) => profiler.addPhase(phase, ms),
     );
     databankRetrievalState = "awaited_direct";
   }
