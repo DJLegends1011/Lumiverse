@@ -1176,12 +1176,13 @@ function buildContextMessages(input: ExecuteInput, settings: CouncilSettings): L
   const chat = chatsSvc.getChat(input.userId, input.chatId);
 
   // Prefer pre-loaded enrichment data; fall back to independent lookups.
+  // `includeUserPersona` is authoritative — enrichment may carry a persona
+  // resolved by the main generation pipeline, but the council toggle overrides it.
   let character = input.enrichment?.character ?? null;
-  const persona = input.enrichment?.persona ?? (
-    ts.includeUserPersona
-      ? personasSvc.resolvePersonaOrDefault(input.userId, input.personaId)
-      : null
-  );
+  const persona = ts.includeUserPersona
+    ? (input.enrichment?.persona
+        ?? personasSvc.resolvePersonaOrDefault(input.userId, input.personaId))
+    : null;
 
   // Character info
   if (ts.includeCharacterInfo && chat) {
