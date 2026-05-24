@@ -10,7 +10,8 @@
     "typecheck": "bun run extract-props && bun run extract-css-vars && tsc -b",
     "build": "bun run extract-props && bun run extract-css-vars && vite build",
     "build:checked": "bun run typecheck && bun run build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "node scripts/postinstall-bindings.cjs"
   },
   "dependencies": {
     "@babel/parser": "^7.29.2",
