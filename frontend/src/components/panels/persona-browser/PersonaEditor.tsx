@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { User, Crown, Copy, Trash2, Play, Upload, Pencil, MessagesSquare, Link, Globe, RefreshCw, X } from 'lucide-react'
+import { User, Crown, Copy, Trash2, Play, Upload, Pencil, MessagesSquare, Link, Globe, RefreshCw, X, BookOpen } from 'lucide-react'
 import { IconPlaylistAdd } from '@tabler/icons-react'
 import { ExpandableTextarea } from '@/components/shared/ExpandedTextEditor'
 import { getPersonaAvatarLargeUrl } from '@/lib/avatarUrls'
@@ -567,6 +567,15 @@ export default function PersonaEditor({
         >
           <Crown size={13} />
           <span>Default</span>
+        </button>
+        <button
+          type="button"
+          className={clsx(styles.toggleBtn, persona.is_narrator && styles.toggleBtnActive)}
+          onClick={() => onUpdate(persona.id, { is_narrator: !persona.is_narrator })}
+          title={persona.is_narrator ? 'Unmark as narrator' : 'Mark as narrator — this persona narrates rather than self-inserts'}
+        >
+          <BookOpen size={13} />
+          <span>Narrator</span>
         </button>
         <div className={styles.lorebookRow}>
           <SearchableSelect

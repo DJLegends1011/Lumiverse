@@ -10,6 +10,7 @@ import type {
   LlmMessagePart,
 } from "../types";
 import { getTextContent } from "../types";
+import { throwProviderResponseError } from "../../utils/provider-errors";
 
 export class OpenAIProvider extends OpenAICompatibleProvider {
   readonly name = "openai";
@@ -200,10 +201,7 @@ export class OpenAIProvider extends OpenAICompatibleProvider {
       signal: request.signal,
     });
 
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`${this.name} Responses API error ${res.status}: ${err}`);
-    }
+    if (!res.ok) await throwProviderResponseError(this.displayName, "responses generate", res);
 
     const data = (await res.json()) as any;
 
@@ -284,10 +282,7 @@ export class OpenAIProvider extends OpenAICompatibleProvider {
       body: JSON.stringify(body),
     }, request.signal);
 
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`${this.name} Responses API error ${res.status}: ${err}`);
-    }
+    if (!res.ok) await throwProviderResponseError(this.displayName, "responses stream", res);
 
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();

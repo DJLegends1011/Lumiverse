@@ -25,7 +25,10 @@ export function assemblePrompt(input: AssemblePromptInput): string {
   const parts: string[] = [];
   parts.push(getFragment("base-system"));
   parts.push(getWorkspaceFrame(draft, persona));
-  parts.push(tool.prompt);
+  const toolPrompt = typeof tool.prompt === "function"
+    ? tool.prompt({ workspaceKind: draft.kind === "scenario" ? "scenario" : "character" })
+    : tool.prompt;
+  parts.push(toolPrompt);
   for (const id of tool.requiresFragments) parts.push(getFragment(id));
 
   if (draft.sources.length > 0) {

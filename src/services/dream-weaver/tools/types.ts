@@ -3,6 +3,10 @@ import type { PromptFragmentId } from "../prompts/index";
 
 export type ValidateResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
+export interface ToolPromptContext {
+  workspaceKind: "character" | "scenario";
+}
+
 export interface DreamWeaverTool<TOutput = unknown> {
   name: string;
   displayName: string;
@@ -11,7 +15,7 @@ export interface DreamWeaverTool<TOutput = unknown> {
   slashCommand?: string;
   aliases?: string[];
   description: string;
-  prompt: string;
+  prompt: string | ((ctx: ToolPromptContext) => string);
   validate: (input: unknown) => ValidateResult<TOutput>;
   conflictMode: "overwrite" | "append";
   requiresFragments: PromptFragmentId[];

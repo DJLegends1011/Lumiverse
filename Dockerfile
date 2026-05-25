@@ -13,6 +13,7 @@ WORKDIR /app/frontend
 
 # Install dependencies first (cache layer)
 COPY frontend/package.json frontend/bun.lock* ./
+COPY frontend/scripts/postinstall-bindings.cjs ./scripts/
 RUN bun install --frozen-lockfile 2>/dev/null || bun install
 
 # FRONTEND_REFRESH: cache-busting marker for the Vite build layer below. Mirrors

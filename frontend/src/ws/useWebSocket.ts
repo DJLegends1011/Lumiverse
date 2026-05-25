@@ -51,6 +51,25 @@ function isLocalStreamPlaceholderId(id: string | null | undefined) {
   )
 }
 
+const MAX_TOAST_ERROR_LENGTH = 800
+// Last-line-of-defense sanitizer for error strings rendered in toasts. The
+// backend already strips HTML/oversize bodies from provider errors, but this
+// keeps a misbehaving provider (or a stale backend) from wedging the toast
+// layout with a 50KB Cloudflare 503 page.
+function sanitizeToastMessage(raw: string | undefined | null): string {
+  if (!raw) return 'Generation failed'
+  const stripped = /<\w[^>]*>/.test(raw)
+    ? raw.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    : raw
+  return stripped.length > MAX_TOAST_ERROR_LENGTH
+    ? `${stripped.slice(0, MAX_TOAST_ERROR_LENGTH - 1)}…`
+    : stripped
+}
+
 const MACRO_VARS_PREFIX = 'metadata.macro_variables.'
 const CHAT_VARS_PREFIX = 'metadata.chat_variables.'
 
@@ -467,8 +486,12 @@ export function useWebSocket() {
             // Surface that in the toast so users know their partial response
             // wasn't lost — it'll appear in the chat after reconciliation.
             const partialSaved = !!payload.messageId && !!payload.content
+            // Defense-in-depth: cap the toast message so a misbehaving provider
+            // (Cloudflare 503 HTML page, etc.) cannot wedge the toast layout
+            // even if it slips past the backend sanitizer.
+            const safeError = sanitizeToastMessage(payload.error)
             toast.error(
-              partialSaved ? `${payload.error} — partial response saved.` : payload.error,
+              partialSaved ? `${safeError} — partial response saved.` : safeError,
               { title: 'Generation Failed' },
             )
             // Reconcile message list on error so any backend-staged empty messages

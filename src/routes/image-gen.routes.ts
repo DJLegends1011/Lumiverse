@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import * as svc from "../services/image-gen.service";
 import * as bindingsSvc from "../services/image-gen-preset-bindings.service";
+import { clampErrorMessage, describeProviderError } from "../utils/provider-errors";
 
 const app = new Hono();
 
@@ -29,7 +30,7 @@ app.post("/generate", async (c) => {
     });
     return c.json(result);
   } catch (err: any) {
-    const msg = String(err?.message || "Image generation failed");
+    const msg = clampErrorMessage(describeProviderError(err, "Image generation failed"));
     const status = /required|not found|unsupported|parse|No API key|missing|connection/i.test(msg) ? 400 : 502;
     return c.json({ error: msg }, status);
   }
@@ -50,7 +51,7 @@ app.post("/preview-prompt", async (c) => {
     });
     return c.json(result);
   } catch (err: any) {
-    const msg = String(err?.message || "Prompt preview failed");
+    const msg = clampErrorMessage(describeProviderError(err, "Prompt preview failed"));
     const status = /required|not found|unsupported|parse|No API key|missing|connection/i.test(msg) ? 400 : 502;
     return c.json({ error: msg }, status);
   }

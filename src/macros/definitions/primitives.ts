@@ -251,8 +251,22 @@ function evaluateCondition(value: string): boolean {
     }
   }
 
-  // Falsy values
-  if (!value || value === "0" || value === "false" || value === "null" || value === "undefined") {
+  // Falsy values. "no" and "off" are included case-insensitively so the
+  // dozen-plus yes/no boolean macros across the codebase
+  // (lumiaCouncilToolsActive, lumiaCouncilModeActive, databank/memory/cortex
+  // enabled flags, loom Sovereign Hand, isGroupChat, etc.) work as
+  // documented — those macros all advertise "Conditional compatible" and
+  // emit the literal string "no" when off.
+  if (!value) return false;
+  const lower = value.toLowerCase();
+  if (
+    lower === "0" ||
+    lower === "false" ||
+    lower === "null" ||
+    lower === "undefined" ||
+    lower === "no" ||
+    lower === "off"
+  ) {
     return false;
   }
   return true;

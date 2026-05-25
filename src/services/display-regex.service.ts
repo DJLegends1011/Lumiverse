@@ -106,7 +106,9 @@ function buildEnvFromContext(userId: string, ctx: DisplayRegexContext): MacroEnv
       groupOthers: "",
       groupMemberCount: "0",
       isGroupChat: "no",
+      isNarrator: persona?.is_narrator ? "yes" : "no",
       groupLastSpeaker: "",
+      groupCardMode: "solo",
     },
     character: {
       name: "",

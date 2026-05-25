@@ -30,7 +30,9 @@ function makeEnv(opts: {
       groupOthers: "Charlie, Dave",
       groupMemberCount: "3",
       isGroupChat: "yes",
+      isNarrator: "no",
       groupLastSpeaker: "Charlie",
+      groupCardMode: "swap",
     },
     character: {
       name: "Bob",
@@ -226,6 +228,20 @@ describe("if / else", () => {
     expect(await ev("{{if::false}}yes{{else}}no{{/if}}")).toBe("no");
     expect(await ev("{{if::null}}yes{{else}}no{{/if}}")).toBe("no");
     expect(await ev("{{if::undefined}}yes{{else}}no{{/if}}")).toBe("no");
+  });
+
+  test("literal 'no' / 'off' are falsy (case-insensitive)", async () => {
+    expect(await ev("{{if::no}}T{{else}}F{{/if}}")).toBe("F");
+    expect(await ev("{{if::No}}T{{else}}F{{/if}}")).toBe("F");
+    expect(await ev("{{if::NO}}T{{else}}F{{/if}}")).toBe("F");
+    expect(await ev("{{if::off}}T{{else}}F{{/if}}")).toBe("F");
+    expect(await ev("{{if::Off}}T{{else}}F{{/if}}")).toBe("F");
+  });
+
+  test("literal 'yes' / 'on' are truthy (mirror of yes/no convention)", async () => {
+    expect(await ev("{{if::yes}}T{{else}}F{{/if}}")).toBe("T");
+    expect(await ev("{{if::Yes}}T{{else}}F{{/if}}")).toBe("T");
+    expect(await ev("{{if::on}}T{{else}}F{{/if}}")).toBe("T");
   });
 
   test("non-scoped if returns 'true' or ''", async () => {
@@ -497,6 +513,37 @@ describe("Identity macros", () => {
 
   test("isGroupChat", async () => {
     expect(await ev("{{isGroupChat}}")).toBe("yes");
+  });
+
+  test("groupCardMode reads the env.names value", async () => {
+    for (const mode of ["solo", "swap", "merge", "merge_ignore_muted"]) {
+      const env = makeEnv();
+      env.names.groupCardMode = mode;
+      expect(await ev("{{groupCardMode}}", env)).toBe(mode);
+    }
+  });
+
+  test("group_card_mode alias resolves the same value", async () => {
+    const env = makeEnv();
+    env.names.groupCardMode = "merge";
+    expect(await ev("{{group_card_mode}}", env)).toBe("merge");
+  });
+
+  test("groupCardMode drives a four-way conditional template", async () => {
+    const template = "{{if::{{groupCardMode}} == solo}}SOLO{{else}}{{if::{{groupCardMode}} == swap}}SWAP{{else}}{{if::{{groupCardMode}} == merge_ignore_muted}}MERGE_MUTED{{else}}MERGE{{/if}}{{/if}}{{/if}}";
+
+    const cases: Array<{ mode: string; expected: string }> = [
+      { mode: "solo", expected: "SOLO" },
+      { mode: "swap", expected: "SWAP" },
+      { mode: "merge", expected: "MERGE" },
+      { mode: "merge_ignore_muted", expected: "MERGE_MUTED" },
+    ];
+
+    for (const c of cases) {
+      const env = makeEnv();
+      env.names.groupCardMode = c.mode;
+      expect(await ev(template, env)).toBe(c.expected);
+    }
   });
 });
 
@@ -1019,6 +1066,62 @@ describe("Chat Utils macros", () => {
     expect(await ev("{{toggle::flag}}", env)).toBe("true");
   });
 
+  test("rcounter increments and starts at 1 on first call", async () => {
+    const env = makeEnv();
+    expect(await ev("{{rcounter::step}}", env)).toBe("1");
+    expect(await ev("{{rcounter::step}}", env)).toBe("2");
+    expect(await ev("{{rcounter::step}}", env)).toBe("3");
+  });
+
+  test("rcounter is independent of pre-seeded local vars (render scope)", async () => {
+    // Critical scope check: even if a chat had a persisted local var named
+    // "step" carrying over from previous renders, rcounter ignores it and
+    // starts from its own zero baseline.
+    const env = makeEnv({ localVars: { step: "99" } });
+    expect(await ev("{{rcounter::step}}", env)).toBe("1");
+  });
+
+  test("rcounter reset arg zeros the counter", async () => {
+    const env = makeEnv();
+    expect(await ev("{{rcounter::step}}", env)).toBe("1");
+    expect(await ev("{{rcounter::step}}", env)).toBe("2");
+    expect(await ev("{{rcounter::step::reset}}", env)).toBe("0");
+    expect(await ev("{{rcounter::step}}", env)).toBe("1");
+  });
+
+  test("rcounter never writes to env.variables.local (no persistence path)", async () => {
+    const env = makeEnv();
+    await ev("{{rcounter::step}}{{rcounter::step}}{{rcounter::step}}", env);
+    // chat-macro-render.service.persistMacroVariableState only reads
+    // env.variables.local / global / chat — rcounter's render bag isn't
+    // part of any persisted scope, so this assertion locks down that the
+    // counter cannot leak into chat.metadata.macro_variables.local.
+    expect(env.variables.local.has("step")).toBe(false);
+  });
+
+  test("rcounter resets across separate env instances (simulates a new render)", async () => {
+    const envA = makeEnv();
+    await ev("{{rcounter::step}}{{rcounter::step}}{{rcounter::step}}", envA);
+    // A fresh env (new prompt build) starts the counter back at 1.
+    const envB = makeEnv();
+    expect(await ev("{{rcounter::step}}", envB)).toBe("1");
+  });
+
+  test("rcounter handles distinct names independently", async () => {
+    const env = makeEnv();
+    expect(await ev("{{rcounter::main}}", env)).toBe("1");
+    expect(await ev("{{rcounter::sub}}", env)).toBe("1");
+    expect(await ev("{{rcounter::main}}", env)).toBe("2");
+    expect(await ev("{{rcounter::sub}}", env)).toBe("2");
+  });
+
+  test("rcounter in a conditional template renumbers cleanly when branches skip", async () => {
+    const env = makeEnv();
+    const template =
+      "{{if::yes}}{{rcounter::step}}. A\n{{/if}}{{if::no}}{{rcounter::step}}. B\n{{/if}}{{rcounter::step}}. C";
+    expect(await ev(template, env)).toBe("1. A\n2. C");
+  });
+
   test("charTags", async () => {
     expect(await ev("{{charTags}}")).toBe("fantasy, warrior, male");
   });
@@ -1419,6 +1522,37 @@ describe("Lumia and council macros", () => {
     ];
 
     expect(await ev("{{lumiaCouncilToolsActive}}", env)).toBe("yes");
+  });
+
+  test("{{if::{{lumiaCouncilToolsActive}}}} respects the yes/no convention", async () => {
+    const env = makeEnv();
+    env.extra.council = {
+      councilMode: false,
+      members: [],
+      toolsSettings: {},
+      memberItems: {},
+      toolResults: [],
+      namedResults: {},
+    };
+
+    const template = "{{if::{{lumiaCouncilToolsActive}}}}FIRED{{else}}SKIPPED{{/if}}";
+
+    // Council off — macro returns "no" → block must NOT fire.
+    expect(await ev(template, env)).toBe("SKIPPED");
+
+    // Council on with a successful tool result — macro returns "yes" → block fires.
+    env.extra.council.councilMode = true;
+    env.extra.council.toolResults = [
+      {
+        memberId: "member-1",
+        memberName: "Mira",
+        toolName: "detect_scene",
+        toolDisplayName: "Scene Analysis",
+        success: true,
+        content: "A storm is closing in.",
+      },
+    ];
+    expect(await ev(template, env)).toBe("FIRED");
   });
 
   test("lumiaCouncilToolsList resolves from configured member tools", async () => {

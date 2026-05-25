@@ -75,9 +75,7 @@ export class GoogleGeminiImageProvider implements ImageProvider {
       signal: request.signal,
     });
 
-    if (!res.ok) {
-      throw new Error(`Gemini API error ${res.status}: ${await res.text().catch(() => "Unknown error")}`);
-    }
+    if (!res.ok) await throwProviderResponseError(this.displayName, "image generate", res);
 
     const data = await res.json();
     const parts = data?.candidates?.[0]?.content?.parts || [];

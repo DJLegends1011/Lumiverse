@@ -4,6 +4,9 @@ import { createCooperativeYielder, fetchWithPreflightAbort, readWithAbort } from
 import type { GenerationRequest, GenerationResponse, StreamChunk, ToolCallResult, LlmMessage, LlmMessagePart } from "../types";
 import { fetchProviderJson, ProviderRequestError, throwProviderResponseError } from "../../utils/provider-errors";
 
+const GENERATE_OPERATION = "generate";
+const STREAM_OPERATION = "stream";
+
 /**
  * Abstract base class for providers that use the OpenAI-compatible
  * /chat/completions API format. Subclasses override `name`, `defaultUrl`,
@@ -87,10 +90,7 @@ export abstract class OpenAICompatibleProvider implements LlmProvider {
       signal: request.signal,
     });
 
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`${this.name} API error ${res.status}: ${err}`);
-    }
+    if (!res.ok) await throwProviderResponseError(this.displayName, GENERATE_OPERATION, res);
 
     const data = (await res.json()) as any;
     const choice = data.choices?.[0];
@@ -144,10 +144,7 @@ export abstract class OpenAICompatibleProvider implements LlmProvider {
       body: JSON.stringify(body),
     }, request.signal);
 
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`${this.name} API error ${res.status}: ${err}`);
-    }
+    if (!res.ok) await throwProviderResponseError(this.displayName, STREAM_OPERATION, res);
 
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();

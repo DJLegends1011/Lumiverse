@@ -13,7 +13,9 @@ import {
 } from "../types";
 import {
   fetchProviderJson,
+  parseProviderErrorBody,
   ProviderRequestError,
+  readBoundedText,
   throwProviderResponseError,
 } from "../../utils/provider-errors";
 
@@ -182,9 +184,17 @@ export class AnthropicProvider implements LlmProvider {
     });
 
     if (!res.ok) {
-      const err = await res.text();
-      this.logSystemValidationError(body, err);
-      throw new Error(`Anthropic API error ${res.status}: ${err}`);
+      const rawBody = await readBoundedText(res);
+      this.logSystemValidationError(body, rawBody);
+      const parsed = parseProviderErrorBody(rawBody);
+      throw new ProviderRequestError({
+        provider: this.displayName,
+        operation: "generate",
+        status: res.status,
+        code: parsed.code || res.statusText || undefined,
+        detail: parsed.detail || res.statusText || undefined,
+        rawBody,
+      });
     }
 
     const data = (await res.json()) as any;
@@ -238,9 +248,17 @@ export class AnthropicProvider implements LlmProvider {
     }, request.signal);
 
     if (!res.ok) {
-      const err = await res.text();
-      this.logSystemValidationError(body, err);
-      throw new Error(`Anthropic API error ${res.status}: ${err}`);
+      const rawBody = await readBoundedText(res);
+      this.logSystemValidationError(body, rawBody);
+      const parsed = parseProviderErrorBody(rawBody);
+      throw new ProviderRequestError({
+        provider: this.displayName,
+        operation: "stream",
+        status: res.status,
+        code: parsed.code || res.statusText || undefined,
+        detail: parsed.detail || res.statusText || undefined,
+        rawBody,
+      });
     }
 
     const reader = res.body!.getReader();

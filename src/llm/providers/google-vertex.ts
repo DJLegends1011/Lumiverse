@@ -272,10 +272,7 @@ export class GoogleVertexProvider implements LlmProvider {
       signal: request.signal,
     });
 
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Vertex AI error ${res.status}: ${err}`);
-    }
+    if (!res.ok) await throwProviderResponseError("Vertex AI", "generate", res);
 
     const data = (await res.json()) as any;
     const candidate = data.candidates?.[0];
@@ -332,10 +329,7 @@ export class GoogleVertexProvider implements LlmProvider {
       body: JSON.stringify(body),
     }, request.signal);
 
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Vertex AI error ${res.status}: ${err}`);
-    }
+    if (!res.ok) await throwProviderResponseError("Vertex AI", "stream", res);
 
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();

@@ -1,4 +1,5 @@
 import { openWebSocket } from "./ws-helpers"
+import { parseProviderErrorBody, readBoundedText } from "../../utils/provider-errors"
 
 export interface ComfyRunnerOptions {
   label: string
@@ -102,8 +103,10 @@ export async function* executeComfyWorkflowStream(
 
   if (!queueRes.ok) {
     ws.close()
-    const errorBody = await queueRes.text().catch(() => "")
-    throw new Error(`${label} rejected workflow: ${errorBody || queueRes.status}`)
+    const rawBody = await readBoundedText(queueRes)
+    const parsed = parseProviderErrorBody(rawBody)
+    const detail = parsed.detail || parsed.code || String(queueRes.status)
+    throw new Error(`${label} rejected workflow: ${detail}`)
   }
 
   const queueData = (await queueRes.json()) as { prompt_id: string }

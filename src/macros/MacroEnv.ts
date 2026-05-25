@@ -57,6 +57,15 @@ export function buildEnv(ctx: BuildEnvContext): MacroEnv {
   const groupLastSpeaker = isGroup
     ? (findLast(messages, (m) => !m.is_user)?.name || "")
     : "";
+  // Resolve the card composition mode. Mirrors the gate in prompt-assembly's
+  // getGroupCardMode — anything not explicitly "merge" / "merge_ignore_muted"
+  // falls back to "swap". Solo chats short-circuit to "solo".
+  const rawCardMode = chat.metadata?.group_card_mode;
+  const groupCardMode = !isGroup
+    ? "solo"
+    : (rawCardMode === "merge" || rawCardMode === "merge_ignore_muted")
+      ? rawCardMode
+      : "swap";
 
   return {
     commit: ctx.commit !== false,
@@ -72,7 +81,9 @@ export function buildEnv(ctx: BuildEnvContext): MacroEnv {
         : "",
       groupMemberCount: isGroup && allGroupNames ? String(allGroupNames.length) : "0",
       isGroupChat: isGroup ? "yes" : "no",
+      isNarrator: persona?.is_narrator ? "yes" : "no",
       groupLastSpeaker,
+      groupCardMode,
     },
     character: {
       name: character.name,

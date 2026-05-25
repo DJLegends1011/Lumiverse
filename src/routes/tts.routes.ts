@@ -4,6 +4,7 @@ import { detectSpeechSegments } from "../services/speech-detection.service";
 import * as audioSvc from "../services/audio.service";
 import * as muxSvc from "../services/audio-mux.service";
 import * as chatsSvc from "../services/chats.service";
+import { clampErrorMessage, describeProviderError } from "../utils/provider-errors";
 
 const app = new Hono();
 
@@ -33,8 +34,9 @@ app.post("/synthesize", async (c) => {
       },
     });
   } catch (err: any) {
-    const status = /required|not found|unsupported|No API key|missing|connection|configured/i.test(err?.message) ? 400 : 502;
-    return c.json({ error: err.message }, status);
+    const msg = clampErrorMessage(describeProviderError(err, "TTS synthesis failed"));
+    const status = /required|not found|unsupported|No API key|missing|connection|configured/i.test(msg) ? 400 : 502;
+    return c.json({ error: msg }, status);
   }
 });
 
@@ -90,8 +92,9 @@ app.post("/synthesize/stream", async (c) => {
       },
     });
   } catch (err: any) {
-    const status = /required|not found|unsupported|No API key|missing|connection|configured/i.test(err?.message) ? 400 : 502;
-    return c.json({ error: err.message }, status);
+    const msg = clampErrorMessage(describeProviderError(err, "TTS streaming failed"));
+    const status = /required|not found|unsupported|No API key|missing|connection|configured/i.test(msg) ? 400 : 502;
+    return c.json({ error: msg }, status);
   }
 });
 

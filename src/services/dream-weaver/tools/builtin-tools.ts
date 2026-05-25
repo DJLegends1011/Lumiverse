@@ -39,7 +39,18 @@ const setName: DreamWeaverTool<{ name: string }> = {
   slashCommand: "/name",
   aliases: ["/title"],
   description: "Generate a grounded character name from the dream.",
-  prompt: `Tool: set_name. Pick a single name that fits the dream. Output JSON: { "name": "<string>" }.`,
+  prompt: ({ workspaceKind }) => {
+    const what = workspaceKind === "scenario"
+      ? "Pick a title for the scenario that grounds it in its world — not a tagline, not a genre label, but a name that belongs to the place or situation the scenario describes. A good title feels like it existed before the scenario was written."
+      : "Pick a single character name that fits the dream and feels like it belongs to a real person — someone with parents who chose it, a culture it came from, a reason it stuck.";
+    return `Tool: set_name. ${what}
+
+Apply the naming standards from the Quality Standards section. Cross-reference the ban list and re-derive if matched. Use the Scrabble Check, Cultural Grounding, and Phonebook Method as appropriate to the setting.
+
+If the source material implies a cultural context, the name should come from or hybridize real naming traditions that fit. If the setting is modern or realistic, prefer mundane over aesthetic. If the setting is fantastical, ground the name in a constructed or borrowed tradition — not in generic fantasy phonetics.
+
+Output JSON: { "name": "<string>" }.`;
+  },
   validate(input): ValidateResult<{ name: string }> {
     const o = asObject(input);
     if (!o) return { ok: false, error: "expected object" };
@@ -63,11 +74,20 @@ const setAppearance: DreamWeaverTool<{
   userInvocable: true,
   slashCommand: "/appearance",
   description: "Generate character appearance using the appearance template.",
-  prompt: `Tool: set_appearance. Use the appearance template fragment exactly. Output JSON:
+  prompt: ({ workspaceKind }) => {
+    const who = workspaceKind === "scenario"
+      ? "Build a physical description for the scenario's main character — the protagonist NPC who interacts with {{user}}. Use the appearance template fragment for structure.\n\nGround the appearance in the scenario's world and the character's place within it. How does this person look like they belong here? What does their body, clothing, or bearing tell you before they speak? Draw from what the source material implies rather than defaulting to genre expectations."
+      : "Build a physical description grounded in who this character is and where they come from. Use the appearance template fragment for structure.\n\nAppearance should feel like it belongs to a specific person, not a character type. Let the source material and existing draft inform details — an environment shapes how someone carries themselves, how they dress, what marks they bear.";
+    return `Tool: set_appearance. ${who}
+
+Where the source material is sparse, choose details that make this person feel specific and real — not the most dramatic or striking option, but the most believable one. If a physical detail could belong to any character in this genre, push past it and find something more particular.
+
+Output JSON:
 {
   "appearance": "<the full templated appearance string>",
   "appearance_data": { "height": "...", "species": "...", "hair": "...", "eyes": "...", "skin_tone": "..." }
-}`,
+}`;
+  },
   validate(input): ValidateResult<{ appearance: string; appearance_data: Record<string, unknown> }> {
     const o = asObject(input);
     if (!o) return { ok: false, error: "expected object" };
@@ -94,7 +114,18 @@ const setPersonality: DreamWeaverTool<{ personality: string }> = {
   userInvocable: true,
   slashCommand: "/personality",
   description: "Behavioral patterns, habits, contradictions.",
-  prompt: `Tool: set_personality. Write 2-3 paragraphs of behavioral patterns, habits, contradictions. Output JSON: { "personality": "<string>" }.`,
+  prompt: ({ workspaceKind }) => {
+    const who = workspaceKind === "scenario"
+      ? "Write 2-3 paragraphs capturing the main character's actual behavioral patterns — not their role summary or a list of traits. This is the protagonist NPC of the scenario, the person {{user}} encounters and interacts with directly.\n\nGround the personality in what the source material implies. How does this person navigate the world the scenario describes? What do they want that they might not say outright? What habits or tensions come from living in this specific situation?"
+      : "Write 2-3 paragraphs capturing how this character actually behaves — not what they are on paper. Personality is not a job description or a list of adjectives. It lives in contradictions, habits, the gap between who someone presents as and who they are when no one's watching.\n\nDig into the source material for texture. What does it imply about how this person moves through the world? If the source material is sparse, lean into what's unsaid — what kind of person would exist in this space, and what internal pressures would shape them?";
+    return `Tool: set_personality. ${who}
+
+A character's profession, social role, or education does not determine their emotional range or inner life. Resist reducing them to their function — find the person who exists beyond their role. Their contradictions, their unguarded moments, the texture that makes them feel inhabited rather than cast.
+
+If the source material leaves personality largely unspecified, explore what kind of individual the context naturally calls for — not the obvious choice, but someone whose presence feels real and whose behavior could surprise.
+
+Output JSON: { "personality": "<string>" }.`;
+  },
   validate(input): ValidateResult<{ personality: string }> {
     const o = asObject(input);
     if (!o) return { ok: false, error: "expected object" };
@@ -137,7 +168,16 @@ const setVoiceGuidance: DreamWeaverTool<{ voice_guidance: VoiceGuidance }> = {
   userInvocable: true,
   slashCommand: "/voice",
   description: "How the character speaks.",
-  prompt: `Tool: set_voice_guidance. Output JSON: { "voice_guidance": <VoiceGuidance per voice-rules fragment> }.`,
+  prompt: ({ workspaceKind }) => {
+    const who = workspaceKind === "scenario"
+      ? "Capture how the scenario's main character actually sounds — their verbal rhythms, word choices, and speech habits. This is the protagonist NPC's voice, not a narrator voice.\n\nVoice should grow from who this character is within the scenario, not from what role they serve in it. How someone speaks is shaped by their specific history, relationships, and internal state — not by their title or function."
+      : "Capture how this character actually sounds in conversation — their verbal rhythms, word choices, and speech habits.\n\nVoice should emerge from personality and circumstance, not from stereotype. A character's background, class, or role might influence their speech, but it doesn't define it. People code-switch, pick up habits from people around them, and develop speech patterns from their own specific history.";
+    return `Tool: set_voice_guidance. ${who}
+
+Draw from the personality and source material already established. What does the way this person navigates their world tell you about how they'd talk? If there's little to work with, find a voice that makes them feel like a real person who existed before you started writing — not the first voice that comes to mind for this type, but something more particular.
+
+Output JSON: { "voice_guidance": <VoiceGuidance per voice-rules fragment> }.`;
+  },
   validate(input): ValidateResult<{ voice_guidance: VoiceGuidance }> {
     const o = asObject(input);
     if (!o) return { ok: false, error: "expected object" };
@@ -188,7 +228,16 @@ const setFirstMessage: DreamWeaverTool<{ first_mes: string }> = {
   slashCommand: "/first_message",
   aliases: ["/opening_scene", "/opening"],
   description: "Opening message, beginning with action or dialogue.",
-  prompt: `Tool: set_first_message. Write the character's opening message — 3-5 paragraphs, beginning with action or dialogue, NOT scene-setting. Output JSON: { "first_mes": "<string>" }.`,
+  prompt: ({ workspaceKind }) => {
+    const who = workspaceKind === "scenario"
+      ? "Write the scenario's opening scene — 3-5 paragraphs. The first sentence carries momentum: the main character mid-action, mid-speech, or mid-thought. In medias res. Subject, verb, want. The reader arrives in a world already moving.\n\nEstablish the main character's presence and voice immediately. Let the scenario's world emerge through what the character does and notices — not through narrated setup. End on a moment that hands action to {{user}}: a question asked, a gesture left hanging, a situation that demands response. Hard cut on the tension, not after it resolves."
+      : "Write the character's opening message — 3-5 paragraphs. The first sentence carries momentum: the character mid-action, mid-speech, or mid-thought. In medias res. Subject, verb, want. The reader arrives in a moment already happening.\n\nLet the character's personality and voice emerge through what they do, not through narrated introduction. The scenario should be felt through the character's behavior, not explained before it. End on a beat that invites {{user}} into the scene: a direct address, an unfinished action, a moment that demands response. Hard cut on the tension, not after it resolves.";
+    return `Tool: set_first_message. ${who}
+
+The voice established in voice_guidance should be audible in how the character speaks and how the narration textures their actions. Every paragraph should earn its place — if removing it wouldn't lose anything specific, it doesn't belong.
+
+Output JSON: { "first_mes": "<string>" }.`;
+  },
   validate(input): ValidateResult<{ first_mes: string }> {
     const o = asObject(input);
     if (!o) return { ok: false, error: "expected object" };

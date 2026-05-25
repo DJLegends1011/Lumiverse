@@ -220,9 +220,7 @@ export class NovelAIImageProvider implements ImageProvider {
       signal: request.signal,
     });
 
-    if (!res.ok) {
-      throw new Error(`NovelAI API error ${res.status}: ${await res.text().catch(() => "Unknown error")}`);
-    }
+    if (!res.ok) await throwProviderResponseError(this.displayName, "image generate", res);
 
     const imageDataUrl = await extractImageFromResponse(res);
     return { imageDataUrl, model, provider: this.name };

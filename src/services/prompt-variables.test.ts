@@ -21,7 +21,7 @@ function makeEnv(overrides: {
     names: {
       user: "u", char: "c", group: "", groupNotMuted: "", notChar: "",
       charGroupFocused: "", groupOthers: "", groupMemberCount: "0",
-      isGroupChat: "no", groupLastSpeaker: "",
+      isGroupChat: "no", isNarrator: "no", groupLastSpeaker: "", groupCardMode: "solo",
     },
     character: {
       name: "", description: "", personality: "", scenario: "", persona: "",

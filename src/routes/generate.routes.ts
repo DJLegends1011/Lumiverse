@@ -8,6 +8,7 @@ import * as summarizePoolSvc from "../services/summarize-pool.service";
 import { getSummarizationPromptDefaults } from "../services/summarization-prompts.service";
 import { eventBus } from "../ws/bus";
 import { EventType } from "../ws/events";
+import { clampErrorMessage, describeProviderError } from "../utils/provider-errors";
 
 const LOCALHOST_ADDRS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 
@@ -31,7 +32,7 @@ function chatRoute(handler: (input: any) => Promise<any>, extras?: Record<string
       const result = await handler({ ...body, userId, signal: c.req.raw.signal, ...extras });
       return c.json(result);
     } catch (err: any) {
-      return c.json({ error: err.message }, 400);
+      return c.json({ error: clampErrorMessage(describeProviderError(err, "Generation failed")) }, 400);
     }
   };
 }
@@ -155,8 +156,9 @@ app.post("/summarize", async (c) => {
     const result = await svc.summarizeGenerate(userId, body);
     return c.json(result);
   } catch (err: any) {
-    const status = err.message.includes("No connection") || err.message.includes("Unknown provider") || err.message.includes("No API key") ? 400 : 502;
-    return c.json({ error: err.message }, status);
+    const msg = clampErrorMessage(describeProviderError(err, "Summarization failed"));
+    const status = msg.includes("No connection") || msg.includes("Unknown provider") || msg.includes("No API key") ? 400 : 502;
+    return c.json({ error: msg }, status);
   }
 });
 
@@ -187,8 +189,9 @@ app.post("/raw", localhostOnly, async (c) => {
     const result = await svc.rawGenerate(userId, body);
     return c.json(result);
   } catch (err: any) {
-    const status = err.message.includes("Unknown provider") || err.message.includes("No API key") ? 400 : 502;
-    return c.json({ error: err.message }, status);
+    const msg = clampErrorMessage(describeProviderError(err, "Raw generation failed"));
+    const status = msg.includes("Unknown provider") || msg.includes("No API key") ? 400 : 502;
+    return c.json({ error: msg }, status);
   }
 });
 
@@ -203,8 +206,9 @@ app.post("/quiet", localhostOnly, async (c) => {
     const result = await svc.quietGenerate(userId, body);
     return c.json(result);
   } catch (err: any) {
-    const status = err.message.includes("No connection") || err.message.includes("Unknown provider") || err.message.includes("No API key") ? 400 : 502;
-    return c.json({ error: err.message }, status);
+    const msg = clampErrorMessage(describeProviderError(err, "Quiet generation failed"));
+    const status = msg.includes("No connection") || msg.includes("Unknown provider") || msg.includes("No API key") ? 400 : 502;
+    return c.json({ error: msg }, status);
   }
 });
 

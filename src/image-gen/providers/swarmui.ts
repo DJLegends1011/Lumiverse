@@ -2,7 +2,7 @@ import type { ImageProvider } from "../provider"
 import type { ImageProviderCapabilities, ImageParameterSchemaMap } from "../param-schema"
 import type { ImageGenRequest, ImageGenResponse } from "../types"
 import { applyRawOverride } from "../types"
-import { ProviderRequestError, throwProviderResponseError } from "../../utils/provider-errors"
+import { parseProviderErrorBody, ProviderRequestError, readBoundedText, throwProviderResponseError } from "../../utils/provider-errors"
 import { openWebSocket } from "./ws-helpers"
 import { executeComfyWorkflow, executeComfyWorkflowStream } from "./comfy-runner"
 
@@ -330,7 +330,7 @@ export class SwarmUIImageProvider implements ImageProvider {
 
       // Retry once on invalid session
       if (!res.ok) {
-        const text = await res.text().catch(() => "")
+        const text = await readBoundedText(res)
         if (text.includes("invalid_session_id") || text.includes("Invalid session")) {
           this.invalidateSession(base, token)
           sessionId = await this.getSession(base, token, request.signal)
@@ -343,7 +343,18 @@ export class SwarmUIImageProvider implements ImageProvider {
           })
         }
         if (!res.ok) {
-          throw new Error(`SwarmUI generation error ${res.status}: ${text || await res.text().catch(() => "Unknown")}`)
+          // Body of the first response has already been read into `text`; the
+          // retry (if any) has its own untouched body.
+          const rawBody = res.bodyUsed ? text : await readBoundedText(res)
+          const parsed = parseProviderErrorBody(rawBody)
+          throw new ProviderRequestError({
+            provider: "SwarmUI",
+            operation: "image generate",
+            status: res.status,
+            code: parsed.code || res.statusText || undefined,
+            detail: parsed.detail || res.statusText || undefined,
+            rawBody,
+          })
         }
       }
 

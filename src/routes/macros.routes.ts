@@ -211,7 +211,7 @@ function buildEnvFromIds(userId: string, body: {
     commit: true,
     names: {
       user: persona?.name || "User", char: "", group: "", groupNotMuted: "", notChar: persona?.name || "User",
-      charGroupFocused: "", groupOthers: "", groupMemberCount: "0", isGroupChat: "no", groupLastSpeaker: "",
+      charGroupFocused: "", groupOthers: "", groupMemberCount: "0", isGroupChat: "no", isNarrator: persona?.is_narrator ? "yes" : "no", groupLastSpeaker: "", groupCardMode: "solo",
     },
     character: {
       name: "", description: "", personality: "", scenario: "", persona: persona?.description || "",

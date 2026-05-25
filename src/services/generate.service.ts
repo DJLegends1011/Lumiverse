@@ -121,7 +121,7 @@ import {
   assemblePromptInWorker,
   canUsePromptAssemblyWorker,
 } from "./prompt-assembly-worker-client";
-import { describeTransportError } from "../utils/provider-errors";
+import { clampErrorMessage, describeProviderError } from "../utils/provider-errors";
 
 interface GenerateInput {
   userId: string;
@@ -480,19 +480,19 @@ function wrapDelimitedReasoningForUser(
  * objects gracefully.
  */
 function errorMessage(err: unknown): string {
-  const transportMessage = describeTransportError(err, "");
-  if (transportMessage) return transportMessage;
+  const described = describeProviderError(err, "");
+  if (described) return clampErrorMessage(described);
   if (err == null) return "Unknown error";
-  if (typeof err === "string") return err;
+  if (typeof err === "string") return clampErrorMessage(err);
   if (
     typeof err === "object" &&
     "message" in err &&
     typeof (err as any).message === "string"
   ) {
-    return (err as any).message;
+    return clampErrorMessage((err as any).message);
   }
   try {
-    return String(err);
+    return clampErrorMessage(String(err));
   } catch {
     return "Unknown error";
   }
