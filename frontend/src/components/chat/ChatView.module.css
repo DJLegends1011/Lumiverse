@@ -306,6 +306,7 @@
   top: 0;
   bottom: 0;
   z-index: 3;
+  pointer-events: none;
 }
 
 .portraitSideRight {
@@ -353,6 +354,7 @@
   border: 1px solid var(--lcs-glass-border);
   color: var(--lumiverse-text-muted);
   cursor: pointer;
+  pointer-events: auto;
   transition:
     background var(--lcs-transition-fast, 120ms cubic-bezier(0.4, 0, 0.2, 1)),
     color var(--lcs-transition-fast, 120ms cubic-bezier(0.4, 0, 0.2, 1)),
