@@ -1,3 +1,4 @@
+import { join } from "path";
 import { PROJECT_ROOT, ENTRY, STOP_SIGTERM_GRACE_MS } from "./lib/constants.js";
 
 export type ServerState = "starting" | "running" | "stopping" | "stopped" | "crashed";
@@ -67,6 +68,9 @@ export function startServer(isDev: boolean): void {
       ...process.env,
       FORCE_COLOR: "1",
       LUMIVERSE_RUNNER_IPC: "1",
+      ...("BUN_RUNTIME_TRANSPILER_CACHE_PATH" in process.env
+        ? { BUN_RUNTIME_TRANSPILER_CACHE_PATH: process.env.BUN_RUNTIME_TRANSPILER_CACHE_PATH }
+        : { BUN_RUNTIME_TRANSPILER_CACHE_PATH: join(PROJECT_ROOT, "data", ".bun-transpiler-cache") }),
     },
     ipc(message) {
       // Handle IPC messages from the server child
