@@ -203,16 +203,17 @@ export function listCharacterSummaries(
   } else if (search && !sort) {
     orderBy = "ORDER BY c.updated_at DESC"; // LIKE fallback has no rank column
   } else {
+    const dir = direction === "desc" ? "DESC" : "ASC";
     switch (sort) {
       case "name":
-        orderBy = `ORDER BY c.name ${direction === "desc" ? "DESC" : "ASC"}`;
+        orderBy = `ORDER BY c.name ${dir}, c.id ASC`;
         break;
       case "created":
-        orderBy = `ORDER BY c.created_at ${direction === "desc" ? "DESC" : "ASC"}`;
+        orderBy = `ORDER BY c.created_at ${dir}, c.id ASC`;
         break;
       case "recent":
       default:
-        orderBy = `ORDER BY c.updated_at ${direction === "desc" ? "DESC" : "ASC"}`;
+        orderBy = `ORDER BY c.updated_at ${dir}, c.id ASC`;
         break;
       }
   }
