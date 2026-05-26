@@ -33,6 +33,7 @@ export interface CreateCharacterInput {
   tags?: string[];
   alternate_greetings?: string[];
   extensions?: Record<string, any>;
+  created_at?: number;
 }
 
 export type UpdateCharacterInput = Partial<CreateCharacterInput>;

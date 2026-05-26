@@ -373,7 +373,23 @@ function mapCardToInput(data: Record<string, any>): CreateCharacterInput {
 
   if (Object.keys(extensions).length > 0) input.extensions = extensions;
 
+  const createDate = data.create_date ?? data.created_at;
+  if (createDate != null) {
+    const parsed = typeof createDate === "number"
+      ? createDate
+      : Date.parse(String(createDate));
+    if (Number.isFinite(parsed) && parsed > 0) {
+      input.created_at = parsed > 1e12 ? Math.floor(parsed / 1000) : parsed;
+    }
+  }
+
   return input;
+}
+
+export function applyFileTimestampFallback(input: CreateCharacterInput, file: File): void {
+  if (input.created_at == null && file.lastModified) {
+    input.created_at = Math.floor(file.lastModified / 1000);
+  }
 }
 
 function hasNonEmptyText(value: unknown): value is string {
