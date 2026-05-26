@@ -454,9 +454,13 @@ export function parseCardJson(json: unknown): CreateCharacterInput {
 
   const obj = json as Record<string, any>;
 
-  // V2/V3 wrapped format
+  // V2/V3 wrapped format — create_date lives on the wrapper, not inside data
   if ((obj.spec === "chara_card_v2" || obj.spec === "chara_card_v3") && obj.data) {
-    return mapCardToInput(obj.data);
+    const data = obj.data as Record<string, any>;
+    if (obj.create_date != null && data.create_date == null) {
+      data.create_date = obj.create_date;
+    }
+    return mapCardToInput(data);
   }
 
   // V1 flat format or plain CreateCharacterInput
