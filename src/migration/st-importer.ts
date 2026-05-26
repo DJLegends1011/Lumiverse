@@ -22,7 +22,7 @@ import {
   parseDateString,
 } from "./st-reader";
 
-import { extractCardFromPng, applyFileTimestampFallback } from "../services/character-card.service";
+import { extractCardFromPng } from "../services/character-card.service";
 import {
   createCharacter,
   findCharacterBySourceFilename,
@@ -131,7 +131,6 @@ export async function importCharacters(
       const file = new File([bytes], filename, { type: "image/png" });
 
       const cardInput = await extractCardFromPng(file);
-      applyFileTimestampFallback(cardInput, file);
       if (cardInput.created_at == null && fileStat) {
         cardInput.created_at = fileStat.createdAt ?? fileStat.modifiedAt;
       }

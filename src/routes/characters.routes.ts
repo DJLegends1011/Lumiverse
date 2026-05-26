@@ -669,8 +669,6 @@ app.post("/import-bulk", async (c) => {
           cardInput = cardSvc.parseCardJson(json);
         }
 
-        cardSvc.applyFileTimestampFallback(cardInput, file);
-
         // Deduplication check
         if (skipDuplicates) {
           const hasRealFilename = filename && filename !== "unknown" && filename !== "";
@@ -831,7 +829,6 @@ app.post("/import", async (c) => {
       if (detectedFormat === "png") {
         // PNG card — extract embedded JSON + use as avatar
         const cardInput = await cardSvc.extractCardFromPng(file);
-        cardSvc.applyFileTimestampFallback(cardInput, file);
         const character = svc.createCharacter(userId, cardInput);
         const image = await images.uploadImage(userId, file);
         svc.setCharacterImage(userId, character.id, image.id);
@@ -843,7 +840,6 @@ app.post("/import", async (c) => {
         // CHARX archive (or JPEG+ZIP polyglot) — ZIP with card.json + optional avatar + gallery images + modules
         const charxResult = await cardSvc.extractCardFromCharx(file);
         const { card: cardInput, avatarFile, risuModule, expressionAssets, lumiverseModules, assetFiles, expressionGroupAnalysis } = charxResult;
-        cardSvc.applyFileTimestampFallback(cardInput, file);
         const character = svc.createCharacter(userId, cardInput);
         // Track archive-path → image-id for resolving inline asset references in text fields
         const assetImageMap = new Map<string, string>();
@@ -1088,7 +1084,6 @@ app.post("/import", async (c) => {
           return c.json({ error: "Invalid JSON in uploaded file" }, 400);
         }
         const cardInput = cardSvc.parseCardJson(json);
-        cardSvc.applyFileTimestampFallback(cardInput, file);
         const character = svc.createCharacter(userId, cardInput);
         autoImportEmbeddedWorldbook(userId, character.id);
         const imported = svc.getCharacter(userId, character.id)!;
