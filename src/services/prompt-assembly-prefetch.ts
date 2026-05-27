@@ -218,10 +218,27 @@ export async function prefetchAssemblyData(ctx: AssemblyContext): Promise<Prefet
   const entriesByBook = profiler.measureSync("world-book-entries", () =>
     worldBooksSvc.listEntriesForBooks(ctx.userId, allBookIds)
   );
+  const embeddedCharacterBook = character.extensions?.character_book;
   const allEntries: import("../types/world-book").WorldBookEntry[] = [];
   for (const bookId of allBookIds) {
     const bookEntries = entriesByBook.get(bookId);
-    if (bookEntries) allEntries.push(...bookEntries);
+    if (bookEntries && bookEntries.length > 0) {
+      allEntries.push(...bookEntries);
+      continue;
+    }
+    if (!embeddedCharacterBook) continue;
+    const book = worldBooksSvc.getWorldBook(ctx.userId, bookId);
+    if (
+      book?.metadata?.source === "character" &&
+      book.metadata?.source_character_id === character.id
+    ) {
+      allEntries.push(
+        ...worldBooksSvc.materializeCharacterBookEntriesForRuntime(
+          bookId,
+          embeddedCharacterBook,
+        ),
+      );
+    }
   }
 
   // Large lorebooks make listEntriesForBooks + row hydration a noticeable

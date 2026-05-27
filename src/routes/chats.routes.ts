@@ -2,7 +2,10 @@ import { Hono } from "hono";
 import * as svc from "../services/chats.service";
 import * as personasSvc from "../services/personas.service";
 import * as charactersSvc from "../services/characters.service";
+import * as settingsSvc from "../services/settings.service";
+import * as worldBooksSvc from "../services/world-books.service";
 import * as regexScriptsSvc from "../services/regex-scripts.service";
+import { getCharacterWorldBookIds } from "../utils/character-world-books";
 import { parsePagination } from "../services/pagination";
 import { RECENT_CHATS_DEFAULT_LIMIT } from "../types/pagination";
 import { parseStChatJsonl, parseStGroupChatJsonl } from "../migration/st-reader";
@@ -294,8 +297,51 @@ app.patch("/:id/metadata", async (c) => {
     }
     partial[key] = value;
   }
-  const updated = svc.mergeChatMetadata(userId, chatId, partial);
+  let updated = svc.mergeChatMetadata(userId, chatId, partial);
   if (!updated) return c.json({ error: "Not found" }, 404);
+
+  // When world book attachments change, immediately prune wi_state entries
+  // belonging to books that are no longer attached from any source. Without
+  // this, orphaned sticky/cooldown state survives until the next generation's
+  // activation cleanup — and the deferred WI state write from a concurrent
+  // generation can restore it.
+  if ("chat_world_book_ids" in body) {
+    const wiState = updated.metadata?.wi_state as Record<string, any> | undefined;
+    if (wiState && Object.keys(wiState).length > 0) {
+      const character = charactersSvc.getCharacter(userId, updated.character_id);
+      const charBookIds = character ? getCharacterWorldBookIds(character.extensions) : [];
+      const persona = personasSvc.resolvePersonaOrDefault(userId);
+      const chatBookIds = (updated.metadata?.chat_world_book_ids as string[] | undefined) ?? [];
+      const globalBookIds = (settingsSvc.getSetting(userId, "globalWorldBooks")?.value as string[] | undefined) ?? [];
+
+      const allBookIds = new Set<string>();
+      for (const id of charBookIds) allBookIds.add(id);
+      if (persona?.attached_world_book_id) allBookIds.add(persona.attached_world_book_id);
+      for (const id of chatBookIds) allBookIds.add(id);
+      for (const id of globalBookIds) allBookIds.add(id);
+
+      if (allBookIds.size > 0) {
+        const entryMap = worldBooksSvc.listEntriesForBooks(userId, [...allBookIds]);
+        const validUids = new Set<string>();
+        for (const [, entries] of entryMap) {
+          for (const e of entries) validUids.add(e.uid);
+        }
+        let pruned = false;
+        for (const uid in wiState) {
+          if (!validUids.has(uid)) {
+            delete wiState[uid];
+            pruned = true;
+          }
+        }
+        if (pruned) {
+          updated = svc.mergeChatMetadata(userId, chatId, { wi_state: wiState }) ?? updated;
+        }
+      } else {
+        updated = svc.mergeChatMetadata(userId, chatId, { wi_state: undefined }) ?? updated;
+      }
+    }
+  }
+
   return c.json(updated);
 });
 
