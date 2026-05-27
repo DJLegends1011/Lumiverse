@@ -89,7 +89,7 @@ import { buildEmotionalContext } from "./memory-cortex";
 import * as databankSvc from "./databank";
 import { getCharacterDatabankIds } from "../utils/character-databanks";
 import { getSidecarSettings } from "./sidecar-settings.service";
-import { getChatBackgroundSignal } from "./chat-background.service";
+import { getChatBackgroundSignal, trackChatBackgroundTask } from "./chat-background.service";
 import { getDreamWeaverRuntimeBlocks } from "./dream-weaver/runtime-prompt";
 import * as regexScriptsSvc from "./regex-scripts.service";
 import { createPromptAssemblyProfiler } from "./prompt-assembly-profiler";
@@ -1152,7 +1152,7 @@ export async function assemblePrompt(
       ? AbortSignal.any([ctx.signal, chatBgSignal])
       : chatBgSignal;
 
-    void (async () => {
+    const cortexBgTask = (async () => {
       const embCfg = await embCfgPromise;
       if (cortexSignal.aborted) return;
       const effective = cortexChatMemSettings
@@ -1212,6 +1212,7 @@ export async function assemblePrompt(
       if (cortexSignal.aborted) return;
       console.warn("[prompt-assembly] Background cortex query failed:", err);
     });
+    trackChatBackgroundTask(ctx.userId, ctx.chatId, cortexBgTask);
   }
 
   // ---- Pre-flight: kick off databank retrieval ----
@@ -1282,6 +1283,9 @@ export async function assemblePrompt(
           (phase, ms) => profiler.addPhase(phase, ms),
         );
       })();
+
+      const dbBgTask = databankPrefetchPromise.then(() => {}, () => {});
+      trackChatBackgroundTask(ctx.userId, ctx.chatId, dbBgTask);
 
       void databankPrefetchPromise.catch((err) => {
         if (dbSignal.aborted) return;

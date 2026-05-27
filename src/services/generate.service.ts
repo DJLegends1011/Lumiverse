@@ -696,8 +696,10 @@ const activeGenerations = new Map<
      *  teardown before starting a replacement generation — this prevents
      *  two HTTP operations (the old cancel and the new connect) from
      *  overlapping on Bun's HTTPThread, which has a known null-callback
-     *  race on concurrent cancel+start. */
-    completion?: Promise<void>;
+     *  race on concurrent cancel+start.
+     *  Created up-front as a deferred promise so it's always present — even
+     *  during the setup phase before the streaming IIFE starts. */
+    completion: Promise<void>;
   }
 >();
 
@@ -1385,12 +1387,10 @@ export async function startGeneration(
       // sequence, preventing two fetch operations from overlapping on Bun's
       // HTTPThread which has a known race on concurrent cancel+start. Bounded
       // at 2s so a hung generation can't deadlock regeneration permanently.
-      if (existing.completion) {
-        await Promise.race([
-          existing.completion,
-          new Promise<void>((r) => setTimeout(r, 2000)),
-        ]);
-      }
+      await Promise.race([
+        existing.completion,
+        new Promise<void>((r) => setTimeout(r, 2000)),
+      ]);
     }
     activeGenerations.delete(existingGenId);
     activeChatGenerations.delete(chatKey);
@@ -1400,15 +1400,24 @@ export async function startGeneration(
   // databank retrieval) left over from prior generations on this chat.
   // Successful completions don't abort their own controllers, so without
   // this, slow embedding APIs can accumulate orphan tasks across sends.
-  abortChatBackground(input.userId, input.chat_id);
+  // Await teardown so background fetch reader.cancel() completes before
+  // the new generation starts its own fetches — overlapping cancel+start
+  // on Bun's HTTPThread triggers a null-callback segfault.
+  await abortChatBackground(input.userId, input.chat_id);
 
-  // Register this generation early (before council) so it can be tracked and aborted
+  // Register this generation early (before council) so it can be tracked and aborted.
+  // The completion promise is created up-front (deferred) so a replacement
+  // generation can always await teardown — even if it arrives during the setup
+  // phase before the streaming IIFE has started.
   const abortController = new AbortController();
+  let resolveCompletion!: () => void;
+  const completion = new Promise<void>((r) => { resolveCompletion = r; });
   activeGenerations.set(generationId, {
     controller: abortController,
     userId: input.userId,
     chatId: input.chat_id,
     startedAt: Date.now(),
+    completion,
   });
   activeChatGenerations.set(chatKey, generationId);
 
@@ -1684,7 +1693,7 @@ export async function startGeneration(
     // detached async continuation. Errors are surfaced via GENERATION_ENDED
     // with an error payload. The promise is stored on activeGenerations so a
     // replacement generation (regenerate) can await teardown before starting.
-    const generationWork = (async () => {
+    (async () => {
       // Yield to the macro task queue IMMEDIATELY so that the HTTP response
       // (`return { generationId, status: "streaming" }` below) is sent before
       // any assembly work begins.  Without this, JavaScript's async execution
@@ -2374,8 +2383,7 @@ export async function startGeneration(
         // and then tearing the stream down on the first iter.next() race.
         checkAborted();
 
-        // Run generation in the background
-        runGeneration(
+        await runGeneration(
           generationId,
           provider,
           apiKey,
@@ -2458,13 +2466,10 @@ export async function startGeneration(
           },
           input.userId,
         );
+      } finally {
+        resolveCompletion();
       }
     })();
-
-    // Store the work promise so a replacement gen (regenerate) can await
-    // its teardown before starting a new HTTP call.
-    const entry = activeGenerations.get(generationId);
-    if (entry) entry.completion = generationWork;
 
     return { generationId, status: "streaming" };
   } catch (err: any) {
@@ -2479,6 +2484,7 @@ export async function startGeneration(
     }
     activeGenerations.delete(generationId);
     activeChatGenerations.delete(chatKey);
+    resolveCompletion();
     pool.errorPool(generationId, errorMessage(err));
     throw err;
   }
