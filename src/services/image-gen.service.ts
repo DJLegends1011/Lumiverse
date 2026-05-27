@@ -853,9 +853,9 @@ async function resolvePromptInput(
     mode: requestedMode === "parsed_custom" ? "parsed_custom" : "custom",
     prompt,
     negativePrompt,
-    parserConnectionId: preset?.parserConnectionId ?? settings.promptParserConnectionId ?? null,
-    parserModel: preset?.parserModel ?? settings.promptParserModel ?? "",
-    parserParameters: preset?.parserParameters ?? settings.promptParserParameters ?? {},
+    parserConnectionId: settings.promptParserConnectionId ?? preset?.parserConnectionId ?? null,
+    parserModel: settings.promptParserModel ?? preset?.parserModel ?? "",
+    parserParameters: settings.promptParserParameters ?? preset?.parserParameters ?? {},
   };
 }
 
