@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { DreamWeaverDraft } from '../../../api/dream-weaver'
 import styles from './VoiceGuidanceEditor.module.css'
 
@@ -10,15 +11,10 @@ interface VoiceGuidanceEditorProps {
   onChange: (voice: VoiceGuidance) => void
 }
 
-const CATEGORIES: { key: RuleCategory; label: string }[] = [
-  { key: 'baseline', label: 'Baseline' },
-  { key: 'rhythm', label: 'Rhythm' },
-  { key: 'diction', label: 'Diction' },
-  { key: 'quirks', label: 'Quirks' },
-  { key: 'hard_nos', label: 'Hard Nos' },
-]
+const CATEGORY_KEYS: RuleCategory[] = ['baseline', 'rhythm', 'diction', 'quirks', 'hard_nos']
 
 export function VoiceGuidanceEditor({ voice, onChange }: VoiceGuidanceEditorProps) {
+  const { t } = useTranslation('dreamWeaver')
   const [view, setView] = useState<'structured' | 'compiled'>('structured')
 
   const updateRule = useCallback((category: RuleCategory, index: number, value: string) => {
@@ -48,49 +44,52 @@ export function VoiceGuidanceEditor({ voice, onChange }: VoiceGuidanceEditorProp
           data-active={view === 'structured' || undefined}
           onClick={() => setView('structured')}
         >
-          Structured
+          {t('studio.voice.structured')}
         </button>
         <button
           className={styles.toggleOption}
           data-active={view === 'compiled' || undefined}
           onClick={() => setView('compiled')}
         >
-          Compiled
+          {t('studio.voice.compiled')}
         </button>
       </div>
 
       {view === 'compiled' ? (
         <div className={styles.compiled}>
-          <p className={styles.compiledHint}>Read-only compiled output used at runtime.</p>
+          <p className={styles.compiledHint}>{t('studio.voice.compiledHint')}</p>
           <div className={styles.compiledText}>
-            {voice.compiled || 'No compiled voice guidance yet.'}
+            {voice.compiled || t('studio.voice.noCompiledYet')}
           </div>
         </div>
       ) : (
         <div className={styles.categories}>
-          {CATEGORIES.map(({ key, label }) => (
-            <div key={key} className={styles.category}>
-              <div className={styles.categoryHeader}>
-                <span className={styles.categoryLabel}>{label}</span>
-                <span className={styles.categoryCount}>{voice.rules[key].length}</span>
+          {CATEGORY_KEYS.map((key) => {
+            const label = t(`studio.voice.categories.${key}`)
+            return (
+              <div key={key} className={styles.category}>
+                <div className={styles.categoryHeader}>
+                  <span className={styles.categoryLabel}>{label}</span>
+                  <span className={styles.categoryCount}>{voice.rules[key].length}</span>
+                </div>
+                <div className={styles.rules}>
+                  {voice.rules[key].map((rule, i) => (
+                    <div key={i} className={styles.ruleRow}>
+                      <input
+                        className={styles.ruleInput}
+                        type="text"
+                        value={rule}
+                        onChange={(e) => updateRule(key, i, e.target.value)}
+                        placeholder={t('studio.voice.rulePlaceholder', { label })}
+                      />
+                      <button className={styles.removeRule} onClick={() => removeRule(key, i)}>×</button>
+                    </div>
+                  ))}
+                  <button className={styles.addRule} onClick={() => addRule(key)}>{t('studio.voice.addRule')}</button>
+                </div>
               </div>
-              <div className={styles.rules}>
-                {voice.rules[key].map((rule, i) => (
-                  <div key={i} className={styles.ruleRow}>
-                    <input
-                      className={styles.ruleInput}
-                      type="text"
-                      value={rule}
-                      onChange={(e) => updateRule(key, i, e.target.value)}
-                      placeholder={`${label} rule...`}
-                    />
-                    <button className={styles.removeRule} onClick={() => removeRule(key, i)}>×</button>
-                  </div>
-                ))}
-                <button className={styles.addRule} onClick={() => addRule(key)}>+ Add rule</button>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { useStore } from '@/store'
 import { messagesApi, chatsApi } from '@/api/chats'
@@ -37,6 +38,8 @@ function parseThinkingTags(content: string): { cleaned: string; thoughts: string
 }
 
 export function useMessageCard(message: Message, chatId: string) {
+  const { t } = useTranslation('chat', { keyPrefix: 'toast' })
+  const { t: tc } = useTranslation('chat', { keyPrefix: 'messageCard' })
   const navigate = useNavigate()
   const editingMessageId = useStore((s) => s.editingMessageId)
   const setEditingMessageId = useStore((s) => s.setEditingMessageId)
@@ -242,9 +245,9 @@ export function useMessageCard(message: Message, chatId: string) {
       setEditingMessageId(null)
     } catch (err) {
       console.error('[MessageCard] Failed to save edit:', err)
-      addToast({ type: 'error', message: 'Failed to save message edit' })
+      addToast({ type: 'error', message: t('failedSaveMessageEdit') })
     }
-  }, [chatId, message.id, editContent, editReasoning, message.is_user, message.extra, setEditingMessageId, updateMessage, addToast])
+  }, [chatId, message.id, editContent, editReasoning, message.is_user, message.extra, setEditingMessageId, updateMessage, addToast, t])
 
   const handleCancelEdit = useCallback(() => {
     setEditingMessageId(null)
@@ -287,9 +290,9 @@ export function useMessageCard(message: Message, chatId: string) {
 
   const handleFork = useCallback(() => {
     openModal('confirm', {
-      title: 'Fork Chat',
-      message: 'Create a new chat branch at this message? All messages up to this point will be copied.',
-      confirmText: 'Fork',
+      title: tc('fork.title'),
+      message: tc('fork.message'),
+      confirmText: tc('fork.confirm'),
       onConfirm: async () => {
         try {
           const newChat = await chatsApi.branch(chatId, message.id)
@@ -299,7 +302,7 @@ export function useMessageCard(message: Message, chatId: string) {
         }
       },
     })
-  }, [chatId, message.id, openModal, navigate])
+  }, [chatId, message.id, openModal, navigate, tc])
 
   const handleDelete = useCallback(() => {
     const hasSwipes = message.swipes && message.swipes.length > 1
@@ -307,29 +310,29 @@ export function useMessageCard(message: Message, chatId: string) {
     if (!message.is_user && hasSwipes) {
       // Assistant message with swipes: offer Swipe vs Message deletion
       openModal('confirm', {
-        title: 'Delete',
-        message: 'Delete just this swipe, or the entire message with all swipes?',
+        title: tc('delete.title'),
+        message: tc('delete.message'),
         variant: 'danger',
-        confirmText: 'Message',
+        confirmText: tc('delete.confirmMessage'),
         onConfirm: doDeleteMessage,
-        secondaryText: 'Swipe',
+        secondaryText: tc('delete.confirmSwipe'),
         onSecondary: doDeleteSwipe,
         secondaryVariant: 'warning',
       })
     } else if (!message.is_user) {
       // Assistant message without swipes: simple confirm
       openModal('confirm', {
-        title: 'Delete Message',
-        message: 'This will permanently remove this message from the chat.',
+        title: tc('deleteMessage.title'),
+        message: tc('deleteMessage.message'),
         variant: 'danger',
-        confirmText: 'Delete',
+        confirmText: tc('deleteMessage.confirm'),
         onConfirm: doDeleteMessage,
       })
     } else {
       // User messages: delete directly (existing behavior)
       doDeleteMessage()
     }
-  }, [message.is_user, message.swipes, openModal, doDeleteMessage, doDeleteSwipe])
+  }, [message.is_user, message.swipes, openModal, doDeleteMessage, doDeleteSwipe, tc])
 
   return {
     isEditing,

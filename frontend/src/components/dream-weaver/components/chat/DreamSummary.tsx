@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { useTranslation } from 'react-i18next'
+
 import { Sparkles, Pencil, Check, X, ChevronDown, ChevronUp } from "lucide-react";
 import styles from "./DreamSummary.module.css";
 
@@ -13,7 +15,10 @@ interface Props {
   onSave?: (messageId: string, newText: string) => Promise<void>;
 }
 
-export function DreamSummary({ messageId, title = "Dream", dreamText, tone, dislikes, onSave }: Props) {
+export function DreamSummary({ messageId, title, dreamText, tone, dislikes, onSave }: Props) {
+  const { t } = useTranslation('dreamWeaver')
+  const { t: tc } = useTranslation('common')
+  const displayTitle = title ?? t('chat.summary.dreamTitle')
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(dreamText);
@@ -53,7 +58,7 @@ export function DreamSummary({ messageId, title = "Dream", dreamText, tone, disl
   const handleSave = async () => {
     const nextValue = editValue.trim();
     if (!nextValue) {
-      setErrorMessage("Dream source text is required.");
+      setErrorMessage(t('chat.summary.errors.required'));
       return;
     }
     if (!onSave || nextValue === dreamText.trim()) {
@@ -66,7 +71,7 @@ export function DreamSummary({ messageId, title = "Dream", dreamText, tone, disl
       await onSave(messageId, nextValue);
       setEditing(false);
     } catch {
-      setErrorMessage("Could not save dream source. Try again.");
+      setErrorMessage(t('chat.summary.errors.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -80,19 +85,19 @@ export function DreamSummary({ messageId, title = "Dream", dreamText, tone, disl
           <span className={styles.iconWrap} aria-hidden>
             <Sparkles size={12} />
           </span>
-          <span className={styles.title}>{title}</span>
-          <span className={styles.activePill}>Source Active</span>
+          <span className={styles.title}>{displayTitle}</span>
+          <span className={styles.activePill}>{t('chat.summary.sourceActive')}</span>
           {onSave && !editing && (
-            <button className={styles.editButton} onClick={handleEdit} title="Edit dream" aria-label="Edit dream">
+            <button className={styles.editButton} onClick={handleEdit} title={t('chat.summary.editDream')} aria-label={t('chat.summary.editDream')}>
               <Pencil size={11} />
             </button>
           )}
           {editing && (
             <div className={styles.editActions}>
-              <button className={styles.editActionBtn} data-confirm onClick={handleSave} disabled={saving} title="Save" aria-label="Save dream">
+              <button className={styles.editActionBtn} data-confirm onClick={handleSave} disabled={saving} title={tc('actions.save')} aria-label={t('chat.summary.saveDreamAria')}>
                 <Check size={11} />
               </button>
-              <button className={styles.editActionBtn} onClick={handleCancel} disabled={saving} title="Cancel" aria-label="Cancel edit">
+              <button className={styles.editActionBtn} onClick={handleCancel} disabled={saving} title={tc('actions.cancel')} aria-label={t('chat.summary.cancelEditAria')}>
                 <X size={11} />
               </button>
             </div>
@@ -107,7 +112,7 @@ export function DreamSummary({ messageId, title = "Dream", dreamText, tone, disl
             onChange={(e) => setEditValue(e.target.value)}
             rows={6}
             disabled={saving}
-            aria-label="Dream source"
+            aria-label={t('chat.summary.dreamSourceAria')}
             aria-invalid={Boolean(errorMessage) || undefined}
           />
         ) : (
@@ -121,7 +126,7 @@ export function DreamSummary({ messageId, title = "Dream", dreamText, tone, disl
             </p>
             {(overflows || expanded) && (
               <button className={styles.toggleBtn} onClick={() => setExpanded((v) => !v)}>
-                {expanded ? <><ChevronUp size={11} /> Show less</> : <><ChevronDown size={11} /> Show more</>}
+                {expanded ? <><ChevronUp size={11} /> {t('chat.summary.showLess')}</> : <><ChevronDown size={11} /> {t('chat.summary.showMore')}</>}
               </button>
             )}
           </>
@@ -133,13 +138,13 @@ export function DreamSummary({ messageId, title = "Dream", dreamText, tone, disl
           <div className={styles.meta}>
             {tone && (
               <span className={styles.metaChip}>
-                <span className={styles.metaLabel}>Tone</span>
+                <span className={styles.metaLabel}>{t('create.tone')}</span>
                 {tone}
               </span>
             )}
             {dislikes && (
               <span className={styles.metaChip}>
-                <span className={styles.metaLabel}>Avoid</span>
+                <span className={styles.metaLabel}>{t('create.avoid')}</span>
                 {dislikes}
               </span>
             )}

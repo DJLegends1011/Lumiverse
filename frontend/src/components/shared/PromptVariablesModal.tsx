@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight, RotateCcw, Sliders } from 'lucide-react'
 import { ModalShell } from '@/components/shared/ModalShell'
 import NumberStepper from '@/components/shared/NumberStepper'
@@ -52,6 +53,8 @@ export function PromptVariablesModal({
   onSave,
   onClose,
 }: PromptVariablesModalProps) {
+  const { t } = useTranslation('shared', { keyPrefix: 'promptVariables' })
+  const { t: tc } = useTranslation('common')
   const eligible = useMemo(() => collectEligibleBlocks(blocks), [blocks])
 
   // Local draft keyed by blockId → varName. Seeded from stored values on open.
@@ -143,9 +146,9 @@ export function PromptVariablesModal({
       <div className={css.header}>
         <Sliders size={18} />
         <div>
-          <h3 className={css.title}>Configure Prompt Variables</h3>
+          <h3 className={css.title}>{t('title')}</h3>
           <p className={css.subtitle}>
-            Values set here are substituted into preset blocks via <code>{'{{var::name}}'}</code>.
+            {t('subtitle', { token: t('tokenExample') })}
           </p>
         </div>
       </div>
@@ -153,7 +156,7 @@ export function PromptVariablesModal({
       <div className={css.body}>
         {eligible.length === 0 ? (
           <div className={css.empty}>
-            No enabled blocks define any prompt variables. Add some in the block editor to configure them here.
+            {t('empty')}
           </div>
         ) : (
           eligible.map(({ block, variables }) => {
@@ -162,9 +165,9 @@ export function PromptVariablesModal({
               <div key={block.id} className={css.blockSection}>
                 <div className={css.blockHeader} onClick={() => toggleBlockCollapsed(block.id)}>
                   {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-                  <span className={css.blockHeaderLabel}>{block.name || 'Untitled block'}</span>
+                  <span className={css.blockHeaderLabel}>{block.name || t('untitledBlock')}</span>
                   <span className={css.blockHeaderCount}>
-                    {variables.length} variable{variables.length === 1 ? '' : 's'}
+                    {t('variableCount', { count: variables.length })}
                   </span>
                 </div>
                 {!isCollapsed && (
@@ -193,7 +196,7 @@ export function PromptVariablesModal({
             className={`${css.btn} ${css.btnGhost} ${css.footerLeft}`}
             onClick={resetAll}
           >
-            Reset all
+            {t('resetAll')}
           </button>
         )}
         <button
@@ -201,7 +204,7 @@ export function PromptVariablesModal({
           className={`${css.btn} ${css.btnCancel}`}
           onClick={onClose}
         >
-          Cancel
+          {tc('actions.cancel')}
         </button>
         <button
           type="button"
@@ -209,7 +212,7 @@ export function PromptVariablesModal({
           onClick={handleSave}
           disabled={saving || eligible.length === 0}
         >
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? t('saving') : tc('actions.save')}
         </button>
       </div>
     </ModalShell>
@@ -224,6 +227,7 @@ interface VariableControlProps {
 }
 
 function VariableControl({ def, value, onChange, onReset }: VariableControlProps) {
+  const { t } = useTranslation('shared', { keyPrefix: 'promptVariables' })
   return (
     <div className={css.variableRow}>
       <div className={css.variableLabel}>
@@ -233,8 +237,8 @@ function VariableControl({ def, value, onChange, onReset }: VariableControlProps
           type="button"
           className={css.resetBtn}
           onClick={onReset}
-          title="Reset to default"
-          aria-label="Reset to default"
+          title={t('resetToDefault')}
+          aria-label={t('resetToDefault')}
         >
           <RotateCcw size={12} />
         </button>

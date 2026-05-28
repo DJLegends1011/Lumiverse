@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import { RefreshCw, RotateCw, Trash2, Github, Plus, ChevronDown, Download, FolderOpen, SlidersHorizontal } from 'lucide-react'
 import { IconVersions } from '@tabler/icons-react'
@@ -14,22 +15,8 @@ import { toast } from '@/lib/toast'
 import styles from './SpindlePanel.module.css'
 import clsx from 'clsx'
 
-const OPERATION_LABELS: Record<string, string> = {
-  installing: 'Installing...',
-  installed: 'Installed',
-  updating: 'Updating...',
-  updated: 'Updated',
-  enabling: 'Starting...',
-  enabled: 'Started',
-  disabling: 'Stopping...',
-  disabled: 'Stopped',
-  restarting: 'Restarting...',
-  restarted: 'Restarted',
-  removing: 'Removing...',
-  removed: 'Removed',
-}
-
 export default function SpindlePanel() {
+  const { t } = useTranslation('panels')
   const extensions = useStore((s) => s.extensions)
   const loadExtensions = useStore((s) => s.loadExtensions)
   const installExtension = useStore((s) => s.installExtension)
@@ -175,13 +162,13 @@ export default function SpindlePanel() {
       setInstallBranches([])
       setAddMenuOpen(false)
     } catch (err: any) {
-      const message = err?.body?.error || err?.message || 'Installation failed'
+      const message = err?.body?.error || err?.message || t('spindlePanel.installationFailed')
       setInstallError(message)
       console.error('[Spindle] Install failed:', err)
     } finally {
       setInstalling(false)
     }
-  }, [installUrl, installBranch, installExtension])
+  }, [installUrl, installBranch, installExtension, t])
 
   const handleToggle = useCallback(async (ext: ExtensionInfo) => {
     setLoadingAction(ext.id)
@@ -315,10 +302,10 @@ export default function SpindlePanel() {
     try {
       await updateAllExtensions()
     } catch (err: any) {
-      const msg = err?.body?.error || err?.message || 'Failed to start bulk update'
-      toast.error(msg, { title: 'Update All' })
+      const msg = err?.body?.error || err?.message || t('spindlePanel.bulkUpdateFailed')
+      toast.error(msg, { title: t('spindlePanel.updateAll') })
     }
-  }, [updateAllExtensions])
+  }, [updateAllExtensions, t])
 
   const handleImportLocal = useCallback(async () => {
     setImportingLocal(true)
@@ -329,19 +316,19 @@ export default function SpindlePanel() {
       const skippedCount = result.skipped.length
       setImportSummary(
         skippedCount > 0
-          ? `Imported ${importedCount}, skipped ${skippedCount}. Check browser console for details.`
-          : `Imported ${importedCount} extension${importedCount === 1 ? '' : 's'}.`
+          ? t('spindlePanel.importSummaryWithSkipped', { imported: importedCount, skipped: skippedCount })
+          : t('spindlePanel.importSummary', { count: importedCount })
       )
       if (skippedCount > 0) console.warn('[Spindle] Local import skipped entries:', result.skipped)
       await loadExtensions()
       setAddMenuOpen(false)
     } catch (err: any) {
       console.error('[Spindle] Local import failed:', err)
-      setImportSummary(`Import failed: ${err?.body?.error || err?.message || 'Unknown error'}`)
+      setImportSummary(t('spindlePanel.importFailed', { error: err?.body?.error || err?.message || t('spindlePanel.unknownError') }))
     } finally {
       setImportingLocal(false)
     }
-  }, [loadExtensions])
+  }, [loadExtensions, t])
 
   const toggleAddMenu = useCallback(() => {
     if (addMenuOpen) {
@@ -366,7 +353,7 @@ export default function SpindlePanel() {
               aria-expanded={addMenuOpen}
               aria-haspopup="menu"
             >
-              <Plus size={13} /> Add Extension <ChevronDown size={13} />
+              <Plus size={13} /> {t('spindlePanel.addExtension')} <ChevronDown size={13} />
             </button>
           </div>
         </div>
@@ -381,7 +368,7 @@ export default function SpindlePanel() {
       {/* Extensions list */}
       <div className={styles.listHeaderRow}>
         <span className={styles.sectionLabel}>
-          Installed ({extensions.length})
+          {t('spindlePanel.installed', { count: extensions.length })}
         </span>
         {manageableCount > 0 && (
           <button
@@ -389,18 +376,21 @@ export default function SpindlePanel() {
             className={styles.updateAllBtn}
             onClick={handleUpdateAll}
             disabled={bulkUpdating}
-            title={bulkUpdating ? 'Bulk update in progress' : 'Pull + rebuild every manageable extension'}
+            title={bulkUpdating ? t('spindlePanel.bulkUpdateInProgress') : t('spindlePanel.updateAllHint')}
           >
             {bulkUpdating ? (
               <>
                 <Spinner size={12} fast />
-                Updating {bulkDisplayIndex}/{bulkUpdateStatus?.total ?? manageableCount}
-                {bulkUpdateStatus?.currentName ? `: ${bulkUpdateStatus.currentName}` : '…'}
+                {t('spindlePanel.updatingProgress', {
+                  current: bulkDisplayIndex,
+                  total: bulkUpdateStatus?.total ?? manageableCount,
+                  name: bulkUpdateStatus?.currentName ? `: ${bulkUpdateStatus.currentName}` : '',
+                })}
               </>
             ) : (
               <>
                 <RefreshCw size={12} />
-                Update All
+                {t('spindlePanel.updateAll')}
               </>
             )}
           </button>
@@ -409,11 +399,11 @@ export default function SpindlePanel() {
 
       {extensions.length === 0 ? (
         <div className={styles.emptyState}>
-          No extensions installed yet.
+          {t('spindlePanel.noExtensions')}
           {isPrivileged && (
             <>
               <br />
-              Click <strong>Add Extension</strong> above to get started.
+              {t('spindlePanel.emptyHint')}
             </>
           )}
         </div>
@@ -427,7 +417,7 @@ export default function SpindlePanel() {
                 const extBranch = ((ext.metadata as any)?.branch || null) as string | null
                 const isNonDefaultBranch = extBranch && extBranch !== 'main' && extBranch !== 'master'
                 const canManage = isPrivileged || (installScope === 'user' && !!user?.id && installedBy === user.id)
-                const scopeLabel = installScope === 'user' ? 'Personal' : 'Operator'
+                const scopeLabel = installScope === 'user' ? t('spindlePanel.personal') : t('spindlePanel.operator')
 
                 return (
                   <>
@@ -445,7 +435,7 @@ export default function SpindlePanel() {
                     {ext.name}
                   </div>
                   <span className={styles.extensionMeta}>
-                    v{ext.version} by {ext.author}
+                    {t('spindlePanel.extensionVersionBy', { version: ext.version, author: ext.author })}
                   </span>
                   <span className={styles.extensionMeta}>
                     {scopeLabel}
@@ -465,7 +455,7 @@ export default function SpindlePanel() {
                     )}
                     onClick={() => handleToggle(ext)}
                     disabled={isExtBusy(ext.id) || !canManage}
-                    title={canManage ? (ext.enabled ? 'Disable' : 'Enable') : 'Managed by operator'}
+                    title={canManage ? (ext.enabled ? t('spindlePanel.disable') : t('spindlePanel.enable')) : t('spindlePanel.managedByOperator')}
                   />
                 </div>
               </div>
@@ -474,7 +464,7 @@ export default function SpindlePanel() {
               {extensionOperationStatus?.extensionId === ext.id && extensionOperationStatus.operation.endsWith('ing') && (
                 <div className={styles.operationStatus}>
                   <Spinner size={12} fast />
-                  {OPERATION_LABELS[extensionOperationStatus.operation] ?? extensionOperationStatus.operation}
+                  {t(`spindlePanel.operations.${extensionOperationStatus.operation}`, { defaultValue: extensionOperationStatus.operation })}
                 </div>
               )}
 
@@ -504,8 +494,8 @@ export default function SpindlePanel() {
                           onClick={() => handlePermissionToggle(ext, perm)}
                           title={
                             canManage
-                              ? `${pretty} (${granted ? 'Enabled' : 'Disabled'})`
-                              : 'Managed by operator'
+                              ? t('spindlePanel.permissionStatus', { name: pretty, status: granted ? t('spindlePanel.enabled') : t('spindlePanel.disabled') })
+                              : t('spindlePanel.managedByOperator')
                           }
                           disabled={!canManage || isToggling}
                         >
@@ -526,24 +516,24 @@ export default function SpindlePanel() {
                     className={styles.labeledBtn}
                     onClick={() => handleUpdate(ext)}
                     disabled={isExtBusy(ext.id) || !canManage}
-                    title={canManage ? 'Pull and rebuild from remote' : 'Managed by operator'}
+                    title={canManage ? t('spindlePanel.updateHint') : t('spindlePanel.managedByOperator')}
                   >
                     {extensionOperationStatus?.extensionId === ext.id && extensionOperationStatus.operation === 'updating'
                       ? <Spinner size={14} fast />
                       : <RefreshCw size={14} />}
-                    <span>Update</span>
+                    <span>{t('spindlePanel.update')}</span>
                   </button>
                   <button
                     type="button"
                     className={styles.labeledBtn}
                     onClick={() => handleRestart(ext)}
                     disabled={isExtBusy(ext.id) || !ext.enabled}
-                    title={ext.enabled ? 'Restart extension worker' : 'Extension is not enabled'}
+                    title={ext.enabled ? t('spindlePanel.restartHint') : t('spindlePanel.notEnabled')}
                   >
                     {extensionOperationStatus?.extensionId === ext.id && extensionOperationStatus.operation === 'restarting'
                       ? <Spinner size={14} fast />
                       : <RotateCw size={14} />}
-                    <span>Restart</span>
+                    <span>{t('spindlePanel.restart')}</span>
                   </button>
                   {canManage && (
                     <button
@@ -554,10 +544,10 @@ export default function SpindlePanel() {
                       )}
                       onClick={() => handleOpenBranchMenu(ext)}
                       disabled={isExtBusy(ext.id)}
-                      title="Switch branch"
+                      title={t('spindlePanel.switchBranch')}
                     >
                       <IconVersions size={14} />
-                      <span>Branch</span>
+                      <span>{t('spindlePanel.branch')}</span>
                     </button>
                   )}
                   <button
@@ -565,10 +555,10 @@ export default function SpindlePanel() {
                     className={styles.labeledBtn}
                     onClick={() => openSettings('extensions')}
                     disabled={!ext.has_frontend}
-                    title={ext.has_frontend ? 'Open extension settings' : 'No frontend settings available'}
+                    title={ext.has_frontend ? t('spindlePanel.openSettings') : t('spindlePanel.noSettings')}
                   >
                     <SlidersHorizontal size={14} />
-                    <span>Settings</span>
+                    <span>{t('spindlePanel.settingsLabel')}</span>
                   </button>
                 </div>
                 <div className={styles.secondaryActions}>
@@ -578,8 +568,8 @@ export default function SpindlePanel() {
                       href={getSafeHttpsUrl(ext.github)!}
                       target="_blank"
                       rel="noopener noreferrer"
-                      title="View on GitHub"
-                      aria-label="View on GitHub"
+                      title={t('spindlePanel.viewOnGitHub')}
+                      aria-label={t('spindlePanel.viewOnGitHub')}
                     >
                       <Github size={13} />
                     </a>
@@ -589,8 +579,8 @@ export default function SpindlePanel() {
                     className={clsx(styles.iconBtnSmall, styles.iconBtnDanger)}
                     onClick={() => handleRemove(ext)}
                     disabled={isExtBusy(ext.id) || !canManage}
-                    title={canManage ? 'Remove extension' : 'Managed by operator'}
-                    aria-label="Remove extension"
+                    title={canManage ? t('spindlePanel.removeExtension') : t('spindlePanel.managedByOperator')}
+                    aria-label={t('spindlePanel.removeExtension')}
                   >
                     <Trash2 size={13} />
                   </button>
@@ -601,9 +591,9 @@ export default function SpindlePanel() {
               {branchMenuExtId === ext.id && (
                 <div className={styles.branchMenu}>
                   {fetchingExtBranches ? (
-                    <span className={styles.branchMenuLoading}>Loading branches...</span>
+                    <span className={styles.branchMenuLoading}>{t('spindlePanel.loadingBranches')}</span>
                   ) : branchMenuBranches.length === 0 ? (
-                    <span className={styles.branchMenuLoading}>No remote branches found</span>
+                    <span className={styles.branchMenuLoading}>{t('spindlePanel.noBranches')}</span>
                   ) : (
                     branchMenuBranches.map((b) => (
                       <button
@@ -617,7 +607,7 @@ export default function SpindlePanel() {
                       >
                         <IconVersions size={12} />
                         {b}
-                        {b === branchMenuCurrent && <span className={styles.branchCurrentLabel}>current</span>}
+                        {b === branchMenuCurrent && <span className={styles.branchCurrentLabel}>{t('spindlePanel.current')}</span>}
                       </button>
                     ))
                   )}
@@ -644,31 +634,31 @@ export default function SpindlePanel() {
               className={styles.menuActionBtn}
               onClick={handleImportLocal}
               disabled={importingLocal}
-              title="Import local extensions from backend data/extensions"
+              title={t('spindlePanel.importLocalHint')}
             >
-              <FolderOpen size={13} /> {importingLocal ? 'Importing Local...' : 'Import Local'}
+              <FolderOpen size={13} /> {importingLocal ? t('spindlePanel.importingLocal') : t('spindlePanel.importLocal')}
             </button>
 
             <div className={styles.menuDivider} />
           </>
         )}
 
-        <label className={styles.menuLabel}>Install from Source</label>
+        <label className={styles.menuLabel}>{t('spindlePanel.installFromSource')}</label>
         <input
           className={styles.installInput}
-          placeholder="GitHub repo URL..."
+          placeholder={t('spindlePanel.repoUrlPlaceholder')}
           value={installUrl}
           onChange={(e) => setInstallUrl(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleInstall()}
           disabled={installing}
         />
         {fetchingBranches && (
-          <span className={styles.branchFetchHint}>Detecting branches...</span>
+          <span className={styles.branchFetchHint}>{t('spindlePanel.detectingBranches')}</span>
         )}
         {!fetchingBranches && installBranches.length > 1 && (
           <div className={styles.branchSelect}>
             <label className={styles.branchSelectLabel}>
-              <IconVersions size={11} /> Branch
+              <IconVersions size={11} /> {t('spindlePanel.branch')}
             </label>
             <select
               className={styles.branchSelectInput}
@@ -676,7 +666,7 @@ export default function SpindlePanel() {
               onChange={(e) => setInstallBranch(e.target.value || null)}
               disabled={installing}
             >
-              <option value="">Default</option>
+              <option value="">{t('spindlePanel.defaultBranch')}</option>
               {installBranches.map((b) => (
                 <option key={b} value={b}>{b}</option>
               ))}
@@ -688,7 +678,7 @@ export default function SpindlePanel() {
           onClick={handleInstall}
           disabled={installing || !installUrl.trim()}
         >
-          <Download size={13} /> {installing ? 'Installing...' : 'Install from Source'}
+          <Download size={13} /> {installing ? t('spindlePanel.installing') : t('spindlePanel.installFromSource')}
         </button>
         {installError && (
           <div className={styles.installError}>{installError}</div>
@@ -700,17 +690,10 @@ export default function SpindlePanel() {
       isOpen={confirmUpdateAllOpen}
       onConfirm={handleConfirmUpdateAll}
       onCancel={() => setConfirmUpdateAllOpen(false)}
-      title={`Update ${manageableCount} extension${manageableCount === 1 ? '' : 's'}?`}
-      message={
-        <>
-          Each extension will fetch and rebuild from its remote. This can take a
-          while — you can keep using the app while it runs, and progress will
-          show in this panel. Any currently-disabled extensions will still be
-          updated but will stay disabled.
-        </>
-      }
+      title={t('spindlePanel.updateAllConfirmTitle', { count: manageableCount })}
+      message={t('spindlePanel.updateAllConfirmMessage')}
       variant="safe"
-      confirmText="Update All"
+      confirmText={t('spindlePanel.updateAll')}
     />
     </>
   )

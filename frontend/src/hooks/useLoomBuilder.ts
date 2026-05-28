@@ -5,6 +5,7 @@ import { connectionsApi } from '@/api/connections'
 import { ApiError, BASE_URL } from '@/api/client'
 import { regexApi } from '@/api/regex'
 import { toast } from '@/lib/toast'
+import i18n from '@/i18n'
 import { enqueuePresetRegexOperation } from '@/lib/presetRegexQueue'
 import { getMacroCatalog } from '@/api/macros'
 import type { LoomPreset, PromptBlock, LoomConnectionProfile, MacroGroup, PromptVariableValues } from '@/lib/loom/types'
@@ -505,10 +506,10 @@ export function useLoomBuilder() {
           if (regexResult.imported > 0) {
             const { loadRegexScripts } = useStore.getState() as any
             if (loadRegexScripts) await loadRegexScripts()
-            toast.success(`Imported ${regexResult.imported} regex script${regexResult.imported !== 1 ? 's' : ''} from preset`)
+            toast.success(i18n.t('panels.loomBuilder.toast.importedRegexFromPreset', { count: regexResult.imported }))
           }
           if (regexResult.errors.length > 0) {
-            toast.error(`${regexResult.errors.length} regex script${regexResult.errors.length !== 1 ? 's' : ''} failed to import`)
+            toast.error(i18n.t('panels.loomBuilder.toast.regexImportFailed', { count: regexResult.errors.length }))
           }
         } catch { /* regex import is best-effort */ }
       }
@@ -525,7 +526,7 @@ export function useLoomBuilder() {
   // Import from legacy preset JSON
   const importFromST = useCallback(async (stData: any, fileName: string) => {
     if (detectImportedPresetKind(stData) === 'loom') {
-      toast.warning('This file is a Loom preset. Use "Import Loom JSON" instead.', { title: 'Preset Import' })
+      toast.warning(i18n.t('panels.loomBuilder.toast.importLoomPresetInstead'), { title: i18n.t('panels.loomBuilder.toast.presetImportTitle') })
       return null
     }
     return persistImportedPreset(stData, fileName)
@@ -534,7 +535,7 @@ export function useLoomBuilder() {
   // Import from file (internal JSON format)
   const importFromFile = useCallback(async (jsonData: any, fileName?: string) => {
     if (detectImportedPresetKind(jsonData) === 'legacy') {
-      toast.warning('This file is a legacy preset. Use "Import Legacy Preset" instead.', { title: 'Preset Import' })
+      toast.warning(i18n.t('panels.loomBuilder.toast.importLegacyPresetInstead'), { title: i18n.t('panels.loomBuilder.toast.presetImportTitle') })
       return null
     }
     return persistImportedPreset(jsonData, fileName)

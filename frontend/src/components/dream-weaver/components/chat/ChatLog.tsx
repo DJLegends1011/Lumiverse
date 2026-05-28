@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { Trans, useTranslation } from 'react-i18next'
 import type { DreamWeaverMessage } from "@/api/dream-weaver-tooling";
 import { ToolCard } from "./ToolCard";
 import { UserCommandBubble } from "./UserCommandBubble";
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function ChatLog({ messages, onAccept, onReject, onCancel, onRetry, onSaveDream }: Props) {
+  const { t } = useTranslation('dreamWeaver')
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     ref.current?.scrollTo({ top: ref.current.scrollHeight, behavior: "smooth" });
@@ -30,10 +32,14 @@ export function ChatLog({ messages, onAccept, onReject, onCancel, onRetry, onSav
     <div className={styles.log} ref={ref}>
       {messages.length === 0 && (
         <div className={styles.emptyState}>
-          <div className={styles.emptyKicker}>Where to start</div>
-          <h3>Describe your concept.</h3>
+          <div className={styles.emptyKicker}>{t('chat.empty.kicker')}</div>
+          <h3>{t('chat.empty.title')}</h3>
           <p>
-            Type <code>/dream</code> followed by a few sentences about your character — their personality, look, or role. Once your source is set, run individual tools like <code>/name</code> or <code>/personality</code>, or use Run Full Suite to fill everything at once.
+            <Trans
+              ns="dreamWeaver"
+              i18nKey="chat.empty.body"
+              components={{ code: <code /> }}
+            />
           </p>
         </div>
       )}
@@ -44,7 +50,7 @@ export function ChatLog({ messages, onAccept, onReject, onCancel, onRetry, onSav
             <DreamSummary
               key={m.id}
               messageId={m.id}
-              title={p.title || "Dream"}
+              title={p.title || undefined}
               dreamText={String(p.content || p.dream_text || "")}
               tone={p.tone}
               dislikes={p.dislikes}

@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import i18n from '@/i18n'
 import { ChevronRight, Copy, Check, Code } from 'lucide-react'
 import { CloseButton } from '@/components/shared/CloseButton'
 import { Button } from '@/components/shared/FormComponents'
@@ -8,6 +10,7 @@ import { generateApi, type DryRunMessage, type DryRunResponse } from '@/api/gene
 import type { BreakdownCacheEntry } from '@/types/store'
 import { groupBreakdownEntries, getBlockDisplayColor } from '@/lib/prompt-breakdown'
 import type { BreakdownGroup } from '@/lib/prompt-breakdown'
+import { translateBreakdownGroupLabel } from '@/lib/i18n/breakdownGroupLabel'
 import { getAnthropicBreakdownCacheHints, getAnthropicCacheUsageSummary } from '@/lib/anthropic-breakdown-cache'
 import { copyTextToClipboard } from '@/lib/clipboard'
 import { dryRunToRawPromptInput, formatRawPrompt, type RawPromptView } from '@/lib/formatRawPrompt'
@@ -27,7 +30,7 @@ const ROLE_CLASS: Record<string, string> = {
 
 function summarizeMessage(content: string): string {
   const normalized = content.replace(/\s+/g, ' ').trim()
-  if (!normalized) return '(empty message)'
+  if (!normalized) return i18n.t('shared.emptyMessage', { ns: 'modals' })
   return normalized
 }
 
@@ -37,6 +40,9 @@ function countLines(content: string): number {
 }
 
 export default function PromptItemizerModal() {
+  const { t } = useTranslation('modals', { keyPrefix: 'promptItemizer' })
+  const { t: ts } = useTranslation('modals', { keyPrefix: 'shared' })
+
   const modalProps = useStore((s) => s.modalProps)
   const closeModal = useStore((s) => s.closeModal)
   const breakdownCache = useStore((s) => s.breakdownCache)
@@ -58,7 +64,7 @@ export default function PromptItemizerModal() {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<BreakdownCacheEntry | null>(null)
   const [openGroups, setOpenGroups] = useState<Set<string>>(
-    new Set(['Lumiverse Prompts', 'Chat History', 'Long-Term Memory']),
+    new Set(['lumiverse', 'chatHistory', 'longTermMemory']),
   )
   const [selectedEntryKey, setSelectedEntryKey] = useState<string | null>(null)
   const [rawView, setRawView] = useState<'off' | RawPromptView>('off')
@@ -109,7 +115,7 @@ export default function PromptItemizerModal() {
   const ensureRawData = useCallback(async (): Promise<DryRunResponse | null> => {
     if (rawData) return rawData
     if (!chatId || !messageId) {
-      setRawError('Missing chat context — open this modal from an active chat.')
+      setRawError(t('missingChat'))
       return null
     }
     setRawLoading(true)
@@ -127,7 +133,7 @@ export default function PromptItemizerModal() {
       setRawData(res)
       return res
     } catch (err: any) {
-      setRawError(err?.message || 'Failed to reassemble prompt.')
+      setRawError(err?.message || t('rawFailed'))
       return null
     } finally {
       setRawLoading(false)
@@ -158,18 +164,19 @@ export default function PromptItemizerModal() {
     return formatRawPrompt(dryRunToRawPromptInput(rawData), rawView)
   }, [rawView, rawData])
 
-  const rawButtonLabel = rawView === 'off' ? 'Raw' : rawView === 'text' ? 'JSON' : 'Visual'
+  const rawButtonLabel = rawView === 'off' ? ts('raw') : rawView === 'text' ? ts('json') : ts('visual')
 
   const groups = useMemo(() => (data ? groupBreakdownEntries(data.entries) : []), [data])
-  const sidecarGroup = groups.find((g) => g.label === 'Sidecar (Lumi Pipeline)')
-  const mainGroups = groups.filter((g) => g.label !== 'Sidecar (Lumi Pipeline)')
+  const groupLabel = useCallback((id: string, fallback: string) => translateBreakdownGroupLabel(id, t), [t])
+  const sidecarGroup = groups.find((g) => g.id === 'sidecar')
+  const mainGroups = groups.filter((g) => g.id !== 'sidecar')
   const flatEntries = useMemo(
     () => groups.flatMap((group) => group.entries.map((entry, index) => ({
-      key: getEntryKey(group.label, index),
-      groupLabel: group.label,
+      key: getEntryKey(group.id, index),
+      groupLabel: groupLabel(group.id, group.label),
       entry,
     }))),
-    [groups],
+    [groups, groupLabel],
   )
 
   useEffect(() => {
@@ -251,7 +258,7 @@ export default function PromptItemizerModal() {
       className={styles.modal}
     >
           <div className={styles.header}>
-            <h2 className={styles.title}>Prompt Breakdown</h2>
+            <h2 className={styles.title}>{t('title')}</h2>
             {data && (
               <>
                 <span className={styles.headerBadge}>{data.provider} / {data.model}</span>
@@ -264,32 +271,33 @@ export default function PromptItemizerModal() {
           </div>
 
           <div className={styles.body}>
-            {loading && <div className={styles.loading}>Loading breakdown...</div>}
-            {!loading && !data && <div className={styles.empty}>No breakdown data available for this message.</div>}
+            {loading && <div className={styles.loading}>{t('loading')}</div>}
+            {!loading && !data && <div className={styles.empty}>{t('empty')}</div>}
             {!loading && data && rawView === 'off' && (
               <>
-                <StackedBar groups={mainGroups} total={data.totalTokens} />
+                <StackedBar groups={mainGroups} total={data.totalTokens} groupLabel={groupLabel} />
                 {anthropicCacheUsage && (
                   <div className={styles.cacheSummary}>
-                    <span>Anthropic cache</span>
-                    <span className={styles.cacheSummaryMetric}>read {anthropicCacheUsage.cacheReadInputTokens.toLocaleString()}</span>
-                    <span className={styles.cacheSummaryMetric}>write {anthropicCacheUsage.cacheCreationInputTokens.toLocaleString()}</span>
+                    <span>{t('anthropicCache')}</span>
+                    <span className={styles.cacheSummaryMetric}>{t('cacheRead', { count: anthropicCacheUsage.cacheReadInputTokens.toLocaleString() })}</span>
+                    <span className={styles.cacheSummaryMetric}>{t('cacheWrite', { count: anthropicCacheUsage.cacheCreationInputTokens.toLocaleString() })}</span>
                     {anthropicCacheUsage.cacheCreation5mInputTokens > 0 && (
-                      <span className={styles.cacheSummaryMetric}>5m {anthropicCacheUsage.cacheCreation5mInputTokens.toLocaleString()}</span>
+                      <span className={styles.cacheSummaryMetric}>{t('cache5m', { count: anthropicCacheUsage.cacheCreation5mInputTokens.toLocaleString() })}</span>
                     )}
                     {anthropicCacheUsage.cacheCreation1hInputTokens > 0 && (
-                      <span className={styles.cacheSummaryMetric}>1h {anthropicCacheUsage.cacheCreation1hInputTokens.toLocaleString()}</span>
+                      <span className={styles.cacheSummaryMetric}>{t('cache1h', { count: anthropicCacheUsage.cacheCreation1hInputTokens.toLocaleString() })}</span>
                     )}
                   </div>
                 )}
-                <Legend groups={mainGroups} />
+                <Legend groups={mainGroups} groupLabel={groupLabel} />
                 {mainGroups.map((group) => (
                   <GroupAccordion
-                    key={group.label}
+                    key={group.id}
                     group={group}
+                    displayLabel={groupLabel(group.id, group.label)}
                     total={data.totalTokens}
-                    open={openGroups.has(group.label)}
-                    onToggle={() => toggleGroup(group.label)}
+                    open={openGroups.has(group.id)}
+                    onToggle={() => toggleGroup(group.id)}
                     selectedEntryKey={selectedEntryKey}
                     onSelectEntry={setSelectedEntryKey}
                     cacheHintsByKey={cacheHintsByKey}
@@ -298,13 +306,14 @@ export default function PromptItemizerModal() {
                 {sidecarGroup && sidecarGroup.tokens > 0 && (
                   <>
                     <div className={styles.sidecarDivider}>
-                      <span>Sidecar (separate LLM calls)</span>
+                      <span>{t('sidecarDivider')}</span>
                     </div>
                     <GroupAccordion
                       group={sidecarGroup}
+                      displayLabel={groupLabel(sidecarGroup.id, sidecarGroup.label)}
                       total={sidecarGroup.tokens}
-                      open={openGroups.has(sidecarGroup.label)}
-                      onToggle={() => toggleGroup(sidecarGroup.label)}
+                      open={openGroups.has(sidecarGroup.id)}
+                      onToggle={() => toggleGroup(sidecarGroup.id)}
                       selectedEntryKey={selectedEntryKey}
                       onSelectEntry={setSelectedEntryKey}
                       cacheHintsByKey={cacheHintsByKey}
@@ -318,7 +327,7 @@ export default function PromptItemizerModal() {
                         <span className={styles.entryInspectorEyebrow}>{selectedEntry.groupLabel}</span>
                         <div className={styles.entryInspectorTitleRow}>
                           <span className={styles.entryInspectorTitle}>{selectedEntry.entry.name}</span>
-                          <span className={styles.headerBadge}>{selectedEntry.entry.tokens.toLocaleString()} tokens</span>
+                          <span className={styles.headerBadge}>{ts('tokens', { count: selectedEntry.entry.tokens })}</span>
                           <span className={styles.headerBadge}>{selectedEntry.entry.type}</span>
                           {selectedCacheHint && (
                             <span
@@ -329,7 +338,7 @@ export default function PromptItemizerModal() {
                                   : styles.cacheHintMiss,
                               )}
                             >
-                              {selectedCacheHint.kind === 'cached' ? 'cached' : 'uncached'}
+                              {selectedCacheHint.kind === 'cached' ? ts('cached') : ts('uncached')}
                             </span>
                           )}
                           {selectedEntry.entry.role && (
@@ -344,8 +353,7 @@ export default function PromptItemizerModal() {
                       <div className={styles.messageInspectorList}>
                         {selectedChatHistoryUsesReassembledMessages && (
                           <div className={styles.messageInspectorNotice}>
-                            Message boundaries are reconstructed from the current chat state because
-                            this older breakdown snapshot did not store the original outbound messages.
+                            {t('messageBoundaryNotice')}
                           </div>
                         )}
                         {selectedChatHistoryMessages.map((message, index) => (
@@ -357,12 +365,12 @@ export default function PromptItemizerModal() {
                         ))}
                       </div>
                     ) : selectedEntry.entry.type === 'chat_history' && rawLoading ? (
-                      <div className={styles.entryInspectorEmpty}>Loading assembled messages...</div>
+                      <div className={styles.entryInspectorEmpty}>{t('loadingMessages')}</div>
                     ) : selectedEntry.entry.content != null ? (
                       <pre className={styles.entryInspectorContent}>{selectedEntry.entry.content}</pre>
                     ) : (
                       <div className={styles.entryInspectorEmpty}>
-                        This stored breakdown only has token counts for this block. Newly generated messages now preserve the block text for inspection here.
+                        {t('tokenCountsOnly')}
                       </div>
                     )}
                   </div>
@@ -372,11 +380,9 @@ export default function PromptItemizerModal() {
             {!loading && data && rawView !== 'off' && (
               <>
                 <div className={styles.rawCaveat}>
-                  Re-assembled from current state. May differ from the original send — chat
-                  variables, world-info state, preset, persona, and character edits can drift
-                  between then and now.
+                  {t('rawCaveat')}
                 </div>
-                {rawLoading && <div className={styles.loading}>Reassembling prompt…</div>}
+                {rawLoading && <div className={styles.loading}>{t('reassembling')}</div>}
                 {!rawLoading && rawError && <div className={styles.empty}>{rawError}</div>}
                 {!rawLoading && !rawError && rawData && (
                   <pre className={styles.rawView}>{rawText}</pre>
@@ -387,7 +393,7 @@ export default function PromptItemizerModal() {
 
           {data && (
             <div className={styles.footer}>
-              <span className={styles.footerTotal}>{data.totalTokens.toLocaleString()} tokens</span>
+              <span className={styles.footerTotal}>{ts('tokens', { count: data.totalTokens })}</span>
               {data.maxContext > 0 && (
                 <span className={styles.footerMax}>
                   / {data.maxContext.toLocaleString()} ({((data.totalTokens / data.maxContext) * 100).toFixed(1)}%)
@@ -395,7 +401,7 @@ export default function PromptItemizerModal() {
               )}
               {sidecarGroup && sidecarGroup.tokens > 0 && (
                 <span className={styles.footerMax} style={{ marginLeft: 6, color: '#e05daa' }}>
-                  + {sidecarGroup.tokens.toLocaleString()} sidecar
+                  {t('footerSidecar', { count: sidecarGroup.tokens })}
                 </span>
               )}
               <div className={styles.footerSpacer} />
@@ -415,7 +421,7 @@ export default function PromptItemizerModal() {
                 onClick={handleCopy}
                 loading={rawLoading && !copied}
               >
-                {copied ? 'Copied' : 'Copy'}
+                {copied ? ts('copied') : ts('copy')}
               </Button>
             </div>
           )}
@@ -424,6 +430,7 @@ export default function PromptItemizerModal() {
 }
 
 function ChatHistoryMessageCard({ message, index }: { message: DryRunMessage; index: number }) {
+  const { t: ts } = useTranslation('modals', { keyPrefix: 'shared' })
   const lineCount = countLines(message.content)
 
   return (
@@ -432,17 +439,25 @@ function ChatHistoryMessageCard({ message, index }: { message: DryRunMessage; in
         <span className={clsx(styles.tokenRole, ROLE_CLASS[message.role])}>{message.role}</span>
         <span className={styles.messageCardIndex}>#{index + 1}</span>
         <span className={styles.messageCardMeta}>
-          {message.content.length.toLocaleString()} chars
-          {lineCount > 0 && ` • ${lineCount.toLocaleString()} lines`}
+          {ts('chars', { count: message.content.length })}
+          {lineCount > 0 && ` • ${ts('lines', { count: lineCount })}`}
         </span>
       </div>
       <div className={styles.messageCardPreview}>{summarizeMessage(message.content)}</div>
-      <pre className={styles.messageCardContent}>{message.content || '(empty message)'}</pre>
+      <pre className={styles.messageCardContent}>{message.content || ts('emptyMessage')}</pre>
     </div>
   )
 }
 
-function StackedBar({ groups, total }: { groups: BreakdownGroup[]; total: number }) {
+function StackedBar({
+  groups,
+  total,
+  groupLabel,
+}: {
+  groups: BreakdownGroup[]
+  total: number
+  groupLabel: (id: string, fallback: string) => string
+}) {
   if (total === 0) return null
   return (
     <div className={styles.stackedBar}>
@@ -451,10 +466,15 @@ function StackedBar({ groups, total }: { groups: BreakdownGroup[]; total: number
         if (pct < 0.5) return null
         return (
           <div
-            key={g.label}
+            key={g.id}
             className={styles.stackedBarSegment}
             style={{ width: `${pct}%`, background: g.color }}
-            title={`${g.label}: ${g.tokens.toLocaleString()} tokens (${pct.toFixed(1)}%)`}
+            title={i18n.t('promptItemizer.segmentTitle', {
+              ns: 'modals',
+              label: groupLabel(g.id, g.label),
+              tokens: g.tokens.toLocaleString(),
+              percent: pct.toFixed(1),
+            })}
           />
         )
       })}
@@ -462,13 +482,19 @@ function StackedBar({ groups, total }: { groups: BreakdownGroup[]; total: number
   )
 }
 
-function Legend({ groups }: { groups: BreakdownGroup[] }) {
+function Legend({
+  groups,
+  groupLabel,
+}: {
+  groups: BreakdownGroup[]
+  groupLabel: (id: string, fallback: string) => string
+}) {
   return (
     <div className={styles.legend}>
       {groups.map((g) => (
-        <div key={g.label} className={styles.legendItem}>
+        <div key={g.id} className={styles.legendItem}>
           <div className={styles.legendDot} style={{ background: g.color }} />
-          <span>{g.label}</span>
+          <span>{groupLabel(g.id, g.label)}</span>
           <span className={styles.legendTokens}>{g.tokens.toLocaleString()}</span>
         </div>
       ))}
@@ -476,8 +502,9 @@ function Legend({ groups }: { groups: BreakdownGroup[] }) {
   )
 }
 
-function GroupAccordion({ group, total, open, onToggle, selectedEntryKey, onSelectEntry, cacheHintsByKey }: {
+function GroupAccordion({ group, displayLabel, total, open, onToggle, selectedEntryKey, onSelectEntry, cacheHintsByKey }: {
   group: BreakdownGroup
+  displayLabel: string
   total: number
   open: boolean
   onToggle: () => void
@@ -489,8 +516,8 @@ function GroupAccordion({ group, total, open, onToggle, selectedEntryKey, onSele
     <div className={styles.accordion}>
       <button type="button" className={styles.accordionHeader} onClick={onToggle}>
         <div className={styles.accordionDot} style={{ background: group.color }} />
-        <span>{group.label}</span>
-        <span className={styles.accordionTokens}>{group.tokens.toLocaleString()} tokens</span>
+        <span>{displayLabel}</span>
+        <span className={styles.accordionTokens}>{i18n.t('shared.tokens', { ns: 'modals', count: group.tokens })}</span>
         <ChevronRight
           size={13}
           className={clsx(styles.accordionChevron, open && styles.accordionChevronOpen)}
@@ -501,7 +528,7 @@ function GroupAccordion({ group, total, open, onToggle, selectedEntryKey, onSele
           <div className={styles.entryList}>
             {group.entries.map((entry, i) => {
               const pct = total > 0 ? ((entry.tokens / total) * 100).toFixed(1) : '0.0'
-              const entryKey = getEntryKey(group.label, i)
+              const entryKey = getEntryKey(group.id, i)
               const cacheHint = cacheHintsByKey.get(entryKey)
 
               return (
@@ -533,7 +560,9 @@ function GroupAccordion({ group, total, open, onToggle, selectedEntryKey, onSele
                         )}
                         title={cacheHint.label}
                       >
-                        {cacheHint.kind === 'cached' ? 'cached' : 'uncached'}
+                        {cacheHint.kind === 'cached'
+                          ? i18n.t('shared.cached', { ns: 'modals' })
+                          : i18n.t('shared.uncached', { ns: 'modals' })}
                       </span>
                     )}
                   </div>

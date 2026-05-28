@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { ComfyUIFieldMapping, ComfyUIMappedFieldSemantic } from '../../../../api/dream-weaver'
 import styles from './MappedFieldsForm.module.css'
 
@@ -77,7 +78,22 @@ function NumericInput({ value, onChange, step, className }: NumericInputProps) {
   )
 }
 
+const SEMANTIC_LABEL_KEYS: Record<ComfyUIMappedFieldSemantic, string> = {
+  positive_prompt: 'comfyui.mappedFields.positivePrompt',
+  negative_prompt: 'comfyui.mappedFields.negativePrompt',
+  seed: 'comfyui.mappedFields.seed',
+  steps: 'comfyui.mappedFields.steps',
+  cfg: 'comfyui.mappedFields.cfg',
+  sampler_name: 'comfyui.mappedFields.sampler',
+  scheduler: 'comfyui.mappedFields.scheduler',
+  width: 'comfyui.mappedFields.width',
+  height: 'comfyui.mappedFields.height',
+  checkpoint: 'comfyui.nodeMenu.semantics.checkpoint',
+  custom: 'comfyui.nodeMenu.semantics.custom',
+}
+
 export function MappedFieldsForm(props: MappedFieldsFormProps) {
+  const { t } = useTranslation('dreamWeaver')
   const [collapsed, setCollapsed] = useState(false)
 
   const uniqueSemantics = new Set<ComfyUIMappedFieldSemantic>()
@@ -95,7 +111,7 @@ export function MappedFieldsForm(props: MappedFieldsFormProps) {
           className={styles.toggleButton}
           onClick={() => setCollapsed(false)}
         >
-          Show Mapped Fields ({props.mappings.length})
+          {t('comfyui.mappedFields.show', { count: props.mappings.length })}
         </button>
         <button
           type="button"
@@ -103,7 +119,7 @@ export function MappedFieldsForm(props: MappedFieldsFormProps) {
           onClick={props.onGenerate}
           disabled={props.generating}
         >
-          {props.generating ? 'Generating...' : 'Generate'}
+          {props.generating ? t('comfyui.mappedFields.generating') : t('comfyui.mappedFields.generate')}
         </button>
       </div>
     )
@@ -117,14 +133,14 @@ export function MappedFieldsForm(props: MappedFieldsFormProps) {
           className={styles.toggleButton}
           onClick={() => setCollapsed(true)}
         >
-          Hide Mapped Fields
+          {t('comfyui.mappedFields.hide')}
         </button>
-        <span className={styles.fieldCount}>{props.mappings.length} fields mapped</span>
+        <span className={styles.fieldCount}>{t('comfyui.mappedFields.fieldCount', { count: props.mappings.length })}</span>
       </div>
       <div className={styles.fieldGrid}>
         {uniqueSemantics.has('positive_prompt') && (
           <div className={`${styles.fieldBlock} ${styles.fieldBlockWide}`}>
-            <label className={styles.label}>Positive Prompt</label>
+            <label className={styles.label}>{t(SEMANTIC_LABEL_KEYS.positive_prompt)}</label>
             <textarea
               className={styles.textarea}
               rows={2}
@@ -135,7 +151,7 @@ export function MappedFieldsForm(props: MappedFieldsFormProps) {
         )}
         {uniqueSemantics.has('negative_prompt') && (
           <div className={`${styles.fieldBlock} ${styles.fieldBlockWide}`}>
-            <label className={styles.label}>Negative Prompt</label>
+            <label className={styles.label}>{t(SEMANTIC_LABEL_KEYS.negative_prompt)}</label>
             <textarea
               className={styles.textarea}
               rows={2}
@@ -146,7 +162,7 @@ export function MappedFieldsForm(props: MappedFieldsFormProps) {
         )}
         {uniqueSemantics.has('seed') && (
           <div className={styles.fieldBlock}>
-            <label className={styles.label}>Seed</label>
+            <label className={styles.label}>{t(SEMANTIC_LABEL_KEYS.seed)}</label>
             <NumericInput
               className={styles.input}
               value={props.values.seed}
@@ -156,7 +172,7 @@ export function MappedFieldsForm(props: MappedFieldsFormProps) {
         )}
         {uniqueSemantics.has('steps') && (
           <div className={styles.fieldBlock}>
-            <label className={styles.label}>Steps</label>
+            <label className={styles.label}>{t(SEMANTIC_LABEL_KEYS.steps)}</label>
             <NumericInput
               className={styles.input}
               value={props.values.steps}
@@ -166,7 +182,7 @@ export function MappedFieldsForm(props: MappedFieldsFormProps) {
         )}
         {uniqueSemantics.has('cfg') && (
           <div className={styles.fieldBlock}>
-            <label className={styles.label}>CFG</label>
+            <label className={styles.label}>{t(SEMANTIC_LABEL_KEYS.cfg)}</label>
             <NumericInput
               className={styles.input}
               value={props.values.cfg}
@@ -177,7 +193,7 @@ export function MappedFieldsForm(props: MappedFieldsFormProps) {
         )}
         {uniqueSemantics.has('width') && (
           <div className={styles.fieldBlock}>
-            <label className={styles.label}>Width</label>
+            <label className={styles.label}>{t(SEMANTIC_LABEL_KEYS.width)}</label>
             <NumericInput
               className={styles.input}
               value={props.values.width}
@@ -187,7 +203,7 @@ export function MappedFieldsForm(props: MappedFieldsFormProps) {
         )}
         {uniqueSemantics.has('height') && (
           <div className={styles.fieldBlock}>
-            <label className={styles.label}>Height</label>
+            <label className={styles.label}>{t(SEMANTIC_LABEL_KEYS.height)}</label>
             <NumericInput
               className={styles.input}
               value={props.values.height}
@@ -197,7 +213,7 @@ export function MappedFieldsForm(props: MappedFieldsFormProps) {
         )}
         {uniqueSemantics.has('sampler_name') && (
           <div className={styles.fieldBlock}>
-            <label className={styles.label}>Sampler</label>
+            <label className={styles.label}>{t(SEMANTIC_LABEL_KEYS.sampler_name)}</label>
             <input
               className={styles.input}
               value={props.values.sampler_name ?? ''}
@@ -207,7 +223,7 @@ export function MappedFieldsForm(props: MappedFieldsFormProps) {
         )}
         {uniqueSemantics.has('scheduler') && (
           <div className={styles.fieldBlock}>
-            <label className={styles.label}>Scheduler</label>
+            <label className={styles.label}>{t(SEMANTIC_LABEL_KEYS.scheduler)}</label>
             <input
               className={styles.input}
               value={props.values.scheduler ?? ''}
@@ -222,7 +238,7 @@ export function MappedFieldsForm(props: MappedFieldsFormProps) {
             onClick={props.onGenerate}
             disabled={props.generating}
           >
-            {props.generating ? 'Generating...' : 'Generate'}
+            {props.generating ? t('comfyui.mappedFields.generating') : t('comfyui.mappedFields.generate')}
           </button>
         </div>
       </div>

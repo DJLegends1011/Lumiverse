@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { DreamWeaverDraft } from '@/api/dream-weaver'
 import { getVisualAssetHintItems } from '../lib/visual-studio-model'
 import type { VisualStudioModel } from '../hooks/useVisualStudio'
@@ -15,10 +16,12 @@ interface VisualsTabProps {
 }
 
 export function VisualsTab({ draft, worldStale, visuals }: VisualsTabProps) {
+  const { t } = useTranslation('dreamWeaver')
+
   if (!draft) {
     return (
       <div className={styles.emptyState}>
-        <p>Generate a Soul draft first.</p>
+        <p>{t('visuals.emptyDraft')}</p>
       </div>
     )
   }

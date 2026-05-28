@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Upload, Image as ImageIcon, Ghost, Trash2, Users } from 'lucide-react'
 import { expressionsApi } from '@/api/expressions'
 import { characterGalleryApi } from '@/api/character-gallery'
@@ -32,12 +33,14 @@ interface Props {
   characterId: string
 }
 
-function toExpressionLabel(fileName: string) {
+function toExpressionLabel(fileName: string, fallback: string) {
   const baseName = fileName.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9_\- ]/g, '').trim()
-  return baseName || 'expression'
+  return baseName || fallback
 }
 
 export default function ExpressionEditorTab({ characterId }: Props) {
+  const { t } = useTranslation('panels')
+  const defaultExpressionLabel = t('characterEditor.expressionEditor.defaultExpressionLabel')
   const [config, setConfig] = useState<ExpressionConfig | null>(null)
   const [groups, setGroups] = useState<ExpressionGroups | null>(null)
   const [activeGroup, setActiveGroup] = useState<string | null>(null)
@@ -200,7 +203,7 @@ export default function ExpressionEditorTab({ characterId }: Props) {
         for (const file of files) {
           try {
             const image = await imagesApi.upload(file)
-            const label = toExpressionLabel(file.name)
+            const label = toExpressionLabel(file.name, defaultExpressionLabel)
             updated = {
               ...updated,
               enabled: true,
@@ -222,7 +225,7 @@ export default function ExpressionEditorTab({ characterId }: Props) {
         setUploading(false)
       }
     },
-    [characterId, config, saveConfig]
+    [characterId, config, saveConfig, defaultExpressionLabel]
   )
 
   const openGalleryPicker = useCallback(() => {
@@ -313,7 +316,7 @@ export default function ExpressionEditorTab({ characterId }: Props) {
         for (const file of files) {
           try {
             const image = await imagesApi.upload(file)
-            const label = toExpressionLabel(file.name)
+            const label = toExpressionLabel(file.name, defaultExpressionLabel)
             updated = {
               ...updated,
               [activeGroup]: {
@@ -334,7 +337,7 @@ export default function ExpressionEditorTab({ characterId }: Props) {
       } catch { /* silent */ }
       finally { setUploading(false) }
     },
-    [characterId, activeGroup, groups]
+    [characterId, activeGroup, groups, defaultExpressionLabel]
   )
 
   const handleGroupGalleryPick = useCallback(() => {
@@ -355,6 +358,137 @@ export default function ExpressionEditorTab({ characterId }: Props) {
     if (groups['_default']) named.push('_default')
     return named
   }, [groups])
+
+  const multiDetectionModes = useMemo(
+    () =>
+      [
+        { mode: 'auto' as const, name: t('characterEditor.expressionEditor.modes.auto.name'), desc: t('characterEditor.expressionEditor.modes.auto.descMulti') },
+        { mode: 'off' as const, name: t('characterEditor.expressionEditor.modes.off.name'), desc: t('characterEditor.expressionEditor.modes.off.descMulti') },
+      ] as const,
+    [t],
+  )
+
+  const singleDetectionModes = useMemo(
+    () =>
+      [
+        { mode: 'auto' as const, name: t('characterEditor.expressionEditor.modes.auto.name'), desc: t('characterEditor.expressionEditor.modes.auto.descSingle') },
+        { mode: 'council' as const, name: t('characterEditor.expressionEditor.modes.council.name'), desc: t('characterEditor.expressionEditor.modes.council.desc') },
+        { mode: 'off' as const, name: t('characterEditor.expressionEditor.modes.off.descManual'), desc: t('characterEditor.expressionEditor.modes.off.descSingle') },
+      ] as const,
+    [t],
+  )
+
+  const renderAutoDetectionFields = (showContextWindow: boolean) => (
+    <>
+      {showContextWindow && (
+        <div className={styles.contextRow}>
+          <label htmlFor="expr-context-window">{t('characterEditor.expressionEditor.messagesToAnalyze')}</label>
+          <NumericInput
+            id="expr-context-window"
+            className={styles.contextInput}
+            value={detection.contextWindow}
+            min={1}
+            max={20}
+            integer
+            onChange={(value) => {
+              const val = Math.max(1, Math.min(20, value ?? 5))
+              saveDetection({ ...detection, contextWindow: val })
+            }}
+          />
+        </div>
+      )}
+      <div className={styles.detectionField}>
+        <label className={styles.detectionFieldLabel}>{t('characterEditor.expressionEditor.connectionProfile')}</label>
+        <SearchableSelect
+          value={detection.connectionProfileId || ''}
+          onChange={(val) => saveDetection({ ...detection, connectionProfileId: val, model: '' })}
+          options={profileOptions}
+          placeholder={t('characterEditor.expressionEditor.useSidecarDefault')}
+          searchPlaceholder={t('characterEditor.expressionEditor.searchConnections')}
+          emptyMessage={t('characterEditor.expressionEditor.noConnectionProfiles')}
+          clearable
+          clearLabel={t('characterEditor.expressionEditor.useSidecarDefault')}
+        />
+      </div>
+      <div className={styles.detectionField}>
+        <label className={styles.detectionFieldLabel}>{t('characterEditor.expressionEditor.model')}</label>
+        <ModelCombobox
+          value={detection.model || ''}
+          onChange={(val) => saveDetection({ ...detection, model: val })}
+          placeholder={
+            detection.connectionProfileId
+              ? t('characterEditor.expressionEditor.modelPlaceholderWithConnection')
+              : t('characterEditor.expressionEditor.selectConnectionFirst')
+          }
+          models={exprModels}
+          modelLabels={exprModelLabels}
+          loading={exprModelsLoading}
+          onRefresh={fetchExprModels}
+          autoRefreshOnFocus
+          refreshKey={detection.connectionProfileId}
+          disabled={!detection.connectionProfileId}
+          emptyMessage={
+            detection.connectionProfileId
+              ? t('characterEditor.expressionEditor.noModelsReturned')
+              : t('characterEditor.expressionEditor.selectConnectionProfileFirst')
+          }
+        />
+        {!detection.connectionProfileId && (
+          <span className={styles.detectionFieldHint}>{t('characterEditor.expressionEditor.sidecarFallbackHint')}</span>
+        )}
+      </div>
+    </>
+  )
+
+  const renderGalleryPicker = (onConfirm: () => void) => (
+    <div>
+      <span className={editorStyles.fieldLabel}>{t('characterEditor.expressionEditor.selectFromGallery')}</span>
+      {galleryItems.length === 0 ? (
+        <div className={styles.emptyHint} style={{ padding: '20px 0' }}>
+          {t('characterEditor.expressionEditor.noGalleryImages')}
+        </div>
+      ) : (
+        <>
+          <div className={styles.galleryModal}>
+            {galleryItems.map((item) => (
+              <div
+                key={item.id}
+                className={`${styles.galleryPickItem}${pickerImageId === item.image_id ? ` ${styles.selected}` : ''}`}
+                onClick={() => {
+                  setPickerImageId(item.image_id)
+                  if (!pickerLabel) setPickerLabel(item.caption || defaultExpressionLabel)
+                }}
+              >
+                <img src={characterGalleryApi.smallUrl(item.image_id)} alt={item.caption || ''} className={styles.galleryPickImage} />
+              </div>
+            ))}
+          </div>
+          {pickerImageId && (
+            <div className={styles.labelPrompt}>
+              <span className={editorStyles.fieldHelper}>{t('characterEditor.expressionEditor.expressionLabelPrompt')}</span>
+              <input
+                type="text"
+                className={styles.labelPromptInput}
+                value={pickerLabel}
+                onChange={(e) => setPickerLabel(e.target.value)}
+                placeholder={t('characterEditor.expressionEditor.expressionLabelPlaceholder')}
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter') onConfirm() }}
+              />
+              <div className={styles.labelPromptActions}>
+                <button type="button" className={styles.labelPromptBtn} onClick={() => { setShowGalleryPicker(false); setPickerImageId(null); setPickerLabel('') }}>
+                  {t('characterEditor.expressionEditor.cancel')}
+                </button>
+                <button type="button" className={styles.labelPromptBtnPrimary} onClick={onConfirm} disabled={!pickerLabel.trim()}>
+                  {t('characterEditor.expressionEditor.addExpression')}
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
 
   const activeGroupSlots: ExpressionSlot[] = useMemo(() => {
     if (!groups || !activeGroup || !groups[activeGroup]) return []
@@ -418,24 +552,20 @@ export default function ExpressionEditorTab({ characterId }: Props) {
     return (
       <div>
         <div className={styles.header}>
-          <span className={editorStyles.fieldLabel}>Expression Sprites — Multi-Character</span>
+          <span className={editorStyles.fieldLabel}>{t('characterEditor.expressionEditor.titleMulti')}</span>
           <span className={editorStyles.fieldHelper}>
-            This card contains expressions for {groupNames.filter((n) => n !== '_default').length} characters
-            ({totalExpressions} total). The active character is detected automatically from conversation context.
+            {t('characterEditor.expressionEditor.titleMultiHelper', {
+              count: groupNames.filter((n) => n !== '_default').length,
+              total: totalExpressions,
+            })}
           </span>
         </div>
 
-        {/* Detection settings — shared with single-character mode */}
         <div className={styles.detectionSection}>
-          <div className={styles.detectionHeader}>Expression Detection</div>
-          <div className={styles.detectionHint}>
-            After each message, the system identifies which character is speaking and selects their expression.
-          </div>
+          <div className={styles.detectionHeader}>{t('characterEditor.expressionEditor.detectionHeader')}</div>
+          <div className={styles.detectionHint}>{t('characterEditor.expressionEditor.detectionHintMulti')}</div>
           <div className={styles.detectionModes}>
-            {([
-              ['auto', 'Automatic', 'A sidecar LLM call identifies the active character and their expression after each generation.'],
-              ['off', 'Off', 'No automatic detection. Expressions only change via <img=""> tags in the response.'],
-            ] as const).map(([mode, name, desc]) => (
+            {multiDetectionModes.map(({ mode, name, desc }) => (
               <label key={mode} className={styles.modeOption}>
                 <input
                   type="radio"
@@ -450,42 +580,7 @@ export default function ExpressionEditorTab({ characterId }: Props) {
               </label>
             ))}
           </div>
-          {detection.mode === 'auto' && (
-            <>
-              <div className={styles.detectionField}>
-                <label className={styles.detectionFieldLabel}>Connection Profile</label>
-                <SearchableSelect
-                  value={detection.connectionProfileId || ''}
-                  onChange={(val) => saveDetection({ ...detection, connectionProfileId: val, model: '' })}
-                  options={profileOptions}
-                  placeholder="Use sidecar default"
-                  searchPlaceholder="Search connections…"
-                  emptyMessage="No connection profiles configured"
-                  clearable
-                  clearLabel="Use sidecar default"
-                />
-              </div>
-              <div className={styles.detectionField}>
-                <label className={styles.detectionFieldLabel}>Model</label>
-                <ModelCombobox
-                  value={detection.model || ''}
-                  onChange={(val) => saveDetection({ ...detection, model: val })}
-                  placeholder={detection.connectionProfileId ? 'e.g. claude-3-haiku-20240307' : 'Select a connection first'}
-                  models={exprModels}
-                  modelLabels={exprModelLabels}
-                  loading={exprModelsLoading}
-                  onRefresh={fetchExprModels}
-                  autoRefreshOnFocus
-                  refreshKey={detection.connectionProfileId}
-                  disabled={!detection.connectionProfileId}
-                  emptyMessage={detection.connectionProfileId ? 'No models returned. Enter one manually.' : 'Select a connection profile first.'}
-                />
-                {!detection.connectionProfileId && (
-                  <span className={styles.detectionFieldHint}>Falls back to the sidecar LLM configured in the Council panel.</span>
-                )}
-              </div>
-            </>
-          )}
+          {detection.mode === 'auto' && renderAutoDetectionFields(false)}
         </div>
 
         {/* Character group tabs + add button */}
@@ -497,7 +592,7 @@ export default function ExpressionEditorTab({ characterId }: Props) {
               className={activeGroup === name ? styles.groupTabActive : styles.groupTab}
               onClick={() => setActiveGroup(name)}
             >
-              {name === '_default' ? 'Default' : name}
+              {name === '_default' ? t('characterEditor.expressionEditor.defaultGroup') : name}
               <span className={styles.groupTabCount}>{Object.keys(groups[name]).length}</span>
             </button>
           ))}
@@ -505,31 +600,30 @@ export default function ExpressionEditorTab({ characterId }: Props) {
             type="button"
             className={styles.groupTab}
             onClick={() => setShowAddGroup(true)}
-            title="Add character"
+            title={t('characterEditor.expressionEditor.addCharacterTitle')}
           >
             <Plus size={14} />
           </button>
         </div>
 
-        {/* Add character group form */}
         {showAddGroup && (
           <div className={styles.labelPrompt}>
-            <span className={editorStyles.fieldHelper}>Enter a character name for the new expression group:</span>
+            <span className={editorStyles.fieldHelper}>{t('characterEditor.expressionEditor.newGroupPrompt')}</span>
             <input
               type="text"
               className={styles.labelPromptInput}
               value={newGroupName}
               onChange={(e) => setNewGroupName(e.target.value)}
-              placeholder="e.g. Alice, Bob..."
+              placeholder={t('characterEditor.expressionEditor.newGroupPlaceholder')}
               autoFocus
               onKeyDown={(e) => { if (e.key === 'Enter') handleAddGroup() }}
             />
             <div className={styles.labelPromptActions}>
               <button type="button" className={styles.labelPromptBtn} onClick={() => { setShowAddGroup(false); setNewGroupName('') }}>
-                Cancel
+                {t('characterEditor.expressionEditor.cancel')}
               </button>
               <button type="button" className={styles.labelPromptBtnPrimary} onClick={handleAddGroup} disabled={!newGroupName.trim()}>
-                Add Character
+                {t('characterEditor.expressionEditor.addCharacterBtn')}
               </button>
             </div>
           </div>
@@ -539,42 +633,42 @@ export default function ExpressionEditorTab({ characterId }: Props) {
         {activeGroup && groups[activeGroup] && (
           <>
             <div className={styles.groupHeader}>
-              <span className={styles.count}>{activeGroupSlots.length} expressions</span>
+              <span className={styles.count}>
+                {t('characterEditor.expressionEditor.expressionsCount', { count: activeGroupSlots.length })}
+              </span>
               <div style={{ display: 'flex', gap: '6px' }}>
                 {groupNames.length === 1 && (
                   <button type="button" className={styles.groupDeleteBtn} onClick={handleConvertToFlat}>
-                    Switch to Single-Character
+                    {t('characterEditor.expressionEditor.switchToSingle')}
                   </button>
                 )}
                 <button type="button" className={styles.groupDeleteBtn} onClick={() => handleDeleteGroup(activeGroup)}>
-                  <Trash2 size={12} /> Remove group
+                  <Trash2 size={12} /> {t('characterEditor.expressionEditor.removeGroup')}
                 </button>
               </div>
             </div>
 
             <div className={styles.controls}>
               <button type="button" className={styles.controlBtn} onClick={() => groupZipRef.current?.click()}>
-                <Upload size={14} /> Import ZIP
+                <Upload size={14} /> {t('characterEditor.expressionEditor.importZip')}
               </button>
               <button type="button" className={styles.controlBtn} onClick={openGalleryPicker}>
-                <ImageIcon size={14} /> Add from Gallery
+                <ImageIcon size={14} /> {t('characterEditor.expressionEditor.addFromGallery')}
               </button>
               <button type="button" className={styles.controlBtn} onClick={() => groupUploadRef.current?.click()}>
-                <Plus size={14} /> Upload Images
+                <Plus size={14} /> {t('characterEditor.expressionEditor.uploadImages')}
               </button>
               <input ref={groupZipRef} type="file" accept=".zip" hidden onChange={handleGroupZipUpload} />
               <input ref={groupUploadRef} type="file" accept="image/*" multiple hidden onChange={handleGroupDirectUpload} />
             </div>
 
-            {uploading && <div className={styles.uploading}>Uploading...</div>}
+            {uploading && <div className={styles.uploading}>{t('characterEditor.expressionEditor.uploading')}</div>}
 
             {activeGroupSlots.length === 0 && !uploading && (
               <div className={styles.empty}>
                 <Ghost size={40} className={styles.emptyIcon} />
-                <div className={styles.emptyTitle}>No expressions yet</div>
-                <div className={styles.emptyHint}>
-                  Upload a ZIP of expression images, add from gallery, or upload one or many image files.
-                </div>
+                <div className={styles.emptyTitle}>{t('characterEditor.expressionEditor.emptyTitle')}</div>
+                <div className={styles.emptyHint}>{t('characterEditor.expressionEditor.emptyHintMulti')}</div>
               </div>
             )}
 
@@ -598,56 +692,7 @@ export default function ExpressionEditorTab({ characterId }: Props) {
           </>
         )}
 
-        {/* Gallery picker overlay (shared) */}
-        {showGalleryPicker && (
-          <div>
-            <span className={editorStyles.fieldLabel}>Select from Gallery</span>
-            {galleryItems.length === 0 ? (
-              <div className={styles.emptyHint} style={{ padding: '20px 0' }}>
-                No gallery images found. Upload images to the Gallery tab first.
-              </div>
-            ) : (
-              <>
-                <div className={styles.galleryModal}>
-                  {galleryItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className={`${styles.galleryPickItem}${pickerImageId === item.image_id ? ` ${styles.selected}` : ''}`}
-                      onClick={() => {
-                        setPickerImageId(item.image_id)
-                        if (!pickerLabel) setPickerLabel(item.caption || 'expression')
-                      }}
-                    >
-                      <img src={characterGalleryApi.smallUrl(item.image_id)} alt={item.caption || ''} className={styles.galleryPickImage} />
-                    </div>
-                  ))}
-                </div>
-                {pickerImageId && (
-                  <div className={styles.labelPrompt}>
-                    <span className={editorStyles.fieldHelper}>Enter an expression label for this image:</span>
-                    <input
-                      type="text"
-                      className={styles.labelPromptInput}
-                      value={pickerLabel}
-                      onChange={(e) => setPickerLabel(e.target.value)}
-                      placeholder="e.g. happy, sad, angry..."
-                      autoFocus
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleGroupGalleryPick() }}
-                    />
-                    <div className={styles.labelPromptActions}>
-                      <button type="button" className={styles.labelPromptBtn} onClick={() => { setShowGalleryPicker(false); setPickerImageId(null); setPickerLabel('') }}>
-                        Cancel
-                      </button>
-                      <button type="button" className={styles.labelPromptBtnPrimary} onClick={handleGroupGalleryPick} disabled={!pickerLabel.trim()}>
-                        Add Expression
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
+        {showGalleryPicker && renderGalleryPicker(handleGroupGalleryPick)}
 
         {lightboxSrc && (
           <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
@@ -667,32 +712,24 @@ export default function ExpressionEditorTab({ characterId }: Props) {
   return (
     <div>
       <div className={styles.header}>
-        <span className={editorStyles.fieldLabel}>Expression Sprites</span>
-        <span className={editorStyles.fieldHelper}>
-          Map emotion labels to images for visual novel-style expression display during chat.
-        </span>
+        <span className={editorStyles.fieldLabel}>{t('characterEditor.expressionEditor.title')}</span>
+        <span className={editorStyles.fieldHelper}>{t('characterEditor.expressionEditor.titleHelper')}</span>
       </div>
 
       <div className={styles.enableRow}>
         <Toggle.Checkbox
           checked={config?.enabled ?? false}
           onChange={handleToggleEnabled}
-          label="Enable expression display"
+          label={t('characterEditor.expressionEditor.enableDisplay')}
         />
       </div>
 
       {hasSlots && (
         <div className={styles.detectionSection}>
-          <div className={styles.detectionHeader}>Expression Detection</div>
-          <div className={styles.detectionHint}>
-            How should the character's expression be chosen after each message?
-          </div>
+          <div className={styles.detectionHeader}>{t('characterEditor.expressionEditor.detectionHeader')}</div>
+          <div className={styles.detectionHint}>{t('characterEditor.expressionEditor.detectionHintSingle')}</div>
           <div className={styles.detectionModes}>
-            {([
-              ['auto', 'Automatic', 'A lightweight sidecar LLM call runs after each generation to detect the expression. Works without Council mode.'],
-              ['council', 'Council Tool Only', 'Expression detection runs as part of the Council deliberation. Requires Council mode enabled with the Expression Detector tool assigned to a member.'],
-              ['off', 'Manual / Off', 'No automatic detection. Expressions only change via the Council tool (if assigned) or stay on the default.'],
-            ] as const).map(([mode, name, desc]) => (
+            {singleDetectionModes.map(({ mode, name, desc }) => (
               <label key={mode} className={styles.modeOption}>
                 <input
                   type="radio"
@@ -707,111 +744,60 @@ export default function ExpressionEditorTab({ characterId }: Props) {
               </label>
             ))}
           </div>
-          {detection.mode === 'auto' && (
-            <>
-              <div className={styles.contextRow}>
-                <label htmlFor="expr-context-window">Messages to analyze:</label>
-                <NumericInput
-                  id="expr-context-window"
-                  className={styles.contextInput}
-                  value={detection.contextWindow}
-                  min={1}
-                  max={20}
-                  integer
-                  onChange={(value) => {
-                    const val = Math.max(1, Math.min(20, value ?? 5))
-                    saveDetection({ ...detection, contextWindow: val })
-                  }}
-                />
-              </div>
-              <div className={styles.detectionField}>
-                <label className={styles.detectionFieldLabel}>Connection Profile</label>
-                <SearchableSelect
-                  value={detection.connectionProfileId || ''}
-                  onChange={(val) => saveDetection({ ...detection, connectionProfileId: val, model: '' })}
-                  options={profileOptions}
-                  placeholder="Use sidecar default"
-                  searchPlaceholder="Search connections…"
-                  emptyMessage="No connection profiles configured"
-                  clearable
-                  clearLabel="Use sidecar default"
-                />
-              </div>
-              <div className={styles.detectionField}>
-                <label className={styles.detectionFieldLabel}>Model</label>
-                <ModelCombobox
-                  value={detection.model || ''}
-                  onChange={(val) => saveDetection({ ...detection, model: val })}
-                  placeholder={detection.connectionProfileId ? 'e.g. claude-3-haiku-20240307' : 'Select a connection first'}
-                  models={exprModels}
-                  modelLabels={exprModelLabels}
-                  loading={exprModelsLoading}
-                  onRefresh={fetchExprModels}
-                  autoRefreshOnFocus
-                  refreshKey={detection.connectionProfileId}
-                  disabled={!detection.connectionProfileId}
-                  emptyMessage={detection.connectionProfileId ? 'No models returned. Enter one manually.' : 'Select a connection profile first.'}
-                />
-                {!detection.connectionProfileId && (
-                  <span className={styles.detectionFieldHint}>Falls back to the sidecar LLM configured in the Council panel.</span>
-                )}
-              </div>
-            </>
-          )}
+          {detection.mode === 'auto' && renderAutoDetectionFields(true)}
         </div>
       )}
 
       {hasSlots && (
         <div className={styles.defaultRow}>
-          <label htmlFor="expr-default">Default expression:</label>
+          <label htmlFor="expr-default">{t('characterEditor.expressionEditor.defaultExpression')}</label>
           <select
             id="expr-default"
             className={styles.defaultSelect}
             value={config?.defaultExpression ?? ''}
             onChange={handleDefaultChange}
           >
-            <option value="">None</option>
+            <option value="">{t('characterEditor.expressionEditor.none')}</option>
             {slots.map((s) => (
               <option key={s.label} value={s.label}>{s.label}</option>
             ))}
           </select>
-          <span className={styles.count}>{slots.length} mapped</span>
+          <span className={styles.count}>
+            {t('characterEditor.expressionEditor.mappedCount', { count: slots.length })}
+          </span>
         </div>
       )}
 
       <div className={styles.controls}>
         <button type="button" className={styles.controlBtn} onClick={() => zipRef.current?.click()}>
-          <Upload size={14} /> Import ZIP
+          <Upload size={14} /> {t('characterEditor.expressionEditor.importZip')}
         </button>
         <button type="button" className={styles.controlBtn} onClick={openGalleryPicker}>
-          <ImageIcon size={14} /> Add from Gallery
+          <ImageIcon size={14} /> {t('characterEditor.expressionEditor.addFromGallery')}
         </button>
         <button type="button" className={styles.controlBtn} onClick={() => uploadRef.current?.click()}>
-          <Plus size={14} /> Upload Images
+          <Plus size={14} /> {t('characterEditor.expressionEditor.uploadImages')}
         </button>
         <button type="button" className={styles.controlBtn} onClick={handleConvertToGroups}>
-          <Users size={14} /> Multi-Character Mode
+          <Users size={14} /> {t('characterEditor.expressionEditor.multiCharacterMode')}
         </button>
         <input ref={zipRef} type="file" accept=".zip" hidden onChange={handleZipUpload} />
         <input ref={uploadRef} type="file" accept="image/*" multiple hidden onChange={handleDirectUpload} />
       </div>
 
-      {uploading && <div className={styles.uploading}>Uploading...</div>}
+      {uploading && <div className={styles.uploading}>{t('characterEditor.expressionEditor.uploading')}</div>}
 
       {!hasSlots && !uploading && (
         <div className={styles.empty}>
           <Ghost size={40} className={styles.emptyIcon} />
-          <div className={styles.emptyTitle}>No expressions yet</div>
-          <div className={styles.emptyHint}>
-            Upload a ZIP of expression images (filenames become labels),<br />
-            add images from the gallery, or upload one or many image files.
-          </div>
+          <div className={styles.emptyTitle}>{t('characterEditor.expressionEditor.emptyTitle')}</div>
+          <div className={styles.emptyHint}>{t('characterEditor.expressionEditor.emptyHintSingle')}</div>
           <div className={styles.emptyActions}>
             <button type="button" className={styles.controlBtn} onClick={() => zipRef.current?.click()}>
-              <Upload size={14} /> Import ZIP
+              <Upload size={14} /> {t('characterEditor.expressionEditor.importZip')}
             </button>
             <button type="button" className={styles.controlBtn} onClick={() => uploadRef.current?.click()}>
-              <Plus size={14} /> Upload Images
+              <Plus size={14} /> {t('characterEditor.expressionEditor.uploadImages')}
             </button>
           </div>
         </div>
@@ -835,71 +821,7 @@ export default function ExpressionEditorTab({ characterId }: Props) {
         </div>
       )}
 
-      {/* Gallery picker overlay */}
-      {showGalleryPicker && (
-        <div>
-          <span className={editorStyles.fieldLabel}>Select from Gallery</span>
-          {galleryItems.length === 0 ? (
-            <div className={styles.emptyHint} style={{ padding: '20px 0' }}>
-              No gallery images found. Upload images to the Gallery tab first.
-            </div>
-          ) : (
-            <>
-              <div className={styles.galleryModal}>
-                {galleryItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`${styles.galleryPickItem}${pickerImageId === item.image_id ? ` ${styles.selected}` : ''}`}
-                    onClick={() => {
-                      setPickerImageId(item.image_id)
-                      if (!pickerLabel) {
-                        setPickerLabel(item.caption || 'expression')
-                      }
-                    }}
-                  >
-                    <img
-                      src={characterGalleryApi.smallUrl(item.image_id)}
-                      alt={item.caption || ''}
-                      className={styles.galleryPickImage}
-                    />
-                  </div>
-                ))}
-              </div>
-              {pickerImageId && (
-                <div className={styles.labelPrompt}>
-                  <span className={editorStyles.fieldHelper}>Enter an expression label for this image:</span>
-                  <input
-                    type="text"
-                    className={styles.labelPromptInput}
-                    value={pickerLabel}
-                    onChange={(e) => setPickerLabel(e.target.value)}
-                    placeholder="e.g. happy, sad, angry..."
-                    autoFocus
-                    onKeyDown={(e) => { if (e.key === 'Enter') confirmGalleryPick() }}
-                  />
-                  <div className={styles.labelPromptActions}>
-                    <button
-                      type="button"
-                      className={styles.labelPromptBtn}
-                      onClick={() => { setShowGalleryPicker(false); setPickerImageId(null); setPickerLabel('') }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.labelPromptBtnPrimary}
-                      onClick={confirmGalleryPick}
-                      disabled={!pickerLabel.trim()}
-                    >
-                      Add Expression
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+      {showGalleryPicker && renderGalleryPicker(confirmGalleryPick)}
 
       {lightboxSrc && (
         <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />

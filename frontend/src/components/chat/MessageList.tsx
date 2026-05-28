@@ -1,4 +1,5 @@
 import { useRef, useEffect, useLayoutEffect, useCallback, useMemo, useState, useSyncExternalStore, type ReactNode, type TouchEvent, type WheelEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useVirtualizer, defaultRangeExtractor, type Range } from '@tanstack/react-virtual'
 import { useChunkedMessages } from '@/hooks/useChunkedMessages'
 import {
@@ -134,6 +135,7 @@ function estimateOOCContribution(blocks: OOCBlock[], mode: OOCStyleType, bubbleW
 }
 
 export default function MessageList({ messages, chatId, isStreaming }: MessageListProps) {
+  const { t } = useTranslation('chat')
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const isPinnedRef = useRef(true)
@@ -997,7 +999,7 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
 
           switch (item.type) {
             case 'loadingOlder':
-              content = <div className={styles.loadingOlder}>Loading older messages...</div>
+              content = <div className={styles.loadingOlder}>{t('messageList.loadingOlder')}</div>
               break
             case 'message':
               messageId = item.message.id
@@ -1017,7 +1019,7 @@ export default function MessageList({ messages, chatId, isStreaming }: MessageLi
             case 'error':
               content = (
                 <div className={styles.errorBubble}>
-                  <span className={styles.errorLabel}>Generation failed:</span> {item.error}
+                  <span className={styles.errorLabel}>{t('messageList.generationFailed')}</span> {item.error}
                 </div>
               )
               break

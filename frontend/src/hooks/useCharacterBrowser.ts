@@ -12,6 +12,7 @@ import type { LorebookInfo } from '@/components/modals/BulkImportProgressModal'
 import type { ExpressionsImportInfo } from '@/components/modals/ExpressionsImportModal'
 import type { AlternateFieldsSummaryInfo } from '@/components/modals/AlternateFieldsSummaryModal'
 import { getEmbeddedCharacterBookEntryCount } from '@/utils/character-world-books'
+import i18n from '@/i18n'
 
 /**
  * If a character carries a portable LoRA hint in `extensions.lumiverse_image_gen_lora`,
@@ -24,11 +25,16 @@ function maybeShowImportedLoraHint(character: Character): void {
   if (!raw || typeof raw !== 'object') return
   if (typeof raw.lora_filename !== 'string' || !raw.lora_filename) return
   if (typeof raw.weight !== 'number' || !Number.isFinite(raw.weight)) return
-  const suffix = typeof raw.source_url === 'string' && raw.source_url
-    ? ' Source URL is visible in the Image LoRA tab.'
+  const sourceHint = typeof raw.source_url === 'string' && raw.source_url
+    ? i18n.t('panels.characterBrowser.toast.loraSourceHint')
     : ''
   toast.info(
-    `${character.name} expects LoRA "${raw.lora_filename}" @ ${raw.weight}. Configure it in the character editor's Image LoRA tab.${suffix}`,
+    i18n.t('panels.characterBrowser.toast.loraHint', {
+      name: character.name,
+      filename: raw.lora_filename,
+      weight: raw.weight,
+      sourceHint,
+    }),
     { duration: 8000 },
   )
 }
@@ -417,7 +423,7 @@ export function useCharacterBrowser() {
         addCharacter(result.character)
         setBrowserTotal((t) => t + 1)
         setFetchVersion((v) => v + 1)
-        toast.success(`${result.character.name} was imported`)
+        toast.success(i18n.t('chat.toast.characterImported', { name: result.character.name }))
         if (getEmbeddedCharacterBookEntryCount(result.character.extensions) > 0
             && !(result.character.extensions?.world_book_ids?.length > 0)) {
           setPendingLorebookImport(result.character)
@@ -520,8 +526,8 @@ export function useCharacterBrowser() {
 
   const openModal = useStore((s) => s.openModal)
   const showChatCreationToast = useCallback(
-    () => toast.info('Creating chat and preparing Memory Cortex in the background…', {
-      title: 'Starting Chat',
+    () => toast.info(i18n.t('chat.toast.creatingChatCortex'), {
+      title: i18n.t('chat.toast.startingChat'),
       duration: 60_000,
       dismissible: false,
     }),
@@ -572,7 +578,7 @@ export function useCharacterBrowser() {
               } catch (err) {
                 toast.dismiss(toastId)
                 console.error('[CharacterBrowser] Failed to create chat:', err)
-                toast.error('Failed to create chat')
+                toast.error(i18n.t('chat.toast.failedCreateChat'))
               }
             },
           })
@@ -587,7 +593,7 @@ export function useCharacterBrowser() {
       } catch (err) {
         if (creationToastId) toast.dismiss(creationToastId)
         console.error('[CharacterBrowser] Failed to open chat:', err)
-        toast.error('Failed to open chat')
+        toast.error(i18n.t('chat.toast.failedOpenChat'))
       }
     },
     [navigate, openModal, showChatCreationToast]
@@ -618,7 +624,7 @@ export function useCharacterBrowser() {
               } catch (err) {
                 toast.dismiss(toastId)
                 console.error('[CharacterBrowser] Failed to create chat:', err)
-                toast.error('Failed to create chat')
+                toast.error(i18n.t('chat.toast.failedCreateChat'))
               }
             },
           })
@@ -633,7 +639,7 @@ export function useCharacterBrowser() {
       } catch (err) {
         if (creationToastId) toast.dismiss(creationToastId)
         console.error('[CharacterBrowser] Failed to start new chat:', err)
-        toast.error('Failed to start new chat')
+        toast.error(i18n.t('chat.toast.failedStartNewChat'))
       }
     },
     [navigate, openModal, showChatCreationToast]

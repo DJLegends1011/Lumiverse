@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FormField, TextInput, Select, Button } from '@/components/shared/FormComponents'
 import { Toggle } from '@/components/shared/Toggle'
 import ModelCombobox from '@/components/panels/connection-manager/ModelCombobox'
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export default function TTSConnectionForm({ providers, profile, onSave, onCancel }: Props) {
+  const { t } = useTranslation('panels')
   const [name, setName] = useState(profile?.name || '')
   const [provider, setProvider] = useState(profile?.provider || providers[0]?.id || 'openai_tts')
   const [apiKey, setApiKey] = useState('')
@@ -134,26 +136,26 @@ export default function TTSConnectionForm({ providers, profile, onSave, onCancel
 
   return (
     <div className={styles.form}>
-      <FormField label="Name" required>
-        <TextInput value={name} onChange={setName} placeholder="Connection name" autoFocus={!profile} />
+      <FormField label={t('ttsConnectionForm.name')} required>
+        <TextInput value={name} onChange={setName} placeholder={t('ttsConnectionForm.connectionName')} autoFocus={!profile} />
       </FormField>
 
-      <FormField label="Provider">
+      <FormField label={t('ttsConnectionForm.provider')}>
         <Select value={provider} onChange={setProvider} options={providerOptions} />
       </FormField>
 
       {capabilities?.apiKeyRequired && (
-        <FormField label="API Key" hint={profile?.has_api_key ? 'Key is set. Enter a new value to replace it.' : undefined}>
+        <FormField label={t('ttsConnectionForm.apiKey')} hint={profile?.has_api_key ? t('ttsConnectionForm.keySetHint') : undefined}>
           <TextInput
             value={apiKey}
             onChange={setApiKey}
-            placeholder={profile?.has_api_key ? '••••••••' : 'Enter API key'}
+            placeholder={profile?.has_api_key ? '••••••••' : t('ttsConnectionForm.enterApiKey')}
             type="password"
           />
         </FormField>
       )}
 
-      <FormField label="API URL" hint="Leave empty for default provider URL">
+      <FormField label={t('ttsConnectionForm.apiUrl')} hint={t('ttsConnectionForm.apiUrlHint')}>
         <TextInput
           value={apiUrl}
           onChange={setApiUrl}
@@ -161,7 +163,7 @@ export default function TTSConnectionForm({ providers, profile, onSave, onCancel
         />
       </FormField>
 
-      <FormField label="Model" hint={capabilities?.modelListStyle === 'dynamic' ? 'Refresh uses the current form values, even before the connection is saved.' : undefined}>
+      <FormField label={t('ttsConnectionForm.model')} hint={capabilities?.modelListStyle === 'dynamic' ? t('ttsConnectionForm.refreshHint') : undefined}>
         <ModelCombobox
           value={model}
           onChange={setModel}
@@ -172,12 +174,12 @@ export default function TTSConnectionForm({ providers, profile, onSave, onCancel
           autoRefreshOnFocus={capabilities?.modelListStyle === 'dynamic'}
           refreshKey={`${provider}:${profile?.id || ''}:models`}
           appearance="standard"
-          placeholder="gpt-4o-mini-tts"
-          emptyMessage="No TTS models found. Enter one manually."
+          placeholder={t('ttsConnectionForm.modelPlaceholder')}
+          emptyMessage={t('ttsConnectionForm.noTtsModels')}
         />
       </FormField>
 
-      <FormField label="Voice" hint={capabilities?.voiceListStyle === 'dynamic' ? 'Refresh uses the current form values, even before the connection is saved.' : undefined}>
+      <FormField label={t('ttsConnectionForm.voice')} hint={capabilities?.voiceListStyle === 'dynamic' ? t('ttsConnectionForm.refreshHint') : undefined}>
         <ModelCombobox
           value={voice}
           onChange={setVoice}
@@ -188,19 +190,19 @@ export default function TTSConnectionForm({ providers, profile, onSave, onCancel
           autoRefreshOnFocus={capabilities?.voiceListStyle === 'dynamic'}
           refreshKey={`${provider}:${profile?.id || ''}:voices`}
           appearance="standard"
-          placeholder="alloy or voice_..."
-          emptyMessage="No voices found. Enter one manually."
+          placeholder={t('ttsConnectionForm.voicePlaceholder')}
+          emptyMessage={t('ttsConnectionForm.noVoices')}
         />
       </FormField>
 
       <FormField label="">
-        <Toggle.Checkbox checked={isDefault} onChange={setIsDefault} label="Set as default TTS connection" />
+        <Toggle.Checkbox checked={isDefault} onChange={setIsDefault} label={t('ttsConnectionForm.setDefault')} />
       </FormField>
 
       <div className={styles.formActions}>
-        <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+        <Button variant="ghost" size="sm" onClick={onCancel}>{t('ttsConnectionForm.cancel')}</Button>
         <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!name.trim()}>
-          {profile ? 'Save' : 'Create'}
+          {profile ? t('ttsConnectionForm.save') : t('ttsConnectionForm.create')}
         </Button>
       </div>
     </div>

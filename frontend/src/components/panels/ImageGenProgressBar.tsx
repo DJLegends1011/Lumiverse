@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useImageGenProgress } from '@/hooks/useImageGenProgress'
 import styles from './ImageGenProgressBar.module.css'
 
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export default function ImageGenProgressBar({ jobId, showPreview = true }: Props) {
+  const { t } = useTranslation('panels', { keyPrefix: 'imageGenPanel.progress' })
   const progress = useImageGenProgress(jobId)
   if (!progress.isGenerating) return null
 
@@ -17,9 +19,9 @@ export default function ImageGenProgressBar({ jobId, showPreview = true }: Props
   return (
     <div className={styles.wrapper}>
       <div className={styles.headerRow}>
-        <span className={styles.label}>Generating image…</span>
+        <span className={styles.label}>{t('generating')}</span>
         <span className={styles.stepCount}>
-          {indeterminate ? 'starting…' : `${step}/${totalSteps} (${pct}%)`}
+          {indeterminate ? t('starting') : t('step', { step, total: totalSteps, pct })}
         </span>
       </div>
       <div className={styles.track}>
@@ -28,7 +30,7 @@ export default function ImageGenProgressBar({ jobId, showPreview = true }: Props
           style={indeterminate ? undefined : { width: `${pct}%` }}
         />
       </div>
-      {showPreview && preview && <img className={styles.preview} src={preview} alt="Generation preview" />}
+      {showPreview && preview && <img className={styles.preview} src={preview} alt={t('previewAlt')} />}
     </div>
   )
 }

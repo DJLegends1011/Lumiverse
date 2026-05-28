@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Search, MessageSquare, Pencil, Download, Upload, Trash2,
   ArrowRight, Check, SortAsc, FileText, Clock, Plus,
@@ -14,6 +15,7 @@ import { get } from '@/api/client'
 import { toast } from '@/lib/toast'
 import ConfirmationModal from '@/components/shared/ConfirmationModal'
 import clsx from 'clsx'
+import { formatRelativeTime } from '@/lib/formatRelativeTime'
 import styles from './ManageChatsModal.module.css'
 
 interface ChatSummary {
@@ -28,22 +30,10 @@ type SortMode = 'date' | 'name' | 'messages'
 
 const EMPTY_GROUP_CHARACTER_IDS: string[] = []
 
-function formatRelativeTime(epochSeconds: number): string {
-  const now = Date.now()
-  const diff = now - epochSeconds * 1000
-  if (diff < 60_000) return 'Just now'
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
-  if (diff < 604_800_000) return `${Math.floor(diff / 86_400_000)}d ago`
-  return new Date(epochSeconds * 1000).toLocaleDateString()
-}
-
-function formatChatName(chat: ChatSummary): string {
-  if (chat.name) return chat.name
-  return `Chat ${new Date(chat.created_at * 1000).toLocaleString()}`
-}
-
 export default function ManageChatsModal() {
+  const { t } = useTranslation('modals', { keyPrefix: 'manageChats' })
+  const { t: tc } = useTranslation('common')
+
   const navigate = useNavigate()
   const closeModal = useStore((s) => s.closeModal)
   const characters = useStore((s) => s.characters)
@@ -72,12 +62,17 @@ export default function ManageChatsModal() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const stFileInputRef = useRef<HTMLInputElement>(null)
 
+  const formatChatName = useCallback((chat: ChatSummary) => {
+    if (chat.name) return chat.name
+    return t('unnamedChat', { date: new Date(chat.created_at * 1000).toLocaleString() })
+  }, [t])
+
   const groupLabel = useMemo(() => {
     if (!isGroupContext) return null
     const names = groupCharacterIds
       .map((id) => characters.find((character) => character.id === id)?.name)
       .filter((name): name is string => Boolean(name))
-    if (names.length === 0) return `Group Chat · ${groupCharacterIds.length} members`
+    if (names.length === 0) return t('groupChatLabel', { count: groupCharacterIds.length })
     return `${names.join(', ')} · ${groupCharacterIds.length} members`
   }, [characters, groupCharacterIds, isGroupContext])
 
@@ -155,7 +150,7 @@ export default function ManageChatsModal() {
     })
   }, [])
 
-  const sortLabel = sortMode === 'date' ? 'Date' : sortMode === 'name' ? 'Name' : 'Messages'
+  const sortLabel = sortMode === 'date' ? t('sortDate') : sortMode === 'name' ? t('sortName') : t('sortMessages')
 
   // Actions
   const handleSwitch = useCallback(
@@ -220,8 +215,8 @@ export default function ManageChatsModal() {
   }, [deleteTarget])
 
   const handleNewChat = useCallback(async () => {
-    const toastId = toast.info('Creating chat and preparing Memory Cortex in the background…', {
-      title: 'Starting Chat',
+    const toastId = toast.info(t('startingChatMessage'), {
+      title: t('startingChatTitle'),
       duration: 60_000,
       dismissible: false,
     })
@@ -238,7 +233,7 @@ export default function ManageChatsModal() {
     } catch (err) {
       toast.dismiss(toastId)
       console.error('[ManageChats] Failed to create chat:', err)
-      toast.error('Failed to create chat')
+      toast.error(t('createFailed'))
     }
   }, [characterId, closeModal, groupCharacterIds, isGroupContext, navigate])
 
@@ -259,16 +254,16 @@ export default function ManageChatsModal() {
         const data = JSON.parse(text)
 
         if (!data.chat || !data.messages) {
-          toast.error('Invalid chat export format')
+          toast.error(t('invalidExport'))
           return
         }
 
         await chatsApi.importChat(characterId, data)
         await fetchChats()
-        toast.success('Chat imported')
+        toast.success(t('importSuccess'))
       } catch (err: any) {
         console.error('[ManageChats] Failed to import chat:', err)
-        toast.error(err?.body?.error || err?.message || 'Failed to import chat')
+        toast.error(err?.body?.error || err?.message || t('importFailed'))
       } finally {
         setImporting(false)
       }
@@ -303,22 +298,28 @@ export default function ManageChatsModal() {
           imported++
         } catch (err: any) {
           console.error('[ManageChats] Failed to import ST chat:', file.name, err)
-          failures.push({ name: file.name, reason: err?.body?.error || err?.message || 'Unknown error' })
+          failures.push({ name: file.name, reason: err?.body?.error || err?.message || t('unknownError') })
         }
       }
       if (imported > 0) await fetchChats()
       const fallbackSuffix = isGroupContext && speakerFallbackCount > 0
-        ? ` Speaker attribution fell back to names for ${speakerFallbackCount} message${speakerFallbackCount === 1 ? '' : 's'}.`
+        ? t('speakerFallback', { count: speakerFallbackCount })
         : ''
       if (imported > 0 && failures.length === 0) {
-        if (fallbackSuffix) toast.warning(`Imported ${imported} chat${imported === 1 ? '' : 's'}.${fallbackSuffix}`)
-        else toast.success(`Imported ${imported} chat${imported === 1 ? '' : 's'}`)
+        if (fallbackSuffix) toast.warning(t('bulkImportedWithSuffix', { count: imported, suffix: fallbackSuffix }))
+        else toast.success(t('bulkImported', { count: imported }))
       } else if (imported > 0 && failures.length > 0) {
-        toast.warning(`Imported ${imported}, failed ${failures.length}: ${failures[0].name} — ${failures[0].reason}.${fallbackSuffix}`.trim())
+        toast.warning(t('bulkImportPartial', {
+          imported,
+          failed: failures.length,
+          name: failures[0].name,
+          reason: failures[0].reason,
+          suffix: fallbackSuffix,
+        }).trim())
       } else if (failures.length === 1) {
-        toast.error(`Failed to import ${failures[0].name}: ${failures[0].reason}`)
+        toast.error(t('bulkImportOneFailed', { name: failures[0].name, reason: failures[0].reason }))
       } else if (failures.length > 1) {
-        toast.error(`Failed to import ${failures.length} chats — first error: ${failures[0].reason}`)
+        toast.error(t('bulkImportManyFailed', { count: failures.length, reason: failures[0].reason }))
       }
       setImportingSt(false)
     },
@@ -332,9 +333,9 @@ export default function ManageChatsModal() {
 
           <div className={styles.header}>
             <div className={styles.headerLeft}>
-              <h3 className={styles.title}>Manage Chats</h3>
+              <h3 className={styles.title}>{t('title')}</h3>
               <span className={styles.subtitle}>
-                {(groupLabel || characterName)} &middot; {chats.length} chat{chats.length !== 1 ? 's' : ''}
+                {(groupLabel || characterName)} &middot; {t('chatCount', { count: chats.length })}
               </span>
             </div>
           </div>
@@ -347,7 +348,7 @@ export default function ManageChatsModal() {
                 className={styles.searchInput}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search chats..."
+                placeholder={t('searchPlaceholder')}
               />
             </div>
             <Button size="sm" icon={<SortAsc size={13} />} onClick={cycleSortMode}>
@@ -358,9 +359,9 @@ export default function ManageChatsModal() {
               icon={importing ? <Spinner size={13} /> : <Upload size={13} />}
               onClick={handleImportClick}
               disabled={importing}
-              title="Import chat from exported JSON"
+              title={t('importJsonTitle')}
             >
-              Import
+              {t('import')}
             </Button>
             <input
               ref={fileInputRef}
@@ -374,9 +375,9 @@ export default function ManageChatsModal() {
               icon={importingSt ? <Spinner size={13} /> : <Upload size={13} />}
               onClick={handleImportStClick}
               disabled={importingSt}
-              title={isGroupContext ? 'Import group chat from SillyTavern JSONL' : 'Import chat from SillyTavern JSONL'}
+              title={isGroupContext ? t('importGroupJsonlTitle') : t('importJsonlTitle')}
             >
-              Import ST
+              {t('importSt')}
             </Button>
             <input
               ref={stFileInputRef}
@@ -392,13 +393,13 @@ export default function ManageChatsModal() {
             {loading && (
               <div className={styles.loading}>
                 <Spinner size={16} />
-                Loading chats...
+                {t('loadingChats')}
               </div>
             )}
 
             {!loading && filteredChats.length === 0 && (
               <div className={styles.empty}>
-                {search.trim() ? 'No chats match your search.' : 'No chats yet for this character.'}
+                {search.trim() ? t('noMatch') : t('noChats')}
               </div>
             )}
 
@@ -439,7 +440,7 @@ export default function ManageChatsModal() {
                           <Clock size={11} />
                           {formatRelativeTime(chat.updated_at)}
                         </span>
-                        {isActive && <span className={styles.activeBadge}>Active</span>}
+                        {isActive && <span className={styles.activeBadge}>{t('active')}</span>}
                       </div>
                     </div>
 
@@ -450,7 +451,7 @@ export default function ManageChatsModal() {
                           variant="ghost"
                           className={styles.actionBtnPrimary}
                           onClick={() => handleSwitch(chat.id)}
-                          title="Switch to this chat"
+                          title={t('switchChat')}
                           icon={<ArrowRight size={14} />}
                         />
                       )}
@@ -460,7 +461,7 @@ export default function ManageChatsModal() {
                           variant="ghost"
                           className={styles.actionBtnPrimary}
                           onClick={() => handleConfirmRename(chat.id)}
-                          title="Confirm rename"
+                          title={t('confirmRename')}
                           icon={<Check size={14} />}
                         />
                       ) : (
@@ -468,7 +469,7 @@ export default function ManageChatsModal() {
                           size="icon"
                           variant="ghost"
                           onClick={() => handleStartRename(chat)}
-                          title="Rename chat"
+                          title={t('renameChat')}
                           icon={<Pencil size={14} />}
                         />
                       )}
@@ -476,7 +477,7 @@ export default function ManageChatsModal() {
                         size="icon"
                         variant="ghost"
                         onClick={() => handleExport(chat.id, displayName)}
-                        title="Export chat"
+                        title={t('exportChat')}
                         icon={<Download size={14} />}
                       />
                       {!isActive && (
@@ -484,7 +485,7 @@ export default function ManageChatsModal() {
                           size="icon"
                           variant="danger-ghost"
                           onClick={() => setDeleteTarget(chat)}
-                          title="Delete chat"
+                          title={t('deleteChat')}
                           icon={<Trash2 size={14} />}
                         />
                       )}
@@ -495,7 +496,7 @@ export default function ManageChatsModal() {
 
             <button type="button" className={styles.newChatBtn} onClick={handleNewChat}>
               <Plus size={15} />
-              New Chat
+              {t('newChat')}
             </button>
           </div>
     </ModalShell>
@@ -504,11 +505,11 @@ export default function ManageChatsModal() {
         isOpen={deleteTarget !== null}
         onConfirm={handleConfirmDelete}
         onCancel={() => setDeleteTarget(null)}
-        title="Delete Chat"
-        message={`Are you sure you want to delete "${deleteTarget ? formatChatName(deleteTarget) : ''}"? This action cannot be undone.`}
+        title={t('deleteTitle')}
+        message={t('deleteMessage', { name: deleteTarget ? formatChatName(deleteTarget) : '' })}
         variant="danger"
-        confirmText="Delete"
-        cancelText="Cancel"
+        confirmText={tc('actions.delete')}
+        cancelText={tc('actions.cancel')}
       />
     </>
   )

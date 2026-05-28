@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, FileUp, Link, UserPlus, Tags } from 'lucide-react'
 import styles from './ImportMenu.module.css'
 
@@ -21,6 +22,7 @@ export default function ImportMenu({
   importLoading,
   tagLibraryImporting = false,
 }: ImportMenuProps) {
+  const { t } = useTranslation('panels')
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -63,7 +65,7 @@ export default function ImportMenu({
         type="button"
         className={styles.trigger}
         onClick={() => setOpen(!open)}
-        title="Add character"
+        title={t('characterBrowser.addCharacter')}
         disabled={importLoading || tagLibraryImporting}
       >
         <Plus size={14} />
@@ -79,7 +81,7 @@ export default function ImportMenu({
             }}
           >
             <UserPlus size={14} />
-            <span>Create New</span>
+            <span>{t('characterBrowser.createNew')}</span>
           </button>
           <button
             type="button"
@@ -88,7 +90,7 @@ export default function ImportMenu({
             disabled={tagLibraryImporting}
           >
             <FileUp size={14} />
-            <span>Import File</span>
+            <span>{t('characterBrowser.importFile')}</span>
           </button>
           <button
             type="button"
@@ -97,7 +99,7 @@ export default function ImportMenu({
             disabled={tagLibraryImporting}
           >
             <Tags size={14} />
-            <span>{tagLibraryImporting ? 'Importing Tags...' : 'Import TagLibrary JSON'}</span>
+            <span>{tagLibraryImporting ? t('characterBrowser.importingTags') : t('characterBrowser.importTagLibrary')}</span>
           </button>
           <button
             type="button"
@@ -108,7 +110,7 @@ export default function ImportMenu({
             }}
           >
             <Link size={14} />
-            <span>Import URL</span>
+            <span>{t('characterBrowser.importUrl')}</span>
           </button>
         </div>
       )}

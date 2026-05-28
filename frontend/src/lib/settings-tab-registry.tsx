@@ -254,7 +254,7 @@ export function settingsRegistryToCommands(entries: SettingsTabEntry[]): Command
     description: entry.tabDescription,
     icon: entry.tabIcon,
     keywords: entry.keywords,
-    group: 'Settings' as const,
+    group: 'settings',
     scope: entry.scope,
     run: () => useStore.getState().openSettings(entry.id),
   }))

@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback, type KeyboardEvent } from "react";
+import { useTranslation } from 'react-i18next'
+import { formatRelativeTime } from '@/lib/formatRelativeTime'
+
 import {
   Brain, Users, Network, ChevronDown, ChevronRight, ChevronLeft, RefreshCw,
   MapPin, Swords, Package, Landmark, Lightbulb, Calendar,
@@ -33,6 +36,9 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function MemoryCortexPanel() {
+  const { t } = useTranslation('panels')
+  const { t: tc } = useTranslation('common')
+
   const activeChatId = useStore((s) => s.activeChatId);
   const totalChatLength = useStore((s) => s.totalChatLength);
   const addToast = useStore((s) => s.addToast);
@@ -94,9 +100,9 @@ export default function MemoryCortexPanel() {
         next.delete(entityId);
         return next;
       });
-      addToast({ type: "info", message: "Entity removed" });
+      addToast({ type: "info", message: t('memoryCortexPanel.toast.entityRemoved') });
     } catch {
-      addToast({ type: "error", message: "Failed to remove entity" });
+      addToast({ type: "error", message: t('memoryCortexPanel.toast.entityRemoveFailed') });
     }
   };
 
@@ -157,9 +163,9 @@ export default function MemoryCortexPanel() {
       setSelectionMode(false);
       setExpandedId((prev) => prev && deletedIds.has(prev) ? null : prev);
       await loadStats();
-      addToast({ type: "info", message: `${res.deletedCount} entit${res.deletedCount === 1 ? "y" : "ies"} removed` });
+      addToast({ type: "info", message: t('memoryCortexPanel.toast.bulkRemoved', { count: res.deletedCount }) });
     } catch {
-      addToast({ type: "error", message: "Failed to remove selected entities" });
+      addToast({ type: "error", message: t('memoryCortexPanel.toast.bulkRemoveFailed') });
     } finally {
       setBulkDeleting(false);
     }
@@ -173,7 +179,7 @@ export default function MemoryCortexPanel() {
     return (
       <div className={styles.empty}>
         <Brain size={32} strokeWidth={1.5} />
-        <p>Open a chat to view its memory graph</p>
+        <p>{t('memoryCortexPanel.noChat')}</p>
       </div>
     );
   }
@@ -184,22 +190,22 @@ export default function MemoryCortexPanel() {
       <div className={styles.tabBar}>
         <button className={clsx(styles.tab, tab === "entities" && styles.tabActive)} onClick={() => setTab("entities")}>
           <Users size={13} />
-          Entities
+          {t('memoryCortexPanel.tabs.entities')}
           {entities.length > 0 && <span className={styles.tabBadge}>{activeEntities.length}</span>}
         </button>
         <button className={clsx(styles.tab, tab === "colors" && styles.tabActive)} onClick={() => setTab("colors")}>
           <Palette size={13} />
-          Colors
+          {t('memoryCortexPanel.tabs.colors')}
         </button>
         <button className={clsx(styles.tab, tab === "stats" && styles.tabActive)} onClick={() => setTab("stats")}>
           <BarChart3 size={13} />
-          Stats
+          {t('memoryCortexPanel.tabs.stats')}
         </button>
         <button className={clsx(styles.tab, tab === "links" && styles.tabActive)} onClick={() => setTab("links")}>
           <Link2 size={13} />
-          Links
+          {t('memoryCortexPanel.tabs.links')}
         </button>
-        <button className={styles.refreshBtn} onClick={() => { loadEntities(); loadStats(); }} title="Refresh">
+        <button className={styles.refreshBtn} onClick={() => { loadEntities(); loadStats(); }} title={tc('actions.refresh')}>
           <RefreshCw size={13} />
         </button>
       </div>
@@ -208,10 +214,9 @@ export default function MemoryCortexPanel() {
         <div className={styles.noticeBanner}>
           <AlertTriangle size={14} className={styles.noticeIcon} />
           <div>
-            <div className={styles.noticeTitle}>Memory Cortex is still warming up</div>
+            <div className={styles.noticeTitle}>{t('memoryCortexPanel.warmupTitle')}</div>
             <p className={styles.noticeText}>
-              This chat only has {totalChatLength} message{totalChatLength === 1 ? "" : "s"} so far.
-              Cortex mappings, relationships, and recall context will have more to surface once the conversation has a few more turns.
+              {t('memoryCortexPanel.warmupText', { count: totalChatLength })}
             </p>
           </div>
         </div>
@@ -227,7 +232,7 @@ export default function MemoryCortexPanel() {
               className={styles.searchInput}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search entities..."
+              placeholder={t('memoryCortexPanel.searchPlaceholder')}
             />
             {entityTypes.length > 1 && (
               <select
@@ -235,7 +240,7 @@ export default function MemoryCortexPanel() {
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
               >
-                <option value="all">All</option>
+                <option value="all">{t('memoryCortexPanel.filterAll')}</option>
                 {entityTypes.map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
@@ -246,18 +251,18 @@ export default function MemoryCortexPanel() {
               onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
               type="button"
             >
-              {selectionMode ? "Done" : "Select"}
+              {selectionMode ? t('memoryCortexPanel.done') : t('memoryCortexPanel.select')}
             </button>
           </div>
 
           {selectionMode && (
             <div className={styles.selectionToolbar}>
-              <span className={styles.selectionCount}>{selectedCount} selected</span>
+              <span className={styles.selectionCount}>{t('memoryCortexPanel.selectedCount', { count: selectedCount })}</span>
               <button className={styles.selectionToolbarBtn} onClick={selectVisibleEntities} type="button">
-                Select visible
+                {t('memoryCortexPanel.selectVisible')}
               </button>
               <button className={styles.selectionToolbarBtn} onClick={clearEntitySelection} disabled={selectedCount === 0} type="button">
-                Clear
+                {t('memoryCortexPanel.clear')}
               </button>
               <button
                 className={styles.selectionToolbarDanger}
@@ -265,19 +270,19 @@ export default function MemoryCortexPanel() {
                 disabled={selectedCount === 0 || bulkDeleting}
                 type="button"
               >
-                {bulkDeleting ? "Removing..." : "Remove selected"}
+                {bulkDeleting ? t('memoryCortexPanel.removing') : t('memoryCortexPanel.removeSelected')}
               </button>
             </div>
           )}
 
           {/* Entity list */}
           {loading ? (
-            <div className={styles.loadingText}>Loading entities...</div>
+            <div className={styles.loadingText}>{t('memoryCortexPanel.loadingEntities')}</div>
           ) : activeEntities.length === 0 && archivedEntities.length === 0 ? (
             <div className={styles.emptyList}>
               <Lightbulb size={20} strokeWidth={1.5} />
-              <p>No entities tracked yet</p>
-              <span>Entities are extracted automatically as you chat</span>
+              <p>{t('memoryCortexPanel.emptyEntitiesTitle')}</p>
+              <span>{t('memoryCortexPanel.emptyEntitiesHint')}</span>
             </div>
           ) : (
             <div className={styles.entityList}>
@@ -296,7 +301,7 @@ export default function MemoryCortexPanel() {
               ))}
               {archivedEntities.length > 0 && (
                 <div className={styles.archivedSection}>
-                  <span className={styles.archivedLabel}>Archived ({archivedEntities.length})</span>
+                  <span className={styles.archivedLabel}>{t('memoryCortexPanel.archived', { count: archivedEntities.length })}</span>
                   {visibleArchivedEntities.map((entity) => (
                     <EntityCard
                       key={entity.id}
@@ -343,16 +348,6 @@ export default function MemoryCortexPanel() {
 
 // ─── Entity Card ───────────────────────────────────────────────
 
-/** Format a timestamp as relative time ("2m ago", "3h ago", "5d ago") */
-function relativeTime(timestamp: number | null): string | null {
-  if (!timestamp) return null;
-  const diff = Math.floor(Date.now() / 1000) - timestamp;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
 function EntityCard({
   entity,
   expanded,
@@ -372,6 +367,7 @@ function EntityCard({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const { t } = useTranslation('panels')
   const Icon = ENTITY_ICONS[entity.entityType] || Lightbulb;
   const statusColor = STATUS_COLORS[entity.status] || STATUS_COLORS.unknown;
   const isProvisional = entity.confidence === "provisional";
@@ -389,8 +385,8 @@ function EntityCard({
   // Fact extraction status indicator
   const needsFacts = entity.factExtractionStatus !== "ok" && entity.salienceAvg > 0.45;
 
-  // Last seen
-  const lastSeen = relativeTime(entity.lastMentionTimestamp ?? entity.lastSeenAt);
+  const lastSeenTs = entity.lastMentionTimestamp ?? entity.lastSeenAt
+  const lastSeen = lastSeenTs ? formatRelativeTime(lastSeenTs) : null
   const handleHeaderClick = () => {
     if (selectionMode) onSelect();
     else onToggle();
@@ -417,7 +413,7 @@ function EntityCard({
             checked={selected}
             onChange={onSelect}
             onClick={(e) => e.stopPropagation()}
-            aria-label={`Select ${entity.name}`}
+            aria-label={t('memoryCortexPanel.entity.selectAria', { name: entity.name })}
           />
         )}
         <div className={styles.entityIcon}>
@@ -427,21 +423,21 @@ function EntityCard({
           <div className={styles.entityName}>
             {entity.name}
             <span className={styles.entityStatus} style={{ background: statusColor }} />
-            {isProvisional && <span className={styles.provisionalBadge}>provisional</span>}
+            {isProvisional && <span className={styles.provisionalBadge}>{t('memoryCortexPanel.entity.provisional')}</span>}
             {entity.userEditedAt !== null && (
-              <span className={styles.curatedBadge} title="User-curated — preserved through rebuilds">
-                <CheckCircle2 size={9} /> curated
+              <span className={styles.curatedBadge} title={t('memoryCortexPanel.entity.curatedTitle')}>
+                <CheckCircle2 size={9} /> {t('memoryCortexPanel.entity.curated')}
               </span>
             )}
             {needsFacts && (
-              <span className={clsx(styles.factStatusBadge, entity.factExtractionStatus === "never" ? styles.factStatusNever : styles.factStatusEmpty)} title={entity.factExtractionStatus === "never" ? "No facts extracted yet" : "Fact extraction found nothing — will retry"}>
+              <span className={clsx(styles.factStatusBadge, entity.factExtractionStatus === "never" ? styles.factStatusNever : styles.factStatusEmpty)} title={entity.factExtractionStatus === "never" ? t('memoryCortexPanel.entity.noFactsTitle') : t('memoryCortexPanel.entity.retryFactsTitle')}>
                 <FileQuestion size={9} />
-                {entity.factExtractionStatus === "never" ? "no facts" : "retry"}
+                {entity.factExtractionStatus === "never" ? t('memoryCortexPanel.entity.noFacts') : t('memoryCortexPanel.entity.retry')}
               </span>
             )}
           </div>
           <div className={styles.entityMeta}>
-            {entity.entityType} &middot; {entity.mentionCount} mentions
+            {entity.entityType} &middot; {t('memoryCortexPanel.entity.mentions', { count: entity.mentionCount })}
             {lastSeen && <span className={styles.lastSeen}> &middot; {lastSeen}</span>}
             {entity.salienceAvg > 0 && (
               <span className={styles.salienceBadge} style={{
@@ -451,7 +447,11 @@ function EntityCard({
               </span>
             )}
             {bd && bdTotal > 0 && (
-              <span className={styles.salienceBar} title={`Mention: ${(bd.mentionComponent * 100).toFixed(0)}% · Arc: ${(bd.arcComponent * 100).toFixed(0)}% · Graph: ${(bd.graphComponent * 100).toFixed(0)}%`}>
+              <span className={styles.salienceBar} title={t('memoryCortexPanel.entity.salienceTooltip', {
+                mention: (bd.mentionComponent * 100).toFixed(0),
+                arc: (bd.arcComponent * 100).toFixed(0),
+                graph: (bd.graphComponent * 100).toFixed(0),
+              })}>
                 <span className={clsx(styles.salienceBarSegment, styles.salienceBarMention)} style={{ width: `${(bd.mentionComponent / bdTotal) * 100}%` }} />
                 <span className={clsx(styles.salienceBarSegment, styles.salienceBarArc)} style={{ width: `${(bd.arcComponent / bdTotal) * 100}%` }} />
                 <span className={clsx(styles.salienceBarSegment, styles.salienceBarGraph)} style={{ width: `${(bd.graphComponent / bdTotal) * 100}%` }} />
@@ -479,7 +479,7 @@ function EntityCard({
 
           {entity.aliases.length > 0 && (
             <div className={styles.entityField}>
-              <span className={styles.fieldLabel}>Aliases</span>
+              <span className={styles.fieldLabel}>{t('memoryCortexPanel.entity.aliases')}</span>
               <div className={styles.tagRow}>
                 {entity.aliases.map((a) => (
                   <span key={a} className={styles.miniTag}>{a}</span>
@@ -490,7 +490,7 @@ function EntityCard({
 
           {entity.facts.length > 0 && (
             <div className={styles.entityField}>
-              <span className={styles.fieldLabel}>Facts</span>
+              <span className={styles.fieldLabel}>{t('memoryCortexPanel.entity.facts')}</span>
               <ul className={styles.factList}>
                 {entity.facts.map((f, i) => (
                   <li key={i}>{f}</li>
@@ -501,7 +501,7 @@ function EntityCard({
 
           {topEmotions.length > 0 && (
             <div className={styles.entityField}>
-              <span className={styles.fieldLabel}>Emotional profile</span>
+              <span className={styles.fieldLabel}>{t('memoryCortexPanel.entity.emotionalProfile')}</span>
               <div className={styles.tagRow}>
                 {topEmotions.map((tag) => (
                   <span key={tag} className={styles.emotionTag}>{tag}</span>
@@ -513,16 +513,16 @@ function EntityCard({
           {/* Salience breakdown detail when expanded */}
           {bd && bd.total > 0 && (
             <div className={styles.entityField}>
-              <span className={styles.fieldLabel}>Salience breakdown</span>
+              <span className={styles.fieldLabel}>{t('memoryCortexPanel.entity.salienceBreakdown')}</span>
               <div className={styles.tagRow}>
                 <span className={styles.miniTag} style={{ borderColor: "color-mix(in srgb, var(--lumiverse-primary) 30%, transparent)" }}>
-                  Mention {(bd.mentionComponent * 100).toFixed(0)}%
+                  {t('memoryCortexPanel.entity.salienceMention', { percent: (bd.mentionComponent * 100).toFixed(0) })}
                 </span>
                 <span className={styles.miniTag} style={{ borderColor: "color-mix(in srgb, #8b5cf6 30%, transparent)" }}>
-                  Arc {(bd.arcComponent * 100).toFixed(0)}%
+                  {t('memoryCortexPanel.entity.salienceArc', { percent: (bd.arcComponent * 100).toFixed(0) })}
                 </span>
                 <span className={styles.miniTag} style={{ borderColor: "color-mix(in srgb, #06b6d4 30%, transparent)" }}>
-                  Graph {(bd.graphComponent * 100).toFixed(0)}%
+                  {t('memoryCortexPanel.entity.salienceGraph', { percent: (bd.graphComponent * 100).toFixed(0) })}
                 </span>
               </div>
             </div>
@@ -530,10 +530,10 @@ function EntityCard({
 
           <div className={styles.entityActions}>
             <button className={styles.editBtn} onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-              <Edit2 size={12} /> Edit
+              <Edit2 size={12} /> {t('memoryCortexPanel.entity.edit')}
             </button>
             <button className={styles.dangerBtn} onClick={(e) => { e.stopPropagation(); onDelete(); }}>
-              Remove
+              {t('memoryCortexPanel.entity.remove')}
             </button>
           </div>
         </div>
@@ -553,6 +553,8 @@ function ColorsView({
   addToast: (t: any) => void;
   entities: CortexEntity[];
 }) {
+  const { t } = useTranslation('panels')
+  const { t: tc } = useTranslation('common')
   const [colors, setColors] = useState<CortexFontColor[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingColor, setEditingColor] = useState<CortexFontColor | null>(null);
@@ -575,30 +577,30 @@ function ColorsView({
     try {
       await memoryCortexApi.deleteColor(chatId, id);
       setColors((prev) => prev.filter((c) => c.id !== id));
-      addToast({ type: "info", message: "Color attribution removed" });
+      addToast({ type: "info", message: t('memoryCortexPanel.colors.removed') });
     } catch {
-      addToast({ type: "error", message: "Failed to remove" });
+      addToast({ type: "error", message: t('memoryCortexPanel.colors.removeFailed') });
     }
   };
 
   const handleReattribute = async (colorId: string, entityId: string | null) => {
     try {
       await memoryCortexApi.reattributeColor(chatId, colorId, entityId);
-      addToast({ type: "success", message: entityId ? "Color reattributed" : "Color detached" });
+      addToast({ type: "success", message: entityId ? t('memoryCortexPanel.colors.reattributed') : t('memoryCortexPanel.colors.detached') });
       load();
     } catch (err: any) {
-      addToast({ type: "error", message: `Reattribute failed: ${err.message}` });
+      addToast({ type: "error", message: t('memoryCortexPanel.colors.reattributeFailed', { error: err.message }) });
     }
   };
 
-  if (loading) return <div className={styles.loadingText}>Loading color map...</div>;
+  if (loading) return <div className={styles.loadingText}>{t('memoryCortexPanel.colors.loading')}</div>;
 
   if (colors.length === 0) {
     return (
       <div className={styles.emptyList}>
         <Palette size={20} strokeWidth={1.5} />
-        <p>No font colors detected yet</p>
-        <span>Colors are extracted from font tags in chat messages as you play</span>
+        <p>{t('memoryCortexPanel.colors.emptyTitle')}</p>
+        <span>{t('memoryCortexPanel.colors.emptyHint')}</span>
       </div>
     );
   }
@@ -623,23 +625,23 @@ function ColorsView({
         <span className={styles.colorHex}>{c.hexColor}</span>
         <span className={styles.colorUsage}>{c.usageType.replace(/_/g, " ")}</span>
         <span className={styles.colorConfidence}>{(c.confidence * 100).toFixed(0)}%</span>
-        <button className={styles.colorEditBtn} onClick={() => setEditingColor(c)} title="Edit">
+        <button className={styles.colorEditBtn} onClick={() => setEditingColor(c)} title={tc('actions.edit')}>
           <Edit2 size={11} />
         </button>
-        <button className={styles.colorDeleteBtn} onClick={() => handleDelete(c.id)} title="Remove">
+        <button className={styles.colorDeleteBtn} onClick={() => handleDelete(c.id)} title={tc('actions.delete')}>
           <Trash2 size={11} />
         </button>
       </div>
       <div className={styles.colorRowReassign}>
-        <span className={styles.colorRowReassignLabel}>Reassign:</span>
+        <span className={styles.colorRowReassignLabel}>{t('memoryCortexPanel.colors.reattributeLabel')}</span>
         <select
           className={styles.colorReattributeSelect}
           value={c.entityId ?? ""}
           onChange={(e) => handleReattribute(c.id, e.target.value || null)}
           disabled={entities.length === 0}
-          title={entities.length === 0 ? "No entities yet to attribute to" : "Reattribute to…"}
+          title={entities.length === 0 ? t('memoryCortexPanel.colors.noEntitiesTitle') : t('memoryCortexPanel.colors.reattributeTitle')}
         >
-          <option value="">{c.entityId ? "(detach)" : "Pick entity…"}</option>
+          <option value="">{c.entityId ? t('memoryCortexPanel.colors.detach') : t('memoryCortexPanel.colors.pickEntity')}</option>
           {entities.map((ent) => (
             <option key={ent.id} value={ent.id}>{ent.name}</option>
           ))}
@@ -654,7 +656,7 @@ function ColorsView({
         <div className={styles.colorGroup}>
           <div className={styles.colorGroupHeader} style={{ color: "#f59e0b" }}>
             <AlertTriangle size={12} style={{ marginRight: 4, verticalAlign: -1 }} />
-            Unattributed ({unattributed.length})
+            {t('memoryCortexPanel.colors.unattributed', { count: unattributed.length })}
           </div>
           {unattributed.map(renderRow)}
         </div>
@@ -699,6 +701,8 @@ function StatsView({
   entities: CortexEntity[];
   addToast: (t: any) => void;
 }) {
+  const { t } = useTranslation('panels')
+  const dl = (key: string) => t(`memoryCortexPanel.stats.drillLabels.${key}`)
   const [drill, setDrill] = useState<DrillTarget>(null);
   const [drillData, setDrillData] = useState<any[]>([]);
   const [drillLoading, setDrillLoading] = useState(false);
@@ -750,17 +754,17 @@ function StatsView({
   };
 
   const handleDeleteRelation = async (relationId: string) => {
-    if (!confirm("Delete this relation?")) return;
+    if (!confirm(t('memoryCortexPanel.stats.deleteRelationConfirm'))) return;
     try {
       await memoryCortexApi.deleteRelation(chatId, relationId);
-      addToast({ type: "success", message: "Relation deleted" });
+      addToast({ type: "success", message: t('memoryCortexPanel.stats.relationDeleted') });
       reloadDrill();
     } catch (err: any) {
-      addToast({ type: "error", message: `Delete failed: ${err.message}` });
+      addToast({ type: "error", message: t('memoryCortexPanel.stats.deleteFailed', { error: err.message }) });
     }
   };
 
-  if (!stats) return <div className={styles.loadingText}>Loading stats...</div>;
+  if (!stats) return <div className={styles.loadingText}>{t('memoryCortexPanel.stats.loading')}</div>;
 
   // Drill-down view
   if (drill) {
@@ -768,30 +772,30 @@ function StatsView({
       <div className={styles.drillView}>
         <button className={styles.drillBack} onClick={() => setDrill(null)}>
           <ChevronLeft size={14} />
-          Back to stats
+          {t('memoryCortexPanel.stats.backToStats')}
         </button>
         <div className={styles.drillTitle}>
-          {drill.charAt(0).toUpperCase() + drill.slice(1)}
+          {t(`memoryCortexPanel.stats.drill.${drill}`)}
           {drill === "relations" && entities.length >= 2 && (
             <button className={styles.addRelationBtn} onClick={() => setCreatingRelation(true)}>
-              <Plus size={11} /> Add relation
+              <Plus size={11} /> {t('memoryCortexPanel.stats.addRelation')}
             </button>
           )}
         </div>
         {drillLoading ? (
-          <div className={styles.loadingText}>Loading records...</div>
+          <div className={styles.loadingText}>{t('memoryCortexPanel.stats.loadingRecords')}</div>
         ) : drillData.length === 0 ? (
-          <div className={styles.loadingText}>No records found</div>
+          <div className={styles.loadingText}>{t('memoryCortexPanel.stats.noRecords')}</div>
         ) : (
           <div className={styles.drillList}>
             {drill === "chunks" && drillData.map((c: any) => (
               <DrillRecord key={c.id} lines={[
-                { label: "Content", value: (c.content || "").slice(0, 200) + ((c.content || "").length > 200 ? "..." : "") },
-                { label: "Tokens", value: c.token_count },
-                { label: "Messages", value: c.message_count },
-                { label: "Salience", value: c.salience_score != null ? `${(c.salience_score * 100).toFixed(0)}%` : "unscored" },
-                { label: "Retrieved", value: c.retrieval_count ? `${c.retrieval_count}x` : "never" },
-                { label: "Vectorized", value: c.vectorized_at ? "yes" : "pending" },
+                { label: dl('content'), value: (c.content || "").slice(0, 200) + ((c.content || "").length > 200 ? "..." : "") },
+                { label: dl('tokens'), value: c.token_count },
+                { label: dl('messages'), value: c.message_count },
+                { label: dl('salience'), value: c.salience_score != null ? `${(c.salience_score * 100).toFixed(0)}%` : dl('unscored') },
+                { label: dl('retrieved'), value: c.retrieval_count ? `${c.retrieval_count}x` : dl('never') },
+                { label: dl('vectorized'), value: c.vectorized_at ? dl('yes') : dl('pending') },
               ]} tags={c.emotional_tags ? JSON.parse(c.emotional_tags) : []} />
             ))}
             {drill === "relations" && drillData.map((r: CortexRelation) => (
@@ -809,18 +813,18 @@ function StatsView({
                 <>
                   {arcs.length > 0 && (
                     <>
-                      <div className={styles.drillSectionHeader}>Story Arcs</div>
+                      <div className={styles.drillSectionHeader}>{dl('storyArcs')}</div>
                       {arcs.map((c: any) => (
                         <div key={c.id} className={styles.arcRecord}>
                           <div className={styles.arcHeader}>
-                            <span className={styles.arcBadge}>Arc</span>
-                            <span className={styles.arcTitle}>{c.title || "Arc Summary"}</span>
+                            <span className={styles.arcBadge}>{dl('arc')}</span>
+                            <span className={styles.arcTitle}>{c.title || dl('arcSummary')}</span>
                           </div>
                           <div className={styles.arcSummary}>{c.summary || ""}</div>
                           <div className={styles.arcMeta}>
-                            <span className={styles.arcMetaItem}><strong>Messages</strong> {c.messageRangeStart ?? "?"}–{c.messageRangeEnd ?? "?"}</span>
-                            <span className={styles.arcMetaItem}><strong>Entities</strong> {(c.entityIds || []).length}</span>
-                            <span className={styles.arcMetaItem}><strong>Salience</strong> {c.salienceAvg != null ? `${(c.salienceAvg * 100).toFixed(0)}%` : "—"}</span>
+                            <span className={styles.arcMetaItem}><strong>{dl('messages')}</strong> {c.messageRangeStart ?? "?"}–{c.messageRangeEnd ?? "?"}</span>
+                            <span className={styles.arcMetaItem}><strong>{dl('entitiesCount')}</strong> {(c.entityIds || []).length}</span>
+                            <span className={styles.arcMetaItem}><strong>{dl('salience')}</strong> {c.salienceAvg != null ? `${(c.salienceAvg * 100).toFixed(0)}%` : "—"}</span>
                           </div>
                           {(c.emotionalTags || []).length > 0 && (
                             <div className={styles.drillTags}>
@@ -835,13 +839,13 @@ function StatsView({
                   )}
                   {scenes.length > 0 && (
                     <>
-                      {arcs.length > 0 && <div className={styles.drillSectionHeader}>Scene Summaries</div>}
+                      {arcs.length > 0 && <div className={styles.drillSectionHeader}>{dl('sceneSummaries')}</div>}
                       {scenes.map((c: any) => (
                         <DrillRecord key={c.id} lines={[
-                          { label: c.title || "Scene Summary", value: "" },
-                          { label: "Summary", value: (c.summary || "").slice(0, 250) + ((c.summary || "").length > 250 ? "..." : "") },
-                          { label: "Messages", value: `${c.messageRangeStart ?? "?"}–${c.messageRangeEnd ?? "?"}` },
-                          { label: "Salience", value: c.salienceAvg != null ? `${(c.salienceAvg * 100).toFixed(0)}%` : "—" },
+                          { label: c.title || dl('sceneSummary'), value: "" },
+                          { label: dl('summary'), value: (c.summary || "").slice(0, 250) + ((c.summary || "").length > 250 ? "..." : "") },
+                          { label: dl('messages'), value: `${c.messageRangeStart ?? "?"}–${c.messageRangeEnd ?? "?"}` },
+                          { label: dl('salience'), value: c.salienceAvg != null ? `${(c.salienceAvg * 100).toFixed(0)}%` : "—" },
                         ]} tags={c.emotionalTags || []} />
                       ))}
                     </>
@@ -854,13 +858,13 @@ function StatsView({
             ))}
             {drill === "entities" && drillData.map((e: CortexEntity) => (
               <DrillRecord key={e.id} lines={[
-                { label: "Name", value: `${e.name}${e.confidence === "provisional" ? " (provisional)" : ""}` },
-                { label: "Type", value: e.entityType },
-                { label: "Status", value: e.status },
-                { label: "Mentions", value: e.mentionCount },
-                { label: "Salience", value: `${((e.salienceAvg ?? 0) * 100).toFixed(0)}%` },
-                { label: "Facts", value: `${(e.facts || []).length}${e.factExtractionStatus === "never" ? " (needs extraction)" : e.factExtractionStatus === "attempted_empty" ? " (retry pending)" : ""}` },
-                ...(e.lastMentionTimestamp ? [{ label: "Last seen", value: relativeTime(e.lastMentionTimestamp) || "—" }] : []),
+                { label: dl('name'), value: `${e.name}${e.confidence === "provisional" ? dl('provisional') : ""}` },
+                { label: dl('type'), value: e.entityType },
+                { label: dl('status'), value: e.status },
+                { label: dl('mentions'), value: e.mentionCount },
+                { label: dl('salience'), value: `${((e.salienceAvg ?? 0) * 100).toFixed(0)}%` },
+                { label: dl('facts'), value: `${(e.facts || []).length}${e.factExtractionStatus === "never" ? dl('needsExtraction') : e.factExtractionStatus === "attempted_empty" ? dl('retryPending') : ""}` },
+                ...(e.lastMentionTimestamp ? [{ label: dl('lastSeen'), value: formatRelativeTime(e.lastMentionTimestamp) }] : []),
               ]} />
             ))}
           </div>
@@ -891,12 +895,12 @@ function StatsView({
   // Stats overview
   return (
     <div className={styles.statsGrid}>
-      <StatCard icon={Brain} label="Memory chunks" value={stats.chunkCount} sub={`${stats.vectorizedChunkCount} vectorized`} desc="Segments of conversation stored for recall." onClick={() => openDrill("chunks")} />
-      <StatCard icon={Users} label="Entities" value={stats.activeEntityCount} sub={`${stats.entityCount - stats.activeEntityCount} archived`} desc="Characters, locations, items tracked." onClick={() => openDrill("entities")} />
-      <StatCard icon={Network} label="Relations" value={stats.relationCount} desc="Connections between entities." onClick={() => openDrill("relations")} />
-      <StatCard icon={BookOpen} label="Consolidations" value={stats.consolidationCount} desc="Compressed memory summaries." onClick={() => openDrill("consolidations")} />
-      <StatCard icon={Zap} label="Embedding calls" value={stats.estimatedEmbeddingCalls} sub="estimated total" desc="API calls used for vectorization." />
-      <StatCard icon={Heart} label="Salience records" value={stats.salienceRecordCount} desc="Chunks scored for importance." onClick={() => openDrill("salience")} />
+      <StatCard icon={Brain} label={t('memoryCortexPanel.stats.cards.chunks')} value={stats.chunkCount} sub={t('memoryCortexPanel.stats.cards.chunksSub', { count: stats.vectorizedChunkCount })} desc={t('memoryCortexPanel.stats.cards.chunksDesc')} onClick={() => openDrill("chunks")} />
+      <StatCard icon={Users} label={t('memoryCortexPanel.stats.cards.entities')} value={stats.activeEntityCount} sub={t('memoryCortexPanel.stats.cards.entitiesSub', { count: stats.entityCount - stats.activeEntityCount })} desc={t('memoryCortexPanel.stats.cards.entitiesDesc')} onClick={() => openDrill("entities")} />
+      <StatCard icon={Network} label={t('memoryCortexPanel.stats.cards.relations')} value={stats.relationCount} desc={t('memoryCortexPanel.stats.cards.relationsDesc')} onClick={() => openDrill("relations")} />
+      <StatCard icon={BookOpen} label={t('memoryCortexPanel.stats.cards.consolidations')} value={stats.consolidationCount} desc={t('memoryCortexPanel.stats.cards.consolidationsDesc')} onClick={() => openDrill("consolidations")} />
+      <StatCard icon={Zap} label={t('memoryCortexPanel.stats.cards.embeddingCalls')} value={stats.estimatedEmbeddingCalls} sub={t('memoryCortexPanel.stats.cards.embeddingSub')} desc={t('memoryCortexPanel.stats.cards.embeddingDesc')} />
+      <StatCard icon={Heart} label={t('memoryCortexPanel.stats.cards.salienceRecords')} value={stats.salienceRecordCount} desc={t('memoryCortexPanel.stats.cards.salienceDesc')} onClick={() => openDrill("salience")} />
     </div>
   );
 }
@@ -978,6 +982,7 @@ const RELATION_TYPE_COLORS: Record<string, string> = {
 // ─── Salience Drill Record ────────────────────────────────────
 
 function SalienceDrillRecord({ record: s }: { record: any }) {
+  const { t } = useTranslation('panels')
   const score = s.score ?? 0;
   const preview = (s.chunk_content || "").slice(0, 200) + ((s.chunk_content || "").length > 200 ? "..." : "");
   const emotionalTags: string[] = (() => { try { return JSON.parse(s.emotional_tags || "[]"); } catch { return []; } })();
@@ -1003,16 +1008,15 @@ function SalienceDrillRecord({ record: s }: { record: any }) {
           styles.sourceBadge,
           s.score_source === "sidecar" && styles.sourceBadgeSidecar,
         )}>
-          {s.score_source || "heuristic"}
+          {s.score_source || t('memoryCortexPanel.stats.salience.heuristic')}
         </span>
       </div>
 
-      {/* Structural signals */}
       <div className={styles.salienceSignals}>
-        {s.has_dialogue ? <span className={styles.signalActive}>dialogue</span> : <span className={styles.signalDim}>no dialogue</span>}
-        {s.has_action ? <span className={styles.signalActive}>action</span> : null}
-        {s.has_internal_thought ? <span className={styles.signalActive}>thought</span> : null}
-        <span className={styles.signalDim}>{s.word_count} words</span>
+        {s.has_dialogue ? <span className={styles.signalActive}>{t('memoryCortexPanel.stats.salience.dialogue')}</span> : <span className={styles.signalDim}>{t('memoryCortexPanel.stats.salience.noDialogue')}</span>}
+        {s.has_action ? <span className={styles.signalActive}>{t('memoryCortexPanel.stats.salience.action')}</span> : null}
+        {s.has_internal_thought ? <span className={styles.signalActive}>{t('memoryCortexPanel.stats.salience.thought')}</span> : null}
+        <span className={styles.signalDim}>{t('memoryCortexPanel.stats.salience.words', { count: s.word_count })}</span>
       </div>
 
       {/* Emotional tags */}
@@ -1066,6 +1070,9 @@ function RelationDrillRecord({
   onEdit?: () => void;
   onDelete?: () => void;
 }) {
+  const { t } = useTranslation('panels')
+  const { t: tc } = useTranslation('common')
+  const RD = 'memoryCortexPanel.relationDrill';
   const contradictionFlag = r.contradictionFlag ?? "none";
   const hasContradiction = contradictionFlag !== "none";
   const edgeSalience = r.edgeSalience ?? r.strength ?? 0;
@@ -1086,8 +1093,8 @@ function RelationDrillRecord({
           <span className={styles.relationArrow}>→</span>
           <span className={styles.relationEntityName}>{r.targetName || (r.targetEntityId ?? "").slice(0, 8)}</span>
           {r.userEditedAt !== null && (
-            <span className={styles.curatedBadge} title="User-curated — preserved through rebuilds" style={{ marginLeft: 6 }}>
-              <CheckCircle2 size={9} /> curated
+            <span className={styles.curatedBadge} title={t(`${RD}.curatedTitle`)} style={{ marginLeft: 6 }}>
+              <CheckCircle2 size={9} /> {t(`${RD}.curated`)}
             </span>
           )}
         </span>
@@ -1107,14 +1114,14 @@ function RelationDrillRecord({
       <div className={styles.relationBody}>
         {r.relationLabel && (
           <div className={styles.drillLine}>
-            <span className={styles.drillLineLabel}>Label</span>
+            <span className={styles.drillLineLabel}>{t(`${RD}.label`)}</span>
             <span className={styles.drillLineValue}>{r.relationLabel}</span>
           </div>
         )}
 
         {/* Sentiment gradient bar */}
         <div className={styles.drillLine}>
-          <span className={styles.drillLineLabel}>Sentiment</span>
+          <span className={styles.drillLineLabel}>{t(`${RD}.sentiment`)}</span>
           <span className={styles.sentimentBarContainer}>
             <span className={styles.sentimentTrack}>
               <span className={styles.sentimentCenter} />
@@ -1136,7 +1143,7 @@ function RelationDrillRecord({
 
         {/* Strength + edge salience */}
         <div className={styles.drillLine}>
-          <span className={styles.drillLineLabel}>Strength</span>
+          <span className={styles.drillLineLabel}>{t(`${RD}.strength`)}</span>
           <span className={styles.edgeSalienceBar}>
             <span className={styles.edgeSalienceTrack}>
               <span className={styles.edgeSalienceFill} style={{ width: `${Math.min(100, edgeSalience * 100)}%` }} />
@@ -1146,8 +1153,10 @@ function RelationDrillRecord({
         </div>
 
         <div className={styles.drillLine}>
-          <span className={styles.drillLineLabel}>Evidence</span>
-          <span className={styles.drillLineValue}>{(r.evidenceChunkIds || []).length} chunks</span>
+          <span className={styles.drillLineLabel}>{t(`${RD}.evidence`)}</span>
+          <span className={styles.drillLineValue}>
+            {t(`${RD}.evidenceChunks`, { count: (r.evidenceChunkIds || []).length })}
+          </span>
         </div>
       </div>
 
@@ -1167,7 +1176,7 @@ function RelationDrillRecord({
           )}
           {aliases.length > 0 && (
             <>
-              <span className={styles.drillLineLabel}>Also called</span>
+              <span className={styles.drillLineLabel}>{t(`${RD}.alsoCalled`)}</span>
               <div className={styles.labelAliasList}>
                 {aliases.map((a, i) => (
                   <span key={i} className={styles.labelAlias}>{a}</span>
@@ -1182,12 +1191,12 @@ function RelationDrillRecord({
         <div className={styles.relationActions}>
           {onEdit && (
             <button className={styles.editBtn} onClick={onEdit}>
-              <Edit2 size={11} /> Edit
+              <Edit2 size={11} /> {t(`${RD}.edit`)}
             </button>
           )}
           {onDelete && (
             <button className={styles.dangerBtn} onClick={onDelete}>
-              <Trash2 size={11} /> Delete
+              <Trash2 size={11} /> {tc('actions.delete')}
             </button>
           )}
         </div>

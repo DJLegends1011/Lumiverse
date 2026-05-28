@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { Spinner } from '@/components/shared/Spinner'
@@ -10,6 +11,7 @@ interface ImageLightboxProps {
 }
 
 export default function ImageLightbox({ src, onClose }: ImageLightboxProps) {
+  const { t } = useTranslation('shared', { keyPrefix: 'imageLightbox' })
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
 
@@ -62,7 +64,7 @@ export default function ImageLightbox({ src, onClose }: ImageLightboxProps) {
             </div>
           )}
           {hasError ? (
-            <div className={styles.error}>Failed to load image</div>
+            <div className={styles.error}>{t('loadFailed')}</div>
           ) : (
             <img
               src={src}

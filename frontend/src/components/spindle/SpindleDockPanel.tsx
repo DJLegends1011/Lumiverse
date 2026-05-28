@@ -1,4 +1,5 @@
-import { useRef, useCallback, useState } from 'react'
+import { useRef, useCallback, useState } from 'react'import { useTranslation } from 'react-i18next'
+
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X } from 'lucide-react'
 import type { DockPanelState } from '@/store/slices/spindle-placement'
 import { useStore } from '@/store'
@@ -11,7 +12,10 @@ interface Props {
   panel: DockPanelState
 }
 
-export default function SpindleDockPanel({ panel }: Props) {
+export default function SpindleDockPanel({
+ panel }: Props) {
+  const { t } = useTranslation('spindle')
+  const { t: tc } = useTranslation('common')
   const updateDockPanel = useStore((s) => s.updateDockPanel)
   const unregisterDockPanel = useStore((s) => s.unregisterDockPanel)
   const dockPanelDesktopSide = useStore((s) => s.spindleSettings.dockPanelDesktopSide)
@@ -106,7 +110,7 @@ export default function SpindleDockPanel({ panel }: Props) {
         {!panel.collapsed && (
           <>
             <span className={styles.title}>{panel.title}</span>
-            <button className={styles.headerBtn} onClick={handleClose} title="Close">
+            <button className={styles.headerBtn} onClick={handleClose} title={tc('actions.close')}>
               <X size={14} />
             </button>
           </>

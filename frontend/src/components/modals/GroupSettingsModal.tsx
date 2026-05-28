@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import { ModalShell } from '@/components/shared/ModalShell'
 import { CloseButton } from '@/components/shared/CloseButton'
@@ -30,6 +31,9 @@ function readVoiceRef(value: unknown): VoiceRef | null {
 type GroupCardMode = 'swap' | 'merge_ignore_muted' | 'merge'
 
 export default function GroupSettingsModal() {
+  const { t } = useTranslation('modals', { keyPrefix: 'groupSettings' })
+  const { t: tc } = useTranslation('common')
+
   const closeModal = useStore((s) => s.closeModal)
   const modalProps = useStore((s) => s.modalProps) as {
     chatId: string
@@ -196,35 +200,35 @@ export default function GroupSettingsModal() {
     <ModalShell isOpen={true} onClose={closeModal} maxWidth={520}>
       <CloseButton onClick={closeModal} variant="solid" position="absolute" />
       <div className={styles.header}>
-        <h2 className={styles.title}>{isGroup ? 'Group Settings' : 'Chat Settings'}</h2>
+        <h2 className={styles.title}>{isGroup ? t('title') : t('singleTitle')}</h2>
       </div>
       <div className={styles.body}>
         <div className={styles.settingsSection}>
           <div className={styles.fieldGroup}>
-            <label className={styles.fieldLabel}>{isGroup ? 'Group Name' : 'Chat Name'}</label>
+            <label className={styles.fieldLabel}>{isGroup ? t('groupName') : t('chatName')}</label>
             <input
               type="text"
               className={styles.fieldInput}
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              placeholder={isGroup ? 'Enter group name...' : 'Enter chat name...'}
+              placeholder={isGroup ? t('groupNamePlaceholder') : t('chatNamePlaceholder')}
             />
           </div>
 
           <div className={styles.fieldGroup}>
-            <label className={styles.fieldLabel}>One-Liner Impersonation Preset</label>
+            <label className={styles.fieldLabel}>{t('impersonationPreset')}</label>
             <select
               className={styles.fieldInput}
               value={impersonationPresetId}
               onChange={(e) => setImpersonationPresetId(e.target.value)}
               disabled={loadingPresets}
             >
-              <option value="">Use main preset</option>
+              <option value="">{t('useMainPreset')}</option>
               {typeof metadata.impersonation_preset_id === 'string'
                 && metadata.impersonation_preset_id
                 && !presetOptions.some((preset) => preset.id === metadata.impersonation_preset_id) && (
                   <option value={metadata.impersonation_preset_id}>
-                    Deleted preset ({metadata.impersonation_preset_id.slice(0, 8)})
+                    {t('deletedPreset', { id: metadata.impersonation_preset_id.slice(0, 8) })}
                   </option>
                 )}
               {presetOptions.map((preset) => (
@@ -234,38 +238,39 @@ export default function GroupSettingsModal() {
               ))}
             </select>
             <div style={{ fontSize: 'calc(11px * var(--lumiverse-font-scale, 1))', color: 'var(--lumiverse-text-dim)', lineHeight: 1.45 }}>
-              When set, input-bar one-liner impersonation uses this preset's impersonation prompt, assistant impersonation prefill, and parameters without changing the main preset for the chat.
+              {t('impersonationHint')}
             </div>
           </div>
 
           {!isGroup && chatCharacter && (
             <>
               <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Voice for {chatCharacter.name} (this chat)</label>
+                <label className={styles.fieldLabel}>{t('voiceForCharacter', { name: chatCharacter.name })}</label>
                 <VoicePicker
                   value={characterOverride}
                   onChange={setCharacterOverride}
-                  ariaLabel={`${chatCharacter.name} voice`}
-                  clearLabel={characterDefaultVoice ? 'Use character default' : 'Use global default'}
+                  ariaLabel={t('voiceForCharacter', { name: chatCharacter.name })}
+                  clearLabel={characterDefaultVoice ? t('useCharacterDefault') : t('useGlobalDefault')}
                   portal
                 />
                 <div style={{ fontSize: 'calc(11px * var(--lumiverse-font-scale, 1))', color: 'var(--lumiverse-text-dim)', lineHeight: 1.45 }}>
-                  Overrides {chatCharacter.name}&apos;s voice for this chat only. Leave unset to use
-                  {characterDefaultVoice ? ' the character’s default voice.' : ' the global default voice.'}
+                  {characterDefaultVoice
+                    ? t('voiceHintWithDefault', { name: chatCharacter.name })
+                    : t('voiceHintGlobal', { name: chatCharacter.name })}
                 </div>
               </div>
 
               <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Narrator (this chat)</label>
+                <label className={styles.fieldLabel}>{t('narrator')}</label>
                 <VoicePicker
                   value={narratorOverride}
                   onChange={setNarratorOverride}
-                  ariaLabel="Narrator voice"
-                  clearLabel="Use global narrator"
+                  ariaLabel={t('narrator')}
+                  clearLabel={t('useGlobalNarrator')}
                   portal
                 />
                 <div style={{ fontSize: 'calc(11px * var(--lumiverse-font-scale, 1))', color: 'var(--lumiverse-text-dim)', lineHeight: 1.45 }}>
-                  Overrides the narrator voice for narration segments in this chat. Falls back to the global narrator voice (or speech voice) when unset.
+                  {t('narratorHint')}
                 </div>
               </div>
             </>
@@ -274,23 +279,23 @@ export default function GroupSettingsModal() {
           {isGroup && (
             <>
               <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Character Card Macros</label>
+                <label className={styles.fieldLabel}>{t('characterCardMacros')}</label>
                 <select
                   className={styles.fieldInput}
                   value={groupCardMode}
                   onChange={(e) => setGroupCardMode(e.target.value as GroupCardMode)}
                 >
-                  <option value="swap">Swap to active character card</option>
-                  <option value="merge_ignore_muted">Merge all unmuted member cards</option>
-                  <option value="merge">Merge all member cards</option>
+                  <option value="swap">{t('cardModeSwap')}</option>
+                  <option value="merge_ignore_muted">{t('cardModeMergeUnmuted')}</option>
+                  <option value="merge">{t('cardModeMerge')}</option>
                 </select>
                 <div style={{ fontSize: 'calc(11px * var(--lumiverse-font-scale, 1))', color: 'var(--lumiverse-text-dim)', lineHeight: 1.45 }}>
-                  Controls how character-card macros like {'{{description}}'}, {'{{personality}}'}, and {'{{scenario}}'} resolve during generation.
+                  {t('cardMacrosHint')}
                 </div>
               </div>
 
               <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Group Scenario</label>
+                <label className={styles.fieldLabel}>{t('groupScenario')}</label>
                 <select
                   className={styles.fieldInput}
                   value={scenarioMode === 'member' ? `member:${scenarioMemberId}` : scenarioMode}
@@ -308,20 +313,20 @@ export default function GroupSettingsModal() {
                     }
                   }}
                 >
-                  <option value="individual">Use individual scenarios</option>
+                  <option value="individual">{t('scenarioIndividual')}</option>
                   {selectedCharacters.map((char) => (
                     <option key={char.id} value={`member:${char.id}`}>
-                      Use {char.name}'s scenario
+                      {t('scenarioFromMemberNamed', { name: char.name })}
                     </option>
                   ))}
-                  <option value="custom">Custom scenario</option>
+                  <option value="custom">{t('scenarioCustom')}</option>
                 </select>
                 {scenarioMode === 'custom' && (
                   <textarea
                     className={styles.fieldInput}
                     value={scenarioCustom}
                     onChange={(e) => setScenarioCustom(e.target.value)}
-                    placeholder="Enter a shared scenario for the group..."
+                    placeholder={t('scenarioPlaceholder')}
                     rows={4}
                     style={{ resize: 'vertical', marginTop: 8 }}
                   />
@@ -329,7 +334,7 @@ export default function GroupSettingsModal() {
               </div>
 
               <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Talkativeness per Character</label>
+                <label className={styles.fieldLabel}>{t('talkativenessPerCharacter')}</label>
                 {selectedCharacters.map((char) => (
                   <div key={char.id} className={styles.talkSlider}>
                     {char.avatar_path || char.image_id ? (
@@ -369,9 +374,9 @@ export default function GroupSettingsModal() {
         </div>
       </div>
       <div className={styles.footer}>
-        <Button variant="ghost" onClick={closeModal}>Cancel</Button>
+        <Button variant="ghost" onClick={closeModal}>{tc('actions.cancel')}</Button>
         <Button variant="primary" onClick={handleSave} disabled={saving} loading={saving}>
-          Save
+          {tc('actions.save')}
         </Button>
       </div>
     </ModalShell>

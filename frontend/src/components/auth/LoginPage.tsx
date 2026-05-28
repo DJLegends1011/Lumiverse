@@ -1,17 +1,22 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { motion, LazyMotion, MotionConfig, domAnimation } from 'motion/react'
+import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import styles from './LoginPage.module.css'
 import clsx from 'clsx'
 
 export default function LoginPage() {
+  const { t } = useTranslation('auth')
+  const { t: tc } = useTranslation('common')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [focused, setFocused] = useState<string | null>(null)
-  const [subtitle] = useState(() => (Math.random() < 0.076 ? 'Enter the goon' : 'Enter the loom'))
+  const [subtitleKey] = useState<'subtitleGoon' | 'subtitleLoom'>(() =>
+    Math.random() < 0.076 ? 'subtitleGoon' : 'subtitleLoom',
+  )
   const login = useStore((s) => s.login)
   const authError = useStore((s) => s.authError)
   const isAuthenticated = useStore((s) => s.isAuthenticated)
@@ -30,13 +35,12 @@ export default function LoginPage() {
       await login(username, password)
       navigate('/')
     } catch (err: any) {
-      setError(err.message || 'Login failed')
+      setError(err.message || t('loginFailed'))
     } finally {
       setLoading(false)
     }
   }
 
-  // Verify any existing session on mount — if valid, skip the form
   useEffect(() => {
     if (!isAuthenticated) {
       checkSession()
@@ -49,7 +53,6 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, navigate])
 
-  // Scroll focused input into view on mobile virtual keyboard
   useEffect(() => {
     if (!focused) return
     const scrollFocusedInput = () => {
@@ -67,11 +70,10 @@ export default function LoginPage() {
     }
   }, [focused])
 
-  // Don't flash the form while we're verifying the session, or if we're about to redirect
   if (isAuthLoading || isAuthenticated) {
     return (
       <div className={styles.checking} role="status" aria-live="polite" aria-busy="true">
-        <div className={styles.checkingSpinner} aria-label="Checking session" />
+        <div className={styles.checkingSpinner} aria-label={t('checkingSession')} />
       </div>
     )
   }
@@ -80,19 +82,15 @@ export default function LoginPage() {
     <LazyMotion features={domAnimation} strict={false}>
     <MotionConfig reducedMotion="user">
     <div className={styles.page}>
-      {/* Ambient background */}
       <div className={styles.bg}>
         <div className={clsx(styles.bgGlow, styles.bgGlow1)} />
         <div className={clsx(styles.bgGlow, styles.bgGlow2)} />
         <div className={clsx(styles.bgGlow, styles.bgGlow3)} />
       </div>
 
-      {/* Grid pattern */}
       <div className={styles.grid} />
 
-      {/* Content */}
       <div className={styles.content}>
-        {/* Logo */}
         <motion.div
           className={styles.logoBlock}
           initial={{ opacity: 0, y: -16 }}
@@ -120,11 +118,10 @@ export default function LoginPage() {
               </g>
             </svg>
           </div>
-          <h1 className={styles.logoTitle}>Lumiverse</h1>
-          <p className={styles.logoSubtitle}>{subtitle}</p>
+          <h1 className={styles.logoTitle}>{tc('appName')}</h1>
+          <p className={styles.logoSubtitle}>{t(subtitleKey)}</p>
         </motion.div>
 
-        {/* Card */}
         <motion.div
           className={styles.card}
           initial={{ opacity: 0, y: 20, scale: 0.97 }}
@@ -140,7 +137,7 @@ export default function LoginPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.3 }}
             >
-              <label className={styles.label} htmlFor="username">Username</label>
+              <label className={styles.label} htmlFor="username">{t('username')}</label>
               <div className={clsx(styles.inputWrap, focused === 'username' && styles.inputWrapFocused)}>
                 <input
                   id="username"
@@ -157,7 +154,7 @@ export default function LoginPage() {
                   autoFocus
                   spellCheck={false}
                   enterKeyHint="next"
-                  placeholder="Enter your username"
+                  placeholder={t('usernamePlaceholder')}
                 />
               </div>
             </motion.div>
@@ -168,7 +165,7 @@ export default function LoginPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.4 }}
             >
-              <label className={styles.label} htmlFor="password">Password</label>
+              <label className={styles.label} htmlFor="password">{t('password')}</label>
               <div className={clsx(styles.inputWrap, focused === 'password' && styles.inputWrapFocused)}>
                 <input
                   id="password"
@@ -182,7 +179,7 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   autoCapitalize="none"
                   enterKeyHint="done"
-                  placeholder="Enter your password"
+                  placeholder={t('passwordPlaceholder')}
                 />
               </div>
             </motion.div>
@@ -211,23 +208,22 @@ export default function LoginPage() {
               {loading ? (
                 <span className={styles.loadingState}>
                   <span className={styles.spinner} />
-                  Signing in
+                  {t('signingIn')}
                 </span>
               ) : (
-                'Sign In'
+                t('signIn')
               )}
             </motion.button>
           </form>
         </motion.div>
 
-        {/* Footer */}
         <motion.p
           className={styles.footer}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.7 }}
         >
-          Your story awaits
+          {t('footer')}
         </motion.p>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import type { DreamWeaverDraft, DreamWeaverSession } from '@/api/dream-weaver'
+import i18n from '@/i18n'
 
 export const MAIN_TABS = ['soul', 'world', 'visuals'] as const
 export const SOUL_SECTIONS = [
@@ -59,31 +60,34 @@ export function shouldOfferOpenChat(session: DreamWeaverSession | null): boolean
 }
 
 export function getSessionStatusLabel(session: DreamWeaverSession): string {
-  if (session.character_id) return 'Finalized'
-  if (session.status === 'generating') return 'Weaving'
-  if (session.status === 'complete') return 'Saved weave'
-  if (session.status === 'error') return 'Needs attention'
-  return session.workspace_kind === 'scenario' ? 'Scenario studio' : 'Character studio'
+  if (session.character_id) return i18n.t('session.statusFinalized', { ns: 'dreamWeaver' })
+  if (session.status === 'generating') return i18n.t('session.statusWeaving', { ns: 'dreamWeaver' })
+  if (session.status === 'complete') return i18n.t('session.statusSaved', { ns: 'dreamWeaver' })
+  if (session.status === 'error') return i18n.t('session.statusNeedsAttention', { ns: 'dreamWeaver' })
+  return session.workspace_kind === 'scenario'
+    ? i18n.t('session.statusScenarioStudio', { ns: 'dreamWeaver' })
+    : i18n.t('session.statusCharacterStudio', { ns: 'dreamWeaver' })
 }
 
 export function isWorldStale(session: DreamWeaverSession | null): boolean {
   return false
 }
 
+export type WeavingOperationKey = 'soul' | 'world' | 'finalize'
+
+export interface WeavingOperation {
+  title: string
+  description: string
+  steps: readonly string[]
+}
+
+export function getWeavingOperation(key: WeavingOperationKey): WeavingOperation {
+  return i18n.t(`weaving.${key}`, { ns: 'dreamWeaver', returnObjects: true }) as WeavingOperation
+}
+
+/** @deprecated Use getWeavingOperation() for locale-aware labels. */
 export const WEAVING_OPERATIONS = {
-  soul: {
-    title: 'Weaving The Soul',
-    description: 'Shaping the card, voice, and opening from your dream.',
-    steps: ['Reading dream', 'Shaping voice', 'Binding the card'],
-  },
-  world: {
-    title: 'Building The World',
-    description: 'Generating lorebooks, NPC definitions, and regex scripts from the soul.',
-    steps: ['Preparing world', 'Building world', 'Assembling lorebooks & NPCs', 'Saving world data'],
-  },
-  finalize: {
-    title: 'Bringing To Life',
-    description: 'Creating your character and preparing the first chat.',
-    steps: ['Saving portrait', 'Creating character', 'Setting up chat', 'Finishing up'],
-  },
+  get soul() { return getWeavingOperation('soul') },
+  get world() { return getWeavingOperation('world') },
+  get finalize() { return getWeavingOperation('finalize') },
 } as const

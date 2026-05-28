@@ -1,4 +1,6 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import i18n from '@/i18n'
 import clsx from 'clsx'
 import { GripVertical } from 'lucide-react'
 import {
@@ -62,8 +64,8 @@ function SortableTabRow({ tab, hidden, onToggle, variant }: SortableTabRowProps)
       <button
         type="button"
         className={styles.dragHandle}
-        title="Drag to reorder"
-        aria-label={`Drag ${tab.tabName}`}
+        title={i18n.t('configureDrawerTabs.dragToReorder', { ns: 'modals' })}
+        aria-label={i18n.t('configureDrawerTabs.dragTab', { ns: 'modals', name: tab.tabName })}
         {...attributes}
         {...listeners}
       >
@@ -77,11 +79,17 @@ function SortableTabRow({ tab, hidden, onToggle, variant }: SortableTabRowProps)
         <div className={styles.copy}>
           <div className={styles.rowTitleWrap}>
             <span className={styles.rowTitle}>{tab.tabName}</span>
-            {locked && <span className={styles.badge}>Core</span>}
-            {variant === 'extension' && <span className={clsx(styles.badge, styles.badgeMuted)}>Extension</span>}
+            {locked && <span className={styles.badge}>{i18n.t('configureDrawerTabs.coreBadge', { ns: 'modals' })}</span>}
+            {variant === 'extension' && (
+              <span className={clsx(styles.badge, styles.badgeMuted)}>
+                {i18n.t('configureDrawerTabs.extensionBadge', { ns: 'modals' })}
+              </span>
+            )}
           </div>
           <p className={styles.rowDescription}>
-            {locked ? 'Always visible so you can still reach core app sections.' : tab.tabDescription}
+            {locked
+              ? i18n.t('configureDrawerTabs.coreLockedHint', { ns: 'modals' })
+              : tab.tabDescription}
           </p>
         </div>
       </div>
@@ -152,6 +160,7 @@ function SortableSection({ title, description, tabs, hiddenTabIds, onToggle, onR
 }
 
 export default function ConfigureDrawerTabsModal() {
+  const { t } = useTranslation('modals')
   const closeModal = useStore((s) => s.closeModal)
   const setSetting = useStore((s) => s.setSetting)
   const drawerSettings = useStore((s) => s.drawerSettings)
@@ -211,15 +220,15 @@ export default function ConfigureDrawerTabsModal() {
 
       <div className={styles.header}>
         <div>
-          <h3 className={styles.title}>Configure Tabs</h3>
-          <p className={styles.subtitle}>Drag to reorder sidebar tabs. Toggle to hide optional tabs; core tabs always remain visible.</p>
+          <h3 className={styles.title}>{t('configureDrawerTabs.title')}</h3>
+          <p className={styles.subtitle}>{t('configureDrawerTabs.subtitle')}</p>
         </div>
       </div>
 
       <div className={styles.body}>
         <SortableSection
-          title="Sidebar Tabs"
-          description="Drag to reorder. Core tabs stay visible but can still be moved; toggle off any tab you don't use often."
+          title={t('configureDrawerTabs.sidebarTitle')}
+          description={t('configureDrawerTabs.sidebarDescription')}
           tabs={orderedBuiltInTabs}
           hiddenTabIds={hiddenTabIds}
           onToggle={handleToggle}
@@ -228,8 +237,8 @@ export default function ConfigureDrawerTabsModal() {
         />
 
         <SortableSection
-          title="Extension Tabs"
-          description="Extension-provided tabs render after the built-in tabs in the sidebar. Drag to reorder or hide individually."
+          title={t('configureDrawerTabs.extensionTitle')}
+          description={t('configureDrawerTabs.extensionDescription')}
           tabs={orderedExtensionTabs}
           hiddenTabIds={hiddenTabIds}
           onToggle={handleToggle}

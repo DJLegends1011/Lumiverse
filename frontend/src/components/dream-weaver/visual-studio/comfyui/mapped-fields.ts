@@ -5,6 +5,7 @@ import type {
   DreamWeaverVisualAsset,
 } from '@/api/dream-weaver'
 import type { ComfyUICapabilities } from '@/api/image-gen'
+import i18n from '@/i18n'
 
 export interface ComfyMappedFieldControl {
   key: string
@@ -112,8 +113,8 @@ function resolveControlOptions(
 
   if (typeof defaultValue === 'boolean') {
     return [
-      { value: 'true', label: 'Enabled' },
-      { value: 'false', label: 'Disabled' },
+      { value: 'true', label: i18n.t('common:actions.enabled') },
+      { value: 'false', label: i18n.t('common:actions.disabled') },
     ]
   }
 

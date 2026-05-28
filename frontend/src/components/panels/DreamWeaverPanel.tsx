@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react'
 import clsx from 'clsx'
+import { useTranslation } from 'react-i18next'
 import { connectionsApi } from '@/api/connections'
 import { dreamWeaverApi, type DreamWeaverSession } from '@/api/dream-weaver'
 import { dreamWeaverToolingApi } from '@/api/dream-weaver-tooling'
@@ -59,6 +60,7 @@ interface DWGenParams {
 }
 
 export default function DreamWeaverPanel() {
+  const { t } = useTranslation('dreamWeaver')
   const [dreamText, setDreamText] = useState('')
   const [workspaceKind, setWorkspaceKind] = useState<'character' | 'scenario'>('character')
   const [tone, setTone] = useState('')
@@ -138,12 +140,12 @@ export default function DreamWeaverPanel() {
       const nextSessions = await dreamWeaverApi.getSessions()
       setSessions(nextSessions)
     } catch (error: any) {
-      const message = error?.body?.error || error?.message || 'Failed to load Dream Weaver sessions'
-      toast.error(message, { title: 'Dream Weaver' })
+      const message = error?.body?.error || error?.message || t('toast.loadFailed')
+      toast.error(message, { title: t('brand') })
     } finally {
       setIsLoadingSessions(false)
     }
-  }, [])
+  }, [t])
 
   const loadBootstrapOptions = useCallback(async () => {
     const [personaResult, connectionResult] = await Promise.allSettled([
@@ -243,19 +245,19 @@ export default function DreamWeaverPanel() {
         try {
           await dreamWeaverToolingApi.dream(session.id)
         } catch (error: any) {
-          const message = error?.body?.error || error?.message || 'Dream source could not be saved'
-          const recoveryMessage = `${message}. The studio was created, so you can reopen it later.`
+          const message = error?.body?.error || error?.message || t('toast.dreamSaveFailed')
+          const recoveryMessage = `${message}. ${t('toast.recoverySuffix')}`
           setErrorMessage(recoveryMessage)
-          toast.error(recoveryMessage, { title: 'Dream Weaver' })
+          toast.error(recoveryMessage, { title: t('brand') })
           return
         }
       }
       setDreamText('')
       openModal('dreamWeaverStudio', { sessionId: session.id })
     } catch (error: any) {
-      const message = error?.body?.error || error?.message || 'Failed to create Dream Weaver session'
+      const message = error?.body?.error || error?.message || t('toast.createFailed')
       setErrorMessage(message)
-      toast.error(message, { title: 'Dream Weaver' })
+      toast.error(message, { title: t('brand') })
     } finally {
       void loadSessions()
       setIsCreating(false)
@@ -271,10 +273,10 @@ export default function DreamWeaverPanel() {
     try {
       await dreamWeaverApi.deleteSession(sessionToDelete.id)
       setSessions((current) => current.filter((s) => s.id !== sessionToDelete.id))
-      toast.success('Dream Weaver session deleted', { title: 'Dream Weaver' })
+      toast.success(t('toast.deleted'), { title: t('brand') })
     } catch (error: any) {
-      const message = error?.body?.error || error?.message || 'Failed to delete Dream Weaver session'
-      toast.error(message, { title: 'Dream Weaver' })
+      const message = error?.body?.error || error?.message || t('toast.deleteFailed')
+      toast.error(message, { title: t('brand') })
     } finally {
       setSessionToDelete(null)
     }
@@ -307,22 +309,22 @@ export default function DreamWeaverPanel() {
   return (
     <>
       <div className={styles.panel}>
-        <section className={styles.createSurface} aria-label="Create a Dream Weaver session">
+        <section className={styles.createSurface} aria-label={t('create.ariaLabel')}>
           <div className={styles.createHeader}>
             <div className={styles.createTitleBlock}>
-              <span className={styles.createKicker}>New Weave</span>
-              <h3 className={styles.createTitle}>Start anywhere, shape it freely.</h3>
+              <span className={styles.createKicker}>{t('create.kicker')}</span>
+              <h3 className={styles.createTitle}>{t('create.title')}</h3>
             </div>
             <div className={styles.kindField}>
-              <span className={styles.fieldLabel}>Card Type</span>
-              <div className={styles.kindToggle} aria-label="Dream Weaver card type">
+              <span className={styles.fieldLabel}>{t('create.cardType')}</span>
+              <div className={styles.kindToggle} aria-label={t('create.cardTypeAria')}>
                 <button
                   type="button"
                   className={styles.kindButton}
                   data-active={workspaceKind === 'character' || undefined}
                   onClick={() => setWorkspaceKind('character')}
                 >
-                  Character
+                  {t('create.character')}
                 </button>
                 <button
                   type="button"
@@ -330,43 +332,43 @@ export default function DreamWeaverPanel() {
                   data-active={workspaceKind === 'scenario' || undefined}
                   onClick={() => setWorkspaceKind('scenario')}
                 >
-                  Scenario
+                  {t('create.scenario')}
                 </button>
               </div>
             </div>
           </div>
 
           <div className={styles.field}>
-            <span className={styles.fieldLabel}>Source Material</span>
+            <span className={styles.fieldLabel}>{t('create.sourceMaterial')}</span>
             <TextArea
               value={dreamText}
               onChange={setDreamText}
-              placeholder="Optional. Paste a premise, scene, imported card notes, worldbook ideas, or anything worth preserving."
+              placeholder={t('create.sourcePlaceholder')}
               rows={6}
             />
             {dreamText.length > 0 && (
-              <span className={styles.charCount}>{dreamText.length.toLocaleString()} characters</span>
+              <span className={styles.charCount}>{t('create.characters', { count: dreamText.length })}</span>
             )}
           </div>
 
           {/* Persona / Connection / Model */}
           <div className={styles.selectorsGrid}>
             <div className={styles.field}>
-              <span className={styles.fieldLabel}>Persona</span>
+              <span className={styles.fieldLabel}>{t('create.persona')}</span>
               <SearchableSelect
                 value={resolvedPersonaId ?? ''}
                 onChange={(v) => setSelectedPersonaId(v || null)}
                 options={personaOptions}
-                placeholder="Use active or default persona"
-                searchPlaceholder="Search personas…"
-                emptyMessage="No personas available"
+                placeholder={t('create.personaPlaceholder')}
+                searchPlaceholder={t('create.searchPersonas')}
+                emptyMessage={t('create.noPersonas')}
                 disabled={personas.length === 0}
-                ariaLabel="Persona"
+                ariaLabel={t('create.persona')}
                 portal
               />
             </div>
             <div className={styles.field}>
-              <span className={styles.fieldLabel}>Connection</span>
+              <span className={styles.fieldLabel}>{t('create.connection')}</span>
               <SearchableSelect
                 value={resolvedConnectionId ?? ''}
                 onChange={(v) => {
@@ -374,16 +376,16 @@ export default function DreamWeaverPanel() {
                   setSelectedModel('')
                 }}
                 options={connectionOptions}
-                placeholder="Use active connection"
-                searchPlaceholder="Search connections…"
-                emptyMessage="No connections available"
+                placeholder={t('create.connectionPlaceholder')}
+                searchPlaceholder={t('create.searchConnections')}
+                emptyMessage={t('create.noConnections')}
                 disabled={connections.length === 0}
-                ariaLabel="Connection"
+                ariaLabel={t('create.connection')}
                 portal
               />
             </div>
             <div className={styles.field}>
-              <span className={styles.fieldLabel}>Model</span>
+              <span className={styles.fieldLabel}>{t('create.model')}</span>
               <ModelCombobox
                 value={selectedModel}
                 onChange={setSelectedModel}
@@ -393,8 +395,8 @@ export default function DreamWeaverPanel() {
                 onRefresh={fetchConnectionModels}
                 autoRefreshOnFocus
                 refreshKey={resolvedConnectionId ?? ''}
-                placeholder="Connection default"
-                emptyMessage={resolvedConnectionId ? 'No models returned. Enter one manually or use the connection default.' : 'No connection available.'}
+                placeholder={t('create.modelPlaceholder')}
+                emptyMessage={resolvedConnectionId ? t('create.noModelsManual') : t('create.noConnection')}
                 disabled={!resolvedConnectionId}
               />
             </div>
@@ -410,7 +412,7 @@ export default function DreamWeaverPanel() {
             >
               <span className={styles.refineLine} />
               <span className={styles.refineLabel}>
-                Refine Direction
+                {t('create.refineDirection')}
                 <ChevronRight
                   size={12}
                   className={clsx(styles.refineChevron, refineExpanded && styles.refineChevronOpen)}
@@ -422,27 +424,27 @@ export default function DreamWeaverPanel() {
             {refineExpanded && (
               <div className={styles.refineBody}>
                 <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Tone</span>
+                  <span className={styles.fieldLabel}>{t('create.tone')}</span>
                   <TextInput
                     value={tone}
                     onChange={setTone}
-                    placeholder="Uneasy, intimate, grounded, sharp…"
+                    placeholder={t('create.tonePlaceholder')}
                   />
                 </div>
                 <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Keep</span>
+                  <span className={styles.fieldLabel}>{t('create.keep')}</span>
                   <TextInput
                     value={constraints}
                     onChange={setConstraints}
-                    placeholder="Specific history, rules, relationships, or constraints."
+                    placeholder={t('create.keepPlaceholder')}
                   />
                 </div>
                 <div className={styles.field}>
-                  <span className={styles.fieldLabel}>Avoid</span>
+                  <span className={styles.fieldLabel}>{t('create.avoid')}</span>
                   <TextInput
                     value={dislikes}
                     onChange={setDislikes}
-                    placeholder="Clichés, tone drift, unwanted tropes, or exclusions."
+                    placeholder={t('create.avoidPlaceholder')}
                   />
                 </div>
               </div>
@@ -459,7 +461,7 @@ export default function DreamWeaverPanel() {
             >
               <span className={styles.refineLine} />
               <span className={styles.refineLabel}>
-                Advanced Generation
+                {t('create.advancedGeneration')}
                 <ChevronRight
                   size={12}
                   className={clsx(styles.refineChevron, tuneExpanded && styles.refineChevronOpen)}
@@ -471,62 +473,62 @@ export default function DreamWeaverPanel() {
             {tuneExpanded && (
               <div className={styles.refineBody}>
                 <p className={styles.tuneHint}>
-                  Applies to every Dream Weaver generation step. Leave blank for tool defaults.
+                  {t('create.tuneHint')}
                 </p>
                 <div className={styles.tuneGrid}>
                   <div className={styles.field}>
-                    <span className={styles.fieldLabel}>Temperature</span>
+                    <span className={styles.fieldLabel}>{t('create.temperature')}</span>
                     <TextInput
                       value={genParams.temperature != null ? String(genParams.temperature) : ''}
                       onChange={(v) => updateGenParam('temperature', v !== '' ? parseFloat(v) : null)}
                       type="number"
-                      placeholder="Default"
+                      placeholder={t('create.defaultPlaceholder')}
                       min={0}
                       max={2}
                       step={0.05}
                     />
                   </div>
                   <div className={styles.field}>
-                    <span className={styles.fieldLabel}>Top P</span>
+                    <span className={styles.fieldLabel}>{t('create.topP')}</span>
                     <TextInput
                       value={genParams.topP != null ? String(genParams.topP) : ''}
                       onChange={(v) => updateGenParam('topP', v !== '' ? parseFloat(v) : null)}
                       type="number"
-                      placeholder="Default"
+                      placeholder={t('create.defaultPlaceholder')}
                       min={0}
                       max={1}
                       step={0.01}
                     />
                   </div>
                   <div className={styles.field}>
-                    <span className={styles.fieldLabel}>Max Tokens</span>
+                    <span className={styles.fieldLabel}>{t('create.maxTokens')}</span>
                     <TextInput
                       value={genParams.maxTokens != null ? String(genParams.maxTokens) : ''}
                       onChange={(v) => updateGenParam('maxTokens', v !== '' ? parseInt(v, 10) : null)}
                       type="number"
-                      placeholder="Default"
+                      placeholder={t('create.defaultPlaceholder')}
                       min={256}
                       step={256}
                     />
                   </div>
                   <div className={styles.field}>
-                    <span className={styles.fieldLabel}>Top K</span>
+                    <span className={styles.fieldLabel}>{t('create.topK')}</span>
                     <TextInput
                       value={genParams.topK != null ? String(genParams.topK) : ''}
                       onChange={(v) => updateGenParam('topK', v !== '' ? parseInt(v, 10) : null)}
                       type="number"
-                      placeholder="Default"
+                      placeholder={t('create.defaultPlaceholder')}
                       min={1}
                       step={1}
                     />
                   </div>
                   <div className={styles.field}>
-                    <span className={styles.fieldLabel}>Timeout (s)</span>
+                    <span className={styles.fieldLabel}>{t('create.timeoutSeconds')}</span>
                     <TextInput
                       value={genParams.timeoutMs != null ? String(Math.round(genParams.timeoutMs / 1000)) : ''}
                       onChange={(v) => updateGenParam('timeoutMs', v !== '' ? parseInt(v, 10) * 1000 : null)}
                       type="number"
-                      placeholder="None"
+                      placeholder={t('create.nonePlaceholder')}
                       min={10}
                       step={10}
                     />
@@ -544,7 +546,7 @@ export default function DreamWeaverPanel() {
             onClick={() => void handleDream()}
             className={styles.dreamBtn}
           >
-            {isCreating ? 'Opening...' : dreamText.trim() ? 'Start Weaving' : 'Open Blank Studio'}
+            {isCreating ? t('create.opening') : dreamText.trim() ? t('create.startWeaving') : t('create.openBlankStudio')}
           </Button>
         </section>
 
@@ -557,13 +559,13 @@ export default function DreamWeaverPanel() {
         )}
 
         {/* Previous Weaves */}
-        <EditorSection title="Previous Weaves" Icon={History} defaultExpanded={true}>
+        <EditorSection title={t('archive.previousWeaves')} Icon={History} defaultExpanded={true}>
           <div className={styles.archiveTools}>
-            <div className={styles.archiveFilters} aria-label="Filter previous weaves">
+            <div className={styles.archiveFilters} aria-label={t('archive.filterAria')}>
               {([
-                ['all', 'All', archiveCounts.all],
-                ['drafts', 'Drafts', archiveCounts.drafts],
-                ['finalized', 'Finalized', archiveCounts.finalized],
+                ['all', t('archive.all'), archiveCounts.all],
+                ['drafts', t('archive.drafts'), archiveCounts.drafts],
+                ['finalized', t('archive.finalized'), archiveCounts.finalized],
               ] as const).map(([key, label, count]) => (
                 <button
                   key={key}
@@ -582,21 +584,21 @@ export default function DreamWeaverPanel() {
               <input
                 value={archiveQuery}
                 onChange={(event) => setArchiveQuery(event.target.value)}
-                placeholder="Search weaves..."
-                aria-label="Search previous weaves"
+                placeholder={t('archive.searchPlaceholder')}
+                aria-label={t('archive.searchAria')}
               />
               {archiveQuery.trim() && (
-                <button type="button" onClick={() => setArchiveQuery('')} aria-label="Clear weave search">
+                <button type="button" onClick={() => setArchiveQuery('')} aria-label={t('archive.clearSearch')}>
                   <X size={12} />
                 </button>
               )}
             </label>
           </div>
           {isLoadingSessions ? (
-            <div className={styles.sessionsEmpty}>Loading saved weaves...</div>
+            <div className={styles.sessionsEmpty}>{t('archive.loading')}</div>
           ) : archiveGroups.length === 0 ? (
             <div className={styles.sessionsEmpty}>
-              {sessions.length === 0 ? 'No saved weaves yet.' : 'No weaves match this view.'}
+              {sessions.length === 0 ? t('archive.empty') : t('archive.noMatch')}
             </div>
           ) : (
             <div className={styles.archiveList}>
@@ -633,7 +635,7 @@ export default function DreamWeaverPanel() {
                               <div className={styles.sessionHeading}>
                                 <span className={styles.sessionTitle}>{getDreamWeaverSessionTitle(session)}</span>
                                 <span className={styles.sessionKind}>
-                                  {session.workspace_kind === 'scenario' ? 'Scenario' : 'Character'}
+                                  {session.workspace_kind === 'scenario' ? t('create.scenario') : t('create.character')}
                                 </span>
                                 <span
                                   className={styles.sessionStatus}
@@ -660,13 +662,13 @@ export default function DreamWeaverPanel() {
                                 onClick={() => handleOpenSession(session.id)}
                               >
                                 <FolderOpen size={13} />
-                                Open
+                                {t('archive.open')}
                               </button>
                               <button
                                 type="button"
                                 className={styles.deleteBtn}
                                 onClick={() => setSessionToDelete(session)}
-                                aria-label="Delete session"
+                                aria-label={t('archive.deleteSession')}
                               >
                                 <Trash2 size={13} />
                               </button>
@@ -687,10 +689,10 @@ export default function DreamWeaverPanel() {
       {sessionToDelete && (
         <ConfirmationModal
           isOpen={true}
-          title="Delete this session?"
-          message="This removes the saved weave state. The generated character stays if you already finalized it."
+          title={t('confirm.deleteTitle')}
+          message={t('confirm.deleteMessage')}
           variant="warning"
-          confirmText="Delete session"
+          confirmText={t('confirm.deleteConfirm')}
           onConfirm={() => void handleDeleteSession()}
           onCancel={() => setSessionToDelete(null)}
         />

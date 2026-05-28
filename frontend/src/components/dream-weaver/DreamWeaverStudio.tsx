@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { motion } from 'motion/react'
 import { CloseButton } from '@/components/shared/CloseButton'
 import { Button } from '@/components/shared/FormComponents'
 import { Spinner } from '@/components/shared/Spinner'
 import { useStore } from '@/store'
 import { dreamWeaverApi, type DreamWeaverDraft } from '@/api/dream-weaver'
+import i18n from '@/i18n'
 import { useDreamWeaverStudio, type TabId } from './hooks/useDreamWeaverStudio'
 import { useVisualStudio } from './hooks/useVisualStudio'
 import { toast } from '@/lib/toast'
@@ -18,6 +21,8 @@ const EMPTY_VOICE_GUIDANCE = {
   compiled: '',
   rules: { baseline: [], rhythm: [], diction: [], quirks: [], hard_nos: [] },
 }
+
+type MissingFieldKey = 'aName' | 'aTitle' | 'personality' | 'firstMessage'
 
 function workspaceToV1(draft: any): DreamWeaverDraft | null {
   if (!draft) return null
@@ -40,7 +45,7 @@ function workspaceToV1(draft: any): DreamWeaverDraft | null {
     voice_guidance: draft.voice_guidance ?? EMPTY_VOICE_GUIDANCE,
     alternate_fields: { description: [], personality: [], scenario: [] },
     greetings: draft.greeting
-      ? [{ id: 'greeting-0', label: 'Greeting', content: draft.greeting }]
+      ? [{ id: 'greeting-0', label: i18n.t('dreamWeaver:studio.progress.defaultGreeting'), content: draft.greeting }]
       : [],
     lorebooks: draft.lorebooks ?? [],
     npc_definitions: draft.npcs ?? [],
@@ -53,14 +58,18 @@ interface DreamWeaverStudioProps {
   sessionId: string
 }
 
-const TAB_LABELS: Record<TabId, string> = { studio: 'Studio', visuals: 'Visuals' }
-const TABS: { id: TabId; label: string }[] = (['studio', 'visuals'] as TabId[]).map((id) => ({
-  id,
-  label: TAB_LABELS[id],
-}))
-
 export function DreamWeaverStudio({ sessionId }: DreamWeaverStudioProps) {
+  const { t } = useTranslation('dreamWeaver')
+  const { t: tc } = useTranslation('common')
   const closeModal = useStore((s) => s.closeModal)
+
+  const tabs = useMemo(
+    () => (['studio', 'visuals'] as TabId[]).map((id) => ({
+      id,
+      label: t(`studio.tabs.${id}`),
+    })),
+    [t],
+  )
 
   const studio = useDreamWeaverStudio(sessionId)
   const draftV1 = useMemo(() => workspaceToV1(studio.draft), [studio.draft])
@@ -72,36 +81,38 @@ export function DreamWeaverStudio({ sessionId }: DreamWeaverStudioProps) {
     studio.session?.dream_text?.trim()
       || studio.draft?.sources?.some((source) => source.content.trim()),
   )
-  const missingFinalizeFields = getMissingFinalizeFields(studio.draft, workspaceKind)
+  const missingFinalizeFieldKeys = getMissingFinalizeFieldKeys(studio.draft, workspaceKind)
+  const missingFinalizeFieldsText = formatMissingFields(t, missingFinalizeFieldKeys)
+  const isScenario = workspaceKind === 'scenario'
   const finalizeLabel = isFinalized
-    ? `Update ${workspaceKind === 'scenario' ? 'Scenario' : 'Character'}`
-    : `Finalize ${workspaceKind === 'scenario' ? 'Scenario' : 'Character'}`
-  const statusLabel = isFinalized ? 'Linked' : 'Draft'
+    ? (isScenario ? t('studio.finalize.updateScenario') : t('studio.finalize.updateCharacter'))
+    : (isScenario ? t('studio.finalize.finalizeScenario') : t('studio.finalize.finalizeCharacter'))
+  const statusLabel = isFinalized ? t('studio.status.linked') : t('studio.status.draft')
   const footerStatus = isFinalized
-    ? 'Updates the existing generated card.'
-    : 'Creates a new card when finalized.'
-  const missingFinalizeMessage = missingFinalizeFields.length > 0
-    ? `Needs ${formatMissingFields(missingFinalizeFields)} before finalizing.`
+    ? t('studio.footer.updatesExisting')
+    : t('studio.footer.createsNew')
+  const missingFinalizeMessage = missingFinalizeFieldKeys.length > 0
+    ? t('studio.needsBeforeFinalize', { fields: missingFinalizeFieldsText })
     : null
   const handleVisualDraftUpdate = useCallback((patch: Partial<DreamWeaverDraft>) => {
     if (!patch.visual_assets) return
     void dreamWeaverApi.updateVisualAssets(sessionId, patch.visual_assets).catch((error: unknown) => {
       console.error('Failed to persist Dream Weaver visual assets', error)
-      toast.error('Failed to save visual settings. Try again before finalizing.', { title: 'Dream Weaver' })
+      toast.error(t('studio.toast.visualSaveFailed'), { title: t('brand') })
     })
-  }, [sessionId])
+  }, [sessionId, t])
   const visuals = useVisualStudio(sessionId, draftV1, handleVisualDraftUpdate)
 
   const prevFinalized = useRef(isFinalized)
   useEffect(() => {
     if (!prevFinalized.current && isFinalized) {
       toast.success(
-        `${workspaceKind === 'scenario' ? 'Scenario' : 'Character'} created. You can now open it in chat.`,
-        { title: 'Dream Weaver' },
+        isScenario ? t('studio.toast.createdScenario') : t('studio.toast.createdCharacter'),
+        { title: t('brand') },
       )
     }
     prevFinalized.current = isFinalized
-  }, [isFinalized, workspaceKind])
+  }, [isFinalized, isScenario, t])
 
   const handleClose = useCallback(() => {
     closeModal()
@@ -112,15 +123,15 @@ export function DreamWeaverStudio({ sessionId }: DreamWeaverStudioProps) {
   }, [studio])
 
   const handleFinalize = useCallback(() => {
-    if (missingFinalizeFields.length > 0) {
-      toast.warning(`Add ${formatMissingFields(missingFinalizeFields)} before finalizing.`, { title: 'Dream Weaver' })
+    if (missingFinalizeFieldKeys.length > 0) {
+      toast.warning(t('studio.addBeforeFinalize', { fields: missingFinalizeFieldsText }), { title: t('brand') })
       return
     }
 
     void studio.finalize({
       accepted_portrait_image_id: visuals.selectedAsset?.references[0]?.image_id ?? null,
     })
-  }, [missingFinalizeFields, studio, visuals.selectedAsset?.references])
+  }, [missingFinalizeFieldKeys.length, missingFinalizeFieldsText, studio, visuals.selectedAsset?.references, t])
 
   return createPortal(
     <>
@@ -136,19 +147,19 @@ export function DreamWeaverStudio({ sessionId }: DreamWeaverStudioProps) {
           {studio.loading ? (
             <div className={styles.loadingState}>
               <Spinner />
-              <p>Loading session...</p>
+              <p>{t('studio.loadingSession')}</p>
             </div>
           ) : (
             <>
               <header className={styles.header}>
                 <div className={styles.headerLeft}>
-                  <span className={styles.headerLabel}>Dream Weaver Studio</span>
+                  <span className={styles.headerLabel}>{t('studio.headerLabel')}</span>
                   <h2 className={styles.headerTitle}>
-                    {sessionDisplayName(studio.draft, studio.session)}
+                    {sessionDisplayName(t, studio.draft, studio.session)}
                   </h2>
                 </div>
                 <div className={styles.headerRight}>
-                  <div className={styles.kindToggle} aria-label="Card type">
+                  <div className={styles.kindToggle} aria-label={t('studio.kind.ariaLabel')}>
                     {(['character', 'scenario'] as const).map((kind) => (
                       <button
                         key={kind}
@@ -158,7 +169,7 @@ export function DreamWeaverStudio({ sessionId }: DreamWeaverStudioProps) {
                         onClick={() => void studio.updateWorkspaceKind(kind)}
                         disabled={Boolean(studio.session?.character_id)}
                       >
-                        {kind === 'character' ? 'Character' : 'Scenario'}
+                        {t(`studio.kind.${kind}`)}
                       </button>
                     ))}
                   </div>
@@ -174,7 +185,7 @@ export function DreamWeaverStudio({ sessionId }: DreamWeaverStudioProps) {
               <div className={styles.body}>
                 <div className={styles.main}>
                   <nav className={styles.tabBar}>
-                    {TABS.map((tab) => (
+                    {tabs.map((tab) => (
                       <button
                         key={tab.id}
                         className={styles.tab}
@@ -200,7 +211,7 @@ export function DreamWeaverStudio({ sessionId }: DreamWeaverStudioProps) {
               <footer className={styles.footer}>
                 <div className={styles.footerLeft}>
                   <span className={styles.sessionName}>
-                    {sessionDisplayName(studio.draft, studio.session)}
+                    {sessionDisplayName(t, studio.draft, studio.session)}
                   </span>
                   <span className={styles.saveStatus} data-dirty={!isFinalized || undefined}>
                     {footerStatus}
@@ -218,16 +229,16 @@ export function DreamWeaverStudio({ sessionId }: DreamWeaverStudioProps) {
                     onClick={handleClose}
                     disabled={studio.finalizing}
                   >
-                    Close
+                    {tc('actions.close')}
                   </Button>
                   <Button
                     variant="primary"
                     size="sm"
                     onClick={handleFinalize}
                     loading={studio.finalizing}
-                    disabled={studio.finalizing || missingFinalizeFields.length > 0}
+                    disabled={studio.finalizing || missingFinalizeFieldKeys.length > 0}
                     aria-describedby={missingFinalizeMessage ? finalizeHelpId : undefined}
-                    title={missingFinalizeFields.length > 0 ? `Needs: ${formatMissingFields(missingFinalizeFields)}` : undefined}
+                    title={missingFinalizeFieldKeys.length > 0 ? t('studio.needsTitle', { fields: missingFinalizeFieldsText }) : undefined}
                   >
                     {finalizeLabel}
                   </Button>
@@ -250,30 +261,39 @@ export function DreamWeaverStudio({ sessionId }: DreamWeaverStudioProps) {
 }
 
 function sessionDisplayName(
+  t: TFunction<'dreamWeaver'>,
   _draft: ReturnType<typeof useDreamWeaverStudio>['draft'],
   session: ReturnType<typeof useDreamWeaverStudio>['session'],
 ): string {
   if (session) {
-    return session.session_number > 0 ? `Session #${session.session_number}` : 'Session'
+    return session.session_number > 0
+      ? t('session.titleNumbered', { number: session.session_number })
+      : t('session.title')
   }
-  return 'New Dream'
+  return t('studio.session.newDream')
 }
 
-function getMissingFinalizeFields(
+function getMissingFinalizeFieldKeys(
   draft: ReturnType<typeof useDreamWeaverStudio>['draft'],
   workspaceKind: 'character' | 'scenario',
-): string[] {
-  if (!draft) return ['a name/title', 'personality', 'first message']
+): MissingFieldKey[] {
+  if (!draft) return ['aName', 'personality', 'firstMessage']
 
-  const missing: string[] = []
-  if (!draft.name?.trim()) missing.push(workspaceKind === 'scenario' ? 'a title' : 'a name')
+  const missing: MissingFieldKey[] = []
+  if (!draft.name?.trim()) missing.push(workspaceKind === 'scenario' ? 'aTitle' : 'aName')
   if (!draft.personality?.trim()) missing.push('personality')
-  if (!draft.first_mes?.trim()) missing.push('first message')
+  if (!draft.first_mes?.trim()) missing.push('firstMessage')
   return missing
 }
 
-function formatMissingFields(fields: string[]): string {
-  if (fields.length <= 1) return fields[0] ?? 'required fields'
-  if (fields.length === 2) return `${fields[0]} and ${fields[1]}`
-  return `${fields.slice(0, -1).join(', ')}, and ${fields[fields.length - 1]}`
+function formatMissingFields(t: TFunction<'dreamWeaver'>, keys: MissingFieldKey[]): string {
+  const labels = keys.map((key) => t(`studio.missingFields.${key}`))
+  if (labels.length <= 1) return labels[0] ?? t('studio.missingFields.requiredFields')
+  if (labels.length === 2) {
+    return t('studio.missingFields.joinTwo', { first: labels[0], second: labels[1] })
+  }
+  return t('studio.missingFields.joinMany', {
+    items: labels.slice(0, -1).join(', '),
+    last: labels[labels.length - 1],
+  })
 }

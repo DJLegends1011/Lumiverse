@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Volume2, Mic, Play, ExternalLink } from 'lucide-react'
 import { useStore } from '@/store'
 import { sttConnectionsApi } from '@/api/stt-connections'
@@ -13,6 +14,7 @@ import styles from './VoiceSettings.module.css'
 import clsx from 'clsx'
 
 export default function VoiceSettings() {
+  const { t } = useTranslation('settings')
   const voiceSettings = useStore((s) => s.voiceSettings)
   const setVoiceSettings = useStore((s) => s.setVoiceSettings)
   const sttProfiles = useStore((s) => s.sttProfiles)
@@ -65,7 +67,7 @@ export default function VoiceSettings() {
 
   const handleTestTTS = async () => {
     if (!voiceSettings.ttsConnectionId) {
-      addToast({ type: 'warning', message: 'Select a TTS connection first' })
+      addToast({ type: 'warning', message: t('voice.selectTtsFirst') })
       return
     }
     if (isSpeaking()) {
@@ -76,7 +78,7 @@ export default function VoiceSettings() {
     try {
       setTTSVolume(voiceSettings.ttsVolume)
       setTTSSpeed(voiceSettings.ttsSpeed)
-      const res = await ttsApi.synthesize(voiceSettings.ttsConnectionId, 'Hello! This is a test of the text-to-speech system.')
+      const res = await ttsApi.synthesize(voiceSettings.ttsConnectionId, t('voice.ttsTestPhrase'))
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: res.statusText }))
         throw new Error(body.error || `TTS error ${res.status}`)
@@ -84,7 +86,7 @@ export default function VoiceSettings() {
       const buffer = await res.arrayBuffer()
       speak(buffer)
     } catch (err: any) {
-      addToast({ type: 'error', message: err.message || 'TTS test failed' })
+      addToast({ type: 'error', message: err.message || t('voice.ttsTestFailed') })
     } finally {
       setTesting(false)
     }
@@ -102,7 +104,7 @@ export default function VoiceSettings() {
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <Volume2 size={14} />
-          <span>Text-to-Speech</span>
+          <span>{t('voice.ttsTitle')}</span>
           <div className={styles.sectionHeaderActions}>
             <button
               className={clsx(styles.actionBtn, styles.actionBtnPrimary)}
@@ -110,7 +112,7 @@ export default function VoiceSettings() {
               disabled={testing || !voiceSettings.ttsConnectionId}
             >
               <Play size={12} />
-              {testing ? 'Speaking...' : isSpeaking() ? 'Stop' : 'Test'}
+              {testing ? t('voice.speaking') : isSpeaking() ? t('voice.stop') : t('voice.test')}
             </button>
           </div>
         </div>
@@ -119,8 +121,8 @@ export default function VoiceSettings() {
           <Toggle.Checkbox
             checked={voiceSettings.ttsEnabled}
             onChange={(v) => setVoiceSettings({ ttsEnabled: v })}
-            label="Enable text-to-speech"
-            hint="Allow AI responses to be spoken aloud"
+            label={t('voice.enableTts')}
+            hint={t('voice.enableTtsHint')}
           />
         </div>
 
@@ -129,29 +131,29 @@ export default function VoiceSettings() {
             checked={voiceSettings.ttsAutoPlay}
             onChange={(v) => setVoiceSettings({ ttsAutoPlay: v })}
             disabled={!voiceSettings.ttsEnabled}
-            label="Auto-play responses"
-            hint="Automatically speak AI responses when generation completes"
+            label={t('voice.autoPlay')}
+            hint={t('voice.autoPlayHint')}
           />
         </div>
 
         <div className={styles.row}>
-          <span className={styles.label}>Connection</span>
+          <span className={styles.label}>{t('voice.connection')}</span>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
             <SearchableSelect
               value={voiceSettings.ttsConnectionId || ''}
               onChange={(val) => setVoiceSettings({ ttsConnectionId: val || null })}
               options={connectionOptions}
-              placeholder="Select a connection…"
-              searchPlaceholder="Search connections…"
-              ariaLabel="TTS connection"
-              emptyMessage="No TTS connections configured"
+              placeholder={t('voice.selectConnection')}
+              searchPlaceholder={t('voice.searchConnections')}
+              ariaLabel={t('voice.ttsConnectionAria')}
+              emptyMessage={t('voice.noTtsConnections')}
               clearable
-              clearLabel="No connection"
+              clearLabel={t('voice.noConnection')}
             />
             <button
               className={styles.actionBtn}
               onClick={() => openDrawer?.('connections')}
-              title="Manage TTS connections"
+              title={t('voice.manageTts')}
             >
               <ExternalLink size={12} />
             </button>
@@ -160,14 +162,14 @@ export default function VoiceSettings() {
 
         {activeConnection && (
           <div className={styles.infoBox}>
-            Provider: <strong>{activeConnection.provider}</strong>
-            {activeConnection.model && <> &middot; Model: <strong>{activeConnection.model}</strong></>}
-            {activeConnection.voice && <> &middot; Voice: <strong>{activeConnection.voice}</strong></>}
+            {t('voice.provider')}: <strong>{activeConnection.provider}</strong>
+            {activeConnection.model && <> &middot; {t('voice.model')}: <strong>{activeConnection.model}</strong></>}
+            {activeConnection.voice && <> &middot; {t('voice.voiceLabel')}: <strong>{activeConnection.voice}</strong></>}
           </div>
         )}
 
         <div className={styles.row}>
-          <span className={styles.label}>Speed ({voiceSettings.ttsSpeed.toFixed(1)}x)</span>
+          <span className={styles.label}>{t('voice.speed', { value: voiceSettings.ttsSpeed.toFixed(1) })}</span>
           <div className={styles.rangeRow}>
             <input
               type="range"
@@ -187,7 +189,7 @@ export default function VoiceSettings() {
         </div>
 
         <div className={styles.row}>
-          <span className={styles.label}>Volume ({Math.round(voiceSettings.ttsVolume * 100)}%)</span>
+          <span className={styles.label}>{t('voice.volume', { pct: Math.round(voiceSettings.ttsVolume * 100) })}</span>
           <div className={styles.rangeRow}>
             <input
               type="range"
@@ -207,7 +209,7 @@ export default function VoiceSettings() {
         </div>
 
         {/* ── Narration Voice ───────────────────────────────────────── */}
-        <div className={styles.subHeader}>Narration</div>
+        <div className={styles.subHeader}>{t('voice.narration')}</div>
 
         <div className={styles.toggleRow}>
           <Toggle.Checkbox
@@ -220,22 +222,22 @@ export default function VoiceSettings() {
               })
             }
             disabled={!voiceSettings.ttsEnabled}
-            label="Use a separate narrator voice"
-            hint="Speak narration/thoughts in a different voice from character speech. Applies anywhere narration appears (single-character cards too)."
+            label={t('voice.separateNarrator')}
+            hint={t('voice.separateNarratorHint')}
           />
         </div>
 
         {voiceSettings.narrationVoice !== null && (
           <>
             <div className={styles.row} style={{ alignItems: 'flex-start' }}>
-              <span className={styles.label} style={{ paddingTop: 6 }}>Narrator</span>
+              <span className={styles.label} style={{ paddingTop: 6 }}>{t('voice.narrator')}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <VoicePicker
                   value={voiceSettings.narrationVoice}
                   onChange={(next) => setVoiceSettings({ narrationVoice: next })}
                   disabled={!voiceSettings.ttsEnabled}
-                  ariaLabel="Narrator"
-                  clearLabel="Use speech voice for narration"
+                  ariaLabel={t('voice.narratorAria')}
+                  clearLabel={t('voice.useSpeechForNarration')}
                   portal
                 />
               </div>
@@ -266,15 +268,15 @@ export default function VoiceSettings() {
                   }
                 }}
                 disabled={!voiceSettings.ttsEnabled}
-                label="Use a separate narrator speed"
-                hint="Speak narration at its own pace instead of inheriting the Speed setting above."
+                label={t('voice.separateNarratorSpeed')}
+                hint={t('voice.separateNarratorSpeedHint')}
               />
             </div>
 
             {voiceSettings.narrationVoice.parameters?.speed !== undefined && (
               <div className={styles.row}>
                 <span className={styles.label}>
-                  Narrator speed ({voiceSettings.narrationVoice.parameters.speed.toFixed(1)}x)
+                  {t('voice.narratorSpeed', { value: voiceSettings.narrationVoice.parameters.speed.toFixed(1) })}
                 </span>
                 <div className={styles.rangeRow}>
                   <input
@@ -307,53 +309,53 @@ export default function VoiceSettings() {
         )}
 
         {/* ── Speech Detection Rules ────────────────────────────────── */}
-        <div className={styles.subHeader}>Speech Detection</div>
+        <div className={styles.subHeader}>{t('voice.speechDetection')}</div>
 
         <div className={styles.row}>
           <div>
-            <span className={styles.label}>Asterisked text</span>
-            <div className={styles.hint}>Content wrapped in *asterisks*</div>
+            <span className={styles.label}>{t('voice.asterisked')}</span>
+            <div className={styles.hint}>{t('voice.asteriskedHint')}</div>
           </div>
           <select
             className={styles.select}
             value={voiceSettings.speechDetectionRules.asterisked}
             onChange={(e) => updateDetectionRule('asterisked', e.target.value)}
           >
-            <option value="skip">Skip</option>
-            <option value="narration">Read as Narration</option>
-            <option value="thought">Read as Thoughts (character voice)</option>
+            <option value="skip">{t('voice.detSkip')}</option>
+            <option value="narration">{t('voice.detNarration')}</option>
+            <option value="thought">{t('voice.detThought')}</option>
           </select>
         </div>
 
         <div className={styles.row}>
           <div>
-            <span className={styles.label}>Quoted text</span>
-            <div className={styles.hint}>Content wrapped in &quot;quotes&quot;</div>
+            <span className={styles.label}>{t('voice.quoted')}</span>
+            <div className={styles.hint}>{t('voice.quotedHint')}</div>
           </div>
           <select
             className={styles.select}
             value={voiceSettings.speechDetectionRules.quoted}
             onChange={(e) => updateDetectionRule('quoted', e.target.value)}
           >
-            <option value="speech">Read as Speech</option>
-            <option value="narration">Read as Narration</option>
-            <option value="skip">Skip</option>
+            <option value="speech">{t('voice.detSpeech')}</option>
+            <option value="narration">{t('voice.detNarration')}</option>
+            <option value="skip">{t('voice.detSkip')}</option>
           </select>
         </div>
 
         <div className={styles.row}>
           <div>
-            <span className={styles.label}>Undecorated text</span>
-            <div className={styles.hint}>Plain text without formatting</div>
+            <span className={styles.label}>{t('voice.undecorated')}</span>
+            <div className={styles.hint}>{t('voice.undecoratedHint')}</div>
           </div>
           <select
             className={styles.select}
             value={voiceSettings.speechDetectionRules.undecorated}
             onChange={(e) => updateDetectionRule('undecorated', e.target.value)}
           >
-            <option value="narration">Read as Narration</option>
-            <option value="speech">Read as Speech</option>
-            <option value="skip">Skip</option>
+            <option value="narration">{t('voice.detNarration')}</option>
+            <option value="speech">{t('voice.detSpeech')}</option>
+            <option value="skip">{t('voice.detSkip')}</option>
           </select>
         </div>
       </div>
@@ -362,25 +364,25 @@ export default function VoiceSettings() {
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <Mic size={14} />
-          <span>Speech-to-Text</span>
+          <span>{t('voice.sttTitle')}</span>
         </div>
 
         <div className={styles.row}>
-          <span className={styles.label}>Provider</span>
+          <span className={styles.label}>{t('voice.sttProvider')}</span>
           <select
             className={styles.select}
             value={voiceSettings.sttProvider}
             onChange={(e) => setVoiceSettings({ sttProvider: e.target.value as 'webspeech' | 'connection' })}
           >
             <option value="webspeech" disabled={!isWebSpeechAvailable()}>
-              Web Speech API {!isWebSpeechAvailable() ? '(Unavailable)' : ''}
+              {t('voice.sttWebSpeech')} {!isWebSpeechAvailable() ? t('voice.sttUnavailable') : ''}
             </option>
-            <option value="connection">STT Connection</option>
+            <option value="connection">{t('voice.sttConnection')}</option>
           </select>
         </div>
 
         <div className={styles.row}>
-          <span className={styles.label}>Language</span>
+          <span className={styles.label}>{t('voice.sttLanguage')}</span>
           <select
             className={styles.select}
             value={voiceSettings.sttLanguage}
@@ -404,8 +406,8 @@ export default function VoiceSettings() {
           <Toggle.Checkbox
             checked={voiceSettings.sttContinuous}
             onChange={(v) => setVoiceSettings({ sttContinuous: v })}
-            label="Continuous recognition"
-            hint="Keep listening after each silence-delimited result"
+            label={t('voice.sttContinuous')}
+            hint={t('voice.sttContinuousHint')}
           />
         </div>
 
@@ -413,8 +415,8 @@ export default function VoiceSettings() {
           <Toggle.Checkbox
             checked={voiceSettings.sttInterimResults}
             onChange={(v) => setVoiceSettings({ sttInterimResults: v })}
-            label="Show interim results"
-            hint="Display partial transcriptions as you speak"
+            label={t('voice.sttInterim')}
+            hint={t('voice.sttInterimHint')}
           />
         </div>
 
@@ -422,10 +424,10 @@ export default function VoiceSettings() {
           <Toggle.Checkbox
             checked={voiceSettings.sttAutoSubmitOnSilence}
             onChange={(v) => setVoiceSettings({ sttAutoSubmitOnSilence: v })}
-            label="Auto-submit after silence"
+            label={t('voice.sttAutoSubmit')}
             hint={voiceSettings.sttProvider === 'webspeech'
-              ? 'Stop Web Speech recognition after a sustained pause'
-              : 'Wait for a sustained pause before transcribing and queueing'}
+              ? t('voice.sttAutoSubmitWebHint')
+              : t('voice.sttAutoSubmitConnHint')}
           />
         </div>
 
@@ -433,37 +435,37 @@ export default function VoiceSettings() {
           <Toggle.Checkbox
             checked={voiceSettings.sttShowMicButton}
             onChange={(v) => setVoiceSettings({ sttShowMicButton: v })}
-            label="Show mic button in input bar"
-            hint="Display the speech-to-text shortcut beside the message input"
+            label={t('voice.sttMicButton')}
+            hint={t('voice.sttMicButtonHint')}
           />
         </div>
 
         {voiceSettings.sttProvider === 'webspeech' && !isWebSpeechAvailable() && (
           <div className={styles.infoBox}>
-            Web Speech API is not available in this browser. Try Chrome or Edge, or switch to an STT connection.
+            {t('voice.sttWebSpeechUnavailable')}
           </div>
         )}
 
         {voiceSettings.sttProvider === 'connection' && (
           <>
             <div className={styles.row}>
-              <span className={styles.label}>Connection</span>
+              <span className={styles.label}>{t('voice.connection')}</span>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
                 <SearchableSelect
                   value={voiceSettings.sttConnectionId || ''}
                   onChange={(val) => setVoiceSettings({ sttConnectionId: val || null })}
                   options={sttConnectionOptions}
-                  placeholder="Select a connection…"
-                  searchPlaceholder="Search connections…"
-                  ariaLabel="STT connection"
-                  emptyMessage="No STT connections configured"
+                  placeholder={t('voice.selectConnection')}
+                  searchPlaceholder={t('voice.searchConnections')}
+                  ariaLabel={t('voice.sttConnectionAria')}
+                  emptyMessage={t('voice.noSttConnections')}
                   clearable
-                  clearLabel="No connection"
+                  clearLabel={t('voice.noConnection')}
                 />
                 <button
                   className={styles.actionBtn}
                   onClick={() => openDrawer?.('connections')}
-                  title="Manage STT connections"
+                  title={t('voice.manageStt')}
                 >
                   <ExternalLink size={12} />
                 </button>
@@ -472,8 +474,8 @@ export default function VoiceSettings() {
 
             <div className={styles.infoBox}>
               {activeSttConnection
-                ? <>Provider: <strong>{activeSttConnection.provider}</strong>{activeSttConnection.model && <> &middot; Model: <strong>{activeSttConnection.model}</strong></>}</>
-                : 'Speech-to-text uses a dedicated STT connection from Connections settings.'}
+                ? <>{t('voice.provider')}: <strong>{activeSttConnection.provider}</strong>{activeSttConnection.model && <> &middot; {t('voice.model')}: <strong>{activeSttConnection.model}</strong></>}</>
+                : t('voice.sttConnectionFallback')}
             </div>
           </>
         )}

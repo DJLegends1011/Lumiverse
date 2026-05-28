@@ -1,4 +1,5 @@
 import { useRef, useCallback, useEffect, useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { FloatWidgetState } from '@/store/slices/spindle-placement'
 import { useStore } from '@/store'
 import useIsMobile from '@/hooks/useIsMobile'
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function SpindleFloatWidget({ widget }: Props) {
+  const { t } = useTranslation('shared', { keyPrefix: 'spindle' })
   const updateFloatWidget = useStore((s) => s.updateFloatWidget)
   const setPlacementHidden = useStore((s) => s.setPlacementHidden)
   const isMobile = useIsMobile()
@@ -110,12 +112,12 @@ export default function SpindleFloatWidget({ widget }: Props) {
   const menuItems: ContextMenuEntry[] = useMemo(() => [
     {
       key: 'hide',
-      label: 'Hide Widget',
+      label: t('hideWidget'),
       onClick: () => { setPlacementHidden(widget.id, true); setContextMenu(null) },
     },
     {
       key: 'reset',
-      label: 'Reset Position',
+      label: t('resetPosition'),
       onClick: () => {
         const pad = 12
         const resetWidth = widget.defaultWidth
@@ -132,6 +134,7 @@ export default function SpindleFloatWidget({ widget }: Props) {
       },
     },
   ], [
+    t,
     setPlacementHidden,
     updateFloatWidget,
     widget.defaultHeight,

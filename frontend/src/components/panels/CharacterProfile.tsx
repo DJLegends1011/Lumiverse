@@ -10,6 +10,7 @@ import {
   User, Users, BookOpen, MessageSquare, Sparkles, FileText, Eye, Mic,
   Pencil, Settings2, ChevronRight,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { extractPalette, getSurfaceColor } from '@/lib/colorExtraction'
 import { deriveHeroTextVars } from '@/lib/characterTheme'
 import type { Character } from '@/types/api'
@@ -74,6 +75,7 @@ function SingleCharacterProfile({
   setEditingCharacterId: (id: string | null) => void
   setDrawerTab: (tab: string) => void
 }) {
+  const { t } = useTranslation('panels')
   const charId = paramId || activeCharacterId
   const storedCharacter = charId ? characters.find((entry) => entry.id === charId) ?? null : null
   const [character, setCharacter] = useState<Character | null>(storedCharacter)
@@ -147,13 +149,13 @@ function SingleCharacterProfile({
     return (
       <div className={styles.empty}>
         <User size={40} strokeWidth={1} />
-        <p>No character selected</p>
+        <p>{t('characterProfile.noCharacterSelected')}</p>
       </div>
     )
   }
 
   if (loading || !character) {
-    return <div className={styles.loading}>Loading...</div>
+    return <div className={styles.loading}>{t('characterProfile.loading')}</div>
   }
 
   return (
@@ -176,9 +178,9 @@ function SingleCharacterProfile({
           <h2 className={styles.name}>{character.name}</h2>
           <button type="button" className={styles.editBtn} onClick={handleEditCharacter}>
             <Pencil size={12} />
-            <span>Edit Character</span>
+            <span>{t('characterProfile.editCharacter')}</span>
           </button>
-          {character.creator && <span className={styles.creator}>by {character.creator}</span>}
+          {character.creator && <span className={styles.creator}>{t('characterProfile.byCreator', { creator: character.creator })}</span>}
           {character.tags.length > 0 && (
             <TagList tags={character.tags} />
           )}
@@ -187,7 +189,7 @@ function SingleCharacterProfile({
 
       {/* Description */}
       {hasDreamWeaverAppearance(dreamWeaverMetadata) && (
-        <EditorSection Icon={Eye} title="Appearance" defaultExpanded={false}>
+        <EditorSection Icon={Eye} title={t('characterProfile.sections.appearance')} defaultExpanded={false}>
           <div className={styles.fieldContent}>
             {dreamWeaverAppearance}
           </div>
@@ -195,35 +197,35 @@ function SingleCharacterProfile({
       )}
 
       {/* Description */}
-      <EditorSection Icon={BookOpen} title="Description" defaultExpanded={false}>
+      <EditorSection Icon={BookOpen} title={t('characterProfile.sections.description')} defaultExpanded={false}>
         <div className={styles.fieldContent}>
-          {character.description || <span className={styles.placeholder}>No description</span>}
+          {character.description || <span className={styles.placeholder}>{t('characterProfile.empty.description')}</span>}
         </div>
       </EditorSection>
 
       {/* Personality */}
-      <EditorSection Icon={Sparkles} title="Personality" defaultExpanded={false}>
+      <EditorSection Icon={Sparkles} title={t('characterProfile.sections.personality')} defaultExpanded={false}>
         <div className={styles.fieldContent}>
-          {character.personality || <span className={styles.placeholder}>No personality defined</span>}
+          {character.personality || <span className={styles.placeholder}>{t('characterProfile.empty.personality')}</span>}
         </div>
       </EditorSection>
 
       {/* Scenario */}
-      <EditorSection Icon={FileText} title="Scenario" defaultExpanded={false}>
+      <EditorSection Icon={FileText} title={t('characterProfile.sections.scenario')} defaultExpanded={false}>
         <div className={styles.fieldContent}>
-          {character.scenario || <span className={styles.placeholder}>No scenario</span>}
+          {character.scenario || <span className={styles.placeholder}>{t('characterProfile.empty.scenario')}</span>}
         </div>
       </EditorSection>
 
       {/* First Message */}
-      <EditorSection Icon={MessageSquare} title="First Message" defaultExpanded={false}>
+      <EditorSection Icon={MessageSquare} title={t('characterProfile.sections.firstMessage')} defaultExpanded={false}>
         <div className={styles.fieldContent}>
-          {character.first_mes || <span className={styles.placeholder}>No first message</span>}
+          {character.first_mes || <span className={styles.placeholder}>{t('characterProfile.empty.firstMessage')}</span>}
         </div>
       </EditorSection>
 
       {hasDreamWeaverVoiceGuidance(dreamWeaverMetadata) && (
-        <EditorSection Icon={Mic} title="Voice Guidance" defaultExpanded={false}>
+        <EditorSection Icon={Mic} title={t('characterProfile.sections.voiceGuidance')} defaultExpanded={false}>
           <div className={styles.fieldContent}>
             {dreamWeaverVoice}
           </div>
@@ -231,9 +233,9 @@ function SingleCharacterProfile({
       )}
 
       {/* System Prompt */}
-      <EditorSection Icon={FileText} title="System Prompt" defaultExpanded={false}>
+      <EditorSection Icon={FileText} title={t('characterProfile.sections.systemPrompt')} defaultExpanded={false}>
         <div className={styles.fieldContent}>
-          {character.system_prompt || <span className={styles.placeholder}>No system prompt</span>}
+          {character.system_prompt || <span className={styles.placeholder}>{t('characterProfile.empty.systemPrompt')}</span>}
         </div>
       </EditorSection>
       </div>
@@ -258,6 +260,7 @@ function GroupProfile({
   setDrawerTab: (tab: string) => void
   openModal: (modal: string, props?: any) => void
 }) {
+  const { t } = useTranslation('panels')
   const [chatName, setChatName] = useState<string>('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -325,19 +328,19 @@ function GroupProfile({
 
         {/* Group info */}
         <div className={styles.groupInfo}>
-          <h2 className={styles.groupName}>{chatName || 'Group Chat'}</h2>
+          <h2 className={styles.groupName}>{chatName || t('characterProfile.groupChat')}</h2>
           <span className={styles.groupMemberCount}>
-            {characterIds.length} member{characterIds.length !== 1 ? 's' : ''}
+            {t('characterProfile.memberCount', { count: characterIds.length })}
           </span>
           <button type="button" className={styles.groupSettingsBtn} onClick={handleGroupSettings}>
             <Settings2 size={13} />
-            <span>Group Settings</span>
+            <span>{t('characterProfile.groupSettings')}</span>
           </button>
         </div>
 
         {/* Member list */}
         <div className={styles.groupDivider}>
-          <span className={styles.groupSectionLabel}>Members</span>
+          <span className={styles.groupSectionLabel}>{t('characterProfile.members')}</span>
         </div>
 
         <div className={styles.groupMembers}>
@@ -368,7 +371,7 @@ function GroupProfile({
                   <div className={styles.memberInfo}>
                     <span className={styles.memberName}>{char.name}</span>
                     {char.creator && (
-                      <span className={styles.memberCreator}>by {char.creator}</span>
+                      <span className={styles.memberCreator}>{t('characterProfile.byCreator', { creator: char.creator })}</span>
                     )}
                   </div>
                   <div className={clsx(styles.memberChevron, isExpanded && styles.memberChevronOpen)}>
@@ -388,19 +391,19 @@ function GroupProfile({
                       </div>
                     )}
                     {char.description && (
-                      <MemberField icon={BookOpen} label="Description" content={char.description} />
+                      <MemberField icon={BookOpen} label={t('characterProfile.sections.description')} content={char.description} />
                     )}
                     {hasDreamWeaverAppearance(dreamWeaverMetadata) && (
-                      <MemberField icon={Eye} label="Appearance" content={dreamWeaverAppearance} />
+                      <MemberField icon={Eye} label={t('characterProfile.sections.appearance')} content={dreamWeaverAppearance} />
                     )}
                     {char.personality && (
-                      <MemberField icon={Sparkles} label="Personality" content={char.personality} />
+                      <MemberField icon={Sparkles} label={t('characterProfile.sections.personality')} content={char.personality} />
                     )}
                     {char.scenario && (
-                      <MemberField icon={FileText} label="Scenario" content={char.scenario} />
+                      <MemberField icon={FileText} label={t('characterProfile.sections.scenario')} content={char.scenario} />
                     )}
                     {hasDreamWeaverVoiceGuidance(dreamWeaverMetadata) && (
-                      <MemberField icon={Mic} label="Voice Guidance" content={dreamWeaverVoice} />
+                      <MemberField icon={Mic} label={t('characterProfile.sections.voiceGuidance')} content={dreamWeaverVoice} />
                     )}
                     <button
                       type="button"
@@ -408,7 +411,7 @@ function GroupProfile({
                       onClick={() => handleEditMember(char.id)}
                     >
                       <Pencil size={11} />
-                      <span>Edit Character</span>
+                      <span>{t('characterProfile.editCharacter')}</span>
                     </button>
                   </div>
                 )}
@@ -424,6 +427,7 @@ function GroupProfile({
 /* ─── Inline field for expanded member cards ──────────────────────── */
 
 function MemberField({ icon: Icon, label, content }: { icon: any; label: string; content: string }) {
+  const { t } = useTranslation('panels')
   const MAX_LEN = 200
   const [showFull, setShowFull] = useState(false)
   const truncated = content.length > MAX_LEN && !showFull
@@ -443,7 +447,7 @@ function MemberField({ icon: Icon, label, content }: { icon: any; label: string;
             className={styles.memberFieldToggle}
             onClick={() => setShowFull((v) => !v)}
           >
-            {showFull ? 'Show less' : 'Show more'}
+            {showFull ? t('characterProfile.showLess') : t('characterProfile.showMore')}
           </button>
         )}
       </div>
@@ -454,6 +458,7 @@ function MemberField({ icon: Icon, label, content }: { icon: any; label: string;
 const TAG_LIMIT = 10
 
 function TagList({ tags }: { tags: string[] }) {
+  const { t } = useTranslation('panels')
   const [expanded, setExpanded] = useState(false)
   const overflow = tags.length - TAG_LIMIT
   const visible = expanded ? tags : tags.slice(0, TAG_LIMIT)
@@ -469,7 +474,7 @@ function TagList({ tags }: { tags: string[] }) {
           className={styles.tagMore}
           onClick={() => setExpanded((v) => !v)}
         >
-          {expanded ? 'Show less' : `+${overflow} more`}
+          {expanded ? t('characterProfile.showLess') : t('characterProfile.moreCount', { count: overflow })}
         </button>
       )}
     </div>

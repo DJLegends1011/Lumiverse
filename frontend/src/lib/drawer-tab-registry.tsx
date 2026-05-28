@@ -8,6 +8,7 @@ import {
 import { IconUsersGroup } from '@tabler/icons-react'
 import { useStore } from '@/store'
 import { wsClient } from '@/ws/client'
+import i18n from '@/i18n'
 import type { Command, CommandScope } from '@/lib/commands'
 import type { DrawerTabState, ExtensionCommandState } from '@/store/slices/spindle-placement'
 import CharacterProfile from '@/components/panels/CharacterProfile'
@@ -152,15 +153,15 @@ export const DRAWER_TABS: DrawerTabEntry[] = [
       <>
         <ConnectionManager />
         <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--lumiverse-border)' }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: 'var(--lumiverse-text-secondary)' }}>Image Generation</h3>
+          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: 'var(--lumiverse-text-secondary)' }}>{i18n.t('connections.imageGeneration', { ns: 'panels' })}</h3>
           <ImageGenConnectionManager />
         </div>
         <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--lumiverse-border)' }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: 'var(--lumiverse-text-secondary)' }}>Speech-to-Text</h3>
+          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: 'var(--lumiverse-text-secondary)' }}>{i18n.t('connections.speechToText', { ns: 'panels' })}</h3>
           <STTConnectionManager />
         </div>
         <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--lumiverse-border)' }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: 'var(--lumiverse-text-secondary)' }}>Text-to-Speech</h3>
+          <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: 'var(--lumiverse-text-secondary)' }}>{i18n.t('connections.textToSpeech', { ns: 'panels' })}</h3>
           <TTSConnectionManager />
         </div>
       </>
@@ -374,7 +375,7 @@ export function registryToCommands(entries: DrawerTabEntry[]): Command[] {
     description: entry.tabDescription,
     icon: entry.tabIcon,
     keywords: entry.keywords,
-    group: 'Panels' as const,
+    group: 'panels',
     scope: entry.scope,
     run: () => useStore.getState().openDrawer(entry.id),
   }))
@@ -388,7 +389,7 @@ export function extensionTabsToCommands(tabs: DrawerTabState[]): Command[] {
     description: tab.description ?? `Open ${tab.title} extension tab`,
     icon: Puzzle,
     keywords: ['extension', 'spindle', tab.extensionId, ...(tab.keywords ?? [])],
-    group: 'Extensions' as const,
+    group: 'extensions',
     run: () => useStore.getState().openDrawer(tab.id),
   }))
 }
@@ -404,7 +405,7 @@ export function extensionCommandsToCommands(entries: ExtensionCommandState[]): C
         description: cmd.description,
         icon: Terminal,
         keywords: ['extension', entry.extensionName, ...(cmd.keywords ?? [])],
-        group: 'Extensions' as const,
+        group: 'extensions',
         scope: cmd.scope as CommandScope | undefined,
         run: () => {
           const state = useStore.getState()

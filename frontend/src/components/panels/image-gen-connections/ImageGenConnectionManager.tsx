@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { imageGenConnectionsApi } from '@/api/image-gen-connections'
 import { useStore } from '@/store'
 import ConfirmationModal from '@/components/shared/ConfirmationModal'
@@ -9,6 +10,7 @@ import type { ImageGenConnectionProfile, CreateImageGenConnectionInput } from '@
 import styles from '../ConnectionManager.module.css'
 
 export default function ImageGenConnectionManager() {
+  const { t } = useTranslation('panels')
   const profiles = useStore((s) => s.imageGenProfiles)
   const setProfiles = useStore((s) => s.setImageGenProfiles)
   const addProfile = useStore((s) => s.addImageGenProfile)
@@ -121,7 +123,7 @@ export default function ImageGenConnectionManager() {
   }, [deleteTarget, removeProfile])
 
   if (loading) {
-    return <div className={styles.loading}>Loading image gen connections...</div>
+    return <div className={styles.loading}>{t('imageGenConnectionManager.loading')}</div>
   }
 
   return (
@@ -129,7 +131,7 @@ export default function ImageGenConnectionManager() {
       {!creating && (
         <button type="button" className={styles.createBtn} onClick={() => setCreating(true)}>
           <Plus size={14} />
-          <span>New Image Gen Connection</span>
+          <span>{t('imageGenConnectionManager.newConnection')}</span>
         </button>
       )}
 
@@ -155,17 +157,17 @@ export default function ImageGenConnectionManager() {
           />
         ))}
         {profiles.length === 0 && !creating && (
-          <div className={styles.empty}>No image generation connections configured.</div>
+          <div className={styles.empty}>{t('imageGenConnectionManager.empty')}</div>
         )}
       </div>
 
       {deleteTarget && (
         <ConfirmationModal
-          title="Delete Image Gen Connection"
-          message={`Delete "${deleteTarget.name}"? This cannot be undone.`}
+          title={t('imageGenConnectionManager.deleteTitle')}
+          message={t('imageGenConnectionManager.deleteMessage', { name: deleteTarget.name })}
           isOpen={true}
           variant="danger"
-          confirmText="Delete"
+          confirmText={t('imageGenConnectionManager.deleteConfirm')}
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
         />

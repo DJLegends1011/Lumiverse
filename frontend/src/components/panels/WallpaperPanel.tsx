@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ImageIcon, Upload, Trash2, Monitor, MessageSquare } from 'lucide-react'
 import { useStore } from '@/store'
 import { imagesApi } from '@/api/images'
@@ -20,6 +21,7 @@ function isVideoMime(mime?: string): boolean {
 }
 
 export default function WallpaperPanel() {
+  const { t } = useTranslation('panels')
   const wallpaper = useStore((s) => s.wallpaper)
   const setWallpaper = useStore((s) => s.setWallpaper)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -49,12 +51,12 @@ export default function WallpaperPanel() {
     const isVideo = isVideoFile(file)
 
     if (isVideo && file.size > MAX_VIDEO_SIZE) {
-      setError(`Video files must be under 100MB. Selected file is ${(file.size / 1024 / 1024).toFixed(1)}MB.`)
+      setError(t('wallpaperPanel.videoTooLarge', { size: (file.size / 1024 / 1024).toFixed(1) }))
       return
     }
 
     if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-      setError('Please select an image or video file (.mp4, .webm).')
+      setError(t('wallpaperPanel.invalidFileType'))
       return
     }
 
@@ -82,7 +84,7 @@ export default function WallpaperPanel() {
         if (oldImageId && oldImageId !== ref.image_id) void imagesApi.deleteIfUnused(oldImageId).catch(() => {})
       }
     } catch (err: any) {
-      setError(err?.message || 'Failed to upload wallpaper.')
+      setError(err?.message || t('wallpaperPanel.uploadFailed'))
     } finally {
       setUploading(false)
     }
@@ -103,7 +105,7 @@ export default function WallpaperPanel() {
       setActiveChatWallpaper(null)
       if (oldImageId) void imagesApi.deleteIfUnused(oldImageId).catch(() => {})
     } catch (err: any) {
-      setError(err?.message || 'Failed to clear chat wallpaper.')
+      setError(err?.message || t('wallpaperPanel.clearChatFailed'))
     }
   }
 
@@ -118,19 +120,19 @@ export default function WallpaperPanel() {
       />
 
       {/* Global wallpaper section */}
-      <span className={styles.scopeLabel}>Global Wallpaper</span>
+      <span className={styles.scopeLabel}>{t('wallpaperPanel.globalWallpaper')}</span>
       <div className={styles.preview}>
         {globalUrl && globalWp?.type === 'video' ? (
           <>
             <video className={styles.previewVideo} src={globalUrl} autoPlay muted loop playsInline />
-            <span className={styles.previewBadge}>Video</span>
+            <span className={styles.previewBadge}>{t('wallpaperPanel.video')}</span>
           </>
         ) : globalUrl ? (
-          <img className={styles.previewImg} src={globalUrl} alt="Global wallpaper" />
+          <img className={styles.previewImg} src={globalUrl} alt={t('wallpaperPanel.globalWallpaperAlt')} />
         ) : (
           <div className={styles.previewPlaceholder}>
             <Monitor size={16} />
-            <span>No global wallpaper set</span>
+            <span>{t('wallpaperPanel.noGlobalWallpaper')}</span>
           </div>
         )}
       </div>
@@ -142,12 +144,12 @@ export default function WallpaperPanel() {
           disabled={uploading}
         >
           <Upload size={14} />
-          <span>{uploading && uploadTarget === 'global' ? 'Uploading...' : 'Set Global'}</span>
+          <span>{uploading && uploadTarget === 'global' ? t('wallpaperPanel.uploading') : t('wallpaperPanel.setGlobal')}</span>
         </button>
         {globalWp && (
           <button type="button" className={styles.dangerBtn} onClick={clearGlobal}>
             <Trash2 size={14} />
-            <span>Clear</span>
+            <span>{t('wallpaperPanel.clear')}</span>
           </button>
         )}
       </div>
@@ -155,21 +157,21 @@ export default function WallpaperPanel() {
       <hr className={styles.divider} />
 
       {/* Per-chat wallpaper section */}
-      <span className={styles.scopeLabel}>Chat Wallpaper</span>
+      <span className={styles.scopeLabel}>{t('wallpaperPanel.chatWallpaper')}</span>
       {activeChatId ? (
         <>
           <div className={styles.preview}>
             {chatUrl && chatWp?.type === 'video' ? (
               <>
                 <video className={styles.previewVideo} src={chatUrl} autoPlay muted loop playsInline />
-                <span className={styles.previewBadge}>Video</span>
+                <span className={styles.previewBadge}>{t('wallpaperPanel.video')}</span>
               </>
             ) : chatUrl ? (
-              <img className={styles.previewImg} src={chatUrl} alt="Chat wallpaper" />
+              <img className={styles.previewImg} src={chatUrl} alt={t('wallpaperPanel.chatWallpaperAlt')} />
             ) : (
               <div className={styles.previewPlaceholder}>
                 <MessageSquare size={16} />
-                <span>No chat wallpaper set</span>
+                <span>{t('wallpaperPanel.noChatWallpaper')}</span>
               </div>
             )}
           </div>
@@ -181,30 +183,30 @@ export default function WallpaperPanel() {
               disabled={uploading}
             >
               <Upload size={14} />
-              <span>{uploading && uploadTarget === 'chat' ? 'Uploading...' : 'Set for Chat'}</span>
+              <span>{uploading && uploadTarget === 'chat' ? t('wallpaperPanel.uploading') : t('wallpaperPanel.setForChat')}</span>
             </button>
             {chatWp && (
               <button type="button" className={styles.dangerBtn} onClick={clearChat}>
                 <Trash2 size={14} />
-                <span>Clear</span>
+                <span>{t('wallpaperPanel.clear')}</span>
               </button>
             )}
           </div>
           <div className={styles.info}>
-            Chat wallpapers override the global wallpaper. AI-generated scene backgrounds override both when active.
+            {t('wallpaperPanel.chatOverrideHint')}
           </div>
         </>
       ) : (
         <div className={styles.info}>
-          Open a chat to set a per-chat wallpaper.
+          {t('wallpaperPanel.openChatHint')}
         </div>
       )}
 
       <hr className={styles.divider} />
 
       {/* Display settings */}
-      <EditorSection title="Display Settings" Icon={ImageIcon}>
-        <FormField label={`Opacity (${Math.round((wallpaper.opacity ?? 0.3) * 100)}%)`}>
+      <EditorSection title={t('wallpaperPanel.displaySettings')} Icon={ImageIcon}>
+        <FormField label={t('wallpaperPanel.opacityLabel', { percent: Math.round((wallpaper.opacity ?? 0.3) * 100) })}>
           <input
             className={styles.slider}
             type="range"
@@ -215,14 +217,14 @@ export default function WallpaperPanel() {
             onChange={(e) => setWallpaper({ opacity: Number(e.target.value) / 100 })}
           />
         </FormField>
-        <FormField label="Fit Mode">
+        <FormField label={t('wallpaperPanel.fitMode')}>
           <Select
             value={wallpaper.fit ?? 'cover'}
             onChange={(value) => setWallpaper({ fit: value as 'cover' | 'contain' | 'fill' })}
             options={[
-              { value: 'cover', label: 'Cover (fill, crop edges)' },
-              { value: 'contain', label: 'Contain (fit, may letterbox)' },
-              { value: 'fill', label: 'Fill (stretch to fit)' },
+              { value: 'cover', label: t('wallpaperPanel.fitCover') },
+              { value: 'contain', label: t('wallpaperPanel.fitContain') },
+              { value: 'fill', label: t('wallpaperPanel.fitFill') },
             ]}
           />
         </FormField>

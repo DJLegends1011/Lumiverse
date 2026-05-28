@@ -4,6 +4,7 @@ import { applyDisplayRegex, applyDisplayRegexAsync } from '@/lib/regex/compiler'
 import { resolveMacrosBatch } from '@/api/macros'
 import { regexApi } from '@/api/regex'
 import { toast } from '@/lib/toast'
+import i18n from '@/i18n'
 import type { DisplayMacroContext } from '@/lib/resolveDisplayMacros'
 import type { RegexScript } from '@/types/regex'
 
@@ -91,9 +92,9 @@ function reportSlowDisplayRegex(script: RegexScript, elapsedMs: number, timedOut
     slowDisplayRegexToastKeys.add(versionKey)
     toast.warning(
       timedOut
-        ? `Display regex "${script.name}" timed out and was flagged in Regex Scripts.`
-        : `Display regex "${script.name}" ran for ${formatElapsedMs(elapsedMs)} and was flagged in Regex Scripts.`,
-      { title: 'Slow Regex Script', duration: 7000 },
+        ? i18n.t('panels:regexPanel.slowDisplayTimedOut', { name: script.name })
+        : i18n.t('panels:regexPanel.slowDisplaySlow', { name: script.name, duration: formatElapsedMs(elapsedMs) }),
+      { title: i18n.t('panels:regexPanel.slowDisplayTitle'), duration: 7000 },
     )
   }
 

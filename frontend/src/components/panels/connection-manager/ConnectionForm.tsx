@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { FormField, TextInput, Select, Button } from '@/components/shared/FormComponents'
 import { Toggle } from '@/components/shared/Toggle'
+import { useTranslation } from 'react-i18next'
 import { connectionsApi } from '@/api/connections'
 import { useStore } from '@/store'
 import {
@@ -52,17 +53,16 @@ const VERTEX_REGIONS = [
   'northamerica-northeast1', 'australia-southeast1', 'global',
 ]
 
-const ANTHROPIC_CACHE_TTL_OPTIONS = [
-  { value: '5m', label: '5 minutes' },
-  { value: '1h', label: '1 hour' },
-]
-
-const NANOGPT_CACHE_TTL_OPTIONS = [
-  { value: '5m', label: '5 minutes' },
-  { value: '1h', label: '1 hour' },
-]
-
 export default function ConnectionForm({ providers, profile, onSave, onCancel, onOAuthCreated }: ConnectionFormProps) {
+  const { t } = useTranslation('panels')
+  const anthropicCacheTtlOptions = [
+    { value: '5m', label: t('connectionForm.fiveMinutes') },
+    { value: '1h', label: t('connectionForm.oneHour') },
+  ]
+  const nanogptCacheTtlOptions = [
+    { value: '5m', label: t('connectionForm.fiveMinutes') },
+    { value: '1h', label: t('connectionForm.oneHour') },
+  ]
   const [name, setName] = useState(profile?.name || '')
   const [provider, setProvider] = useState(profile?.provider || 'openai')
   const [apiKey, setApiKey] = useState('')
@@ -218,15 +218,15 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
         try {
           await connectionsApi.update(activeConnectionId, { api_key: returnedApiKey })
           if (!cancelled) {
-            setByopStatus('Signed in with Pollinations. API key saved automatically.')
+            setByopStatus(t('connectionForm.pollinationsSaved'))
           }
         } catch {
           if (!cancelled) {
-            setByopStatus('Pollinations sign-in succeeded, but auto-save failed. Click Save to persist manually.')
+            setByopStatus(t('connectionForm.pollinationsAutoSaveFailed'))
           }
         }
       } else if (!cancelled) {
-        setByopStatus('Signed in with Pollinations. API key captured. Click Create to save this connection.')
+        setByopStatus(t('connectionForm.pollinationsCaptured'))
       }
 
       clearRedirectArtifacts()
@@ -236,7 +236,7 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
     return () => {
       cancelled = true
     }
-  }, [isPollinations, profile?.id])
+  }, [isPollinations, profile?.id, t])
 
   const showResponsesApiToggle = provider === 'openai'
   const showSubscriptionApiToggle = provider === 'nanogpt'
@@ -278,11 +278,11 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
 
       window.location.href = result.auth_url
     } catch (err: any) {
-      const msg = String(err?.message || 'Failed to start Pollinations sign-in')
+      const msg = String(err?.message || t('connectionForm.pollinationsStartFailed'))
       setByopStatus(msg)
       setByopLoading(false)
     }
-  }, [model, profile?.id])
+  }, [model, profile?.id, t])
 
   // Handle service account JSON file upload
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -295,20 +295,20 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
         // Validate it's valid JSON with required fields
         const parsed = JSON.parse(text)
         if (!parsed.private_key || !parsed.client_email || !parsed.project_id) {
-          alert('Invalid service account JSON: missing required fields (private_key, client_email, project_id)')
+          alert(t('connectionForm.invalidServiceAccountMissingFields'))
           return
         }
         // Store the raw JSON as the "API key"
         setApiKey(text)
         setSaFileName(file.name)
       } catch {
-        alert('Invalid JSON file. Please upload a valid Google service account key file.')
+        alert(t('connectionForm.invalidJsonFile'))
       }
     }
     reader.readAsText(file)
     // Reset file input so the same file can be re-selected
     e.target.value = ''
-  }, [])
+  }, [t])
 
   const handleSubmit = useCallback(() => {
     if (!name.trim()) return
@@ -382,21 +382,21 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
 
   return (
     <div className={styles.form}>
-      <FormField label="Name" required>
-        <TextInput value={name} onChange={setName} placeholder="Connection name" autoFocus={!profile} />
+      <FormField label={t('connectionForm.name')} required>
+        <TextInput value={name} onChange={setName} placeholder={t('connectionForm.connectionName')} autoFocus={!profile} />
       </FormField>
-      <FormField label="Provider">
+      <FormField label={t('connectionForm.provider')}>
         <Select value={provider} onChange={setProvider} options={providerOptions} />
       </FormField>
 
       {isVertexAI ? (
         <>
           <FormField
-            label="Service Account JSON"
+            label={t('connectionForm.serviceAccountJson')}
             hint={
               profile?.has_api_key
-                ? `Credentials loaded${saFileName ? ` (${saFileName})` : ''}. Upload a new file to replace.`
-                : 'Upload your Google Cloud service account key JSON file'
+                ? t('connectionForm.credentialsLoaded', { file: saFileName ? ` (${saFileName})` : '' })
+                : t('connectionForm.uploadServiceAccount')
             }
           >
             <div className={styles.fileUploadRow}>
@@ -405,11 +405,11 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
               >
-                {apiKey ? 'File loaded' : 'Choose file'}
+                {apiKey ? t('connectionForm.fileLoaded') : t('connectionForm.chooseFile')}
               </Button>
               {(saFileName || apiKey) && (
                 <span className={styles.fileUploadName}>
-                  {saFileName || 'service-account.json'}
+                  {saFileName || t('connectionForm.serviceAccountFilename')}
                 </span>
               )}
               <input
@@ -421,7 +421,7 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
               />
             </div>
           </FormField>
-          <FormField label="Region" hint="Google Cloud region for Vertex AI">
+          <FormField label={t('connectionForm.region')} hint={t('connectionForm.vertexRegionHint')}>
             <Select
               value={vertexRegion}
               onChange={setVertexRegion}
@@ -432,7 +432,7 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
       ) : (
         <>
           {isPollinations && (
-            <FormField label="Pollinations BYOP" hint="Use Sign in with Pollinations to fetch a BYOP key automatically, or paste a key manually below.">
+            <FormField label={t('connectionForm.pollinationsByop')} hint={t('connectionForm.pollinationsByopHint')}>
               <div className={styles.byopRow}>
                 <Button
                   variant="secondary"
@@ -440,24 +440,24 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
                   onClick={handlePollinationsSignIn}
                   disabled={byopLoading}
                 >
-                  {byopLoading ? 'Redirecting...' : 'Sign in with Pollinations'}
+                  {byopLoading ? t('connectionForm.redirecting') : t('connectionForm.signInWithPollinations')}
                 </Button>
                 {byopStatus && <span className={styles.byopStatus}>{byopStatus}</span>}
               </div>
             </FormField>
           )}
-          <FormField label="API Key" hint={profile?.has_api_key ? 'Key is set. Enter a new value to replace it.' : undefined}>
-            <TextInput value={apiKey} onChange={setApiKey} placeholder={profile?.has_api_key ? '••••••••' : 'Enter API key'} type="password" />
+          <FormField label={t('connectionForm.apiKey')} hint={profile?.has_api_key ? t('connectionForm.keyAlreadySet') : undefined}>
+            <TextInput value={apiKey} onChange={setApiKey} placeholder={profile?.has_api_key ? '••••••••' : t('connectionForm.enterApiKey')} type="password" />
           </FormField>
         </>
       )}
 
       {!hideApiUrl && (
-        <FormField label="API URL" hint={isVertexAI ? 'Leave empty to use default Vertex AI endpoint with selected region' : 'Leave empty for default provider URL'}>
+        <FormField label={t('connectionForm.apiUrl')} hint={isVertexAI ? t('connectionForm.vertexApiUrlHint') : t('connectionForm.defaultApiUrlHint')}>
           <TextInput value={apiUrl} onChange={setApiUrl} placeholder={urlPlaceholder} />
         </FormField>
       )}
-      <FormField label="Model" hint="Refresh uses the current form values, even before the connection is saved.">
+      <FormField label={t('connectionForm.model')} hint={t('connectionForm.modelHint')}>
         <ModelCombobox
           value={model}
           onChange={setModel}
@@ -470,16 +470,26 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
         />
       </FormField>
       <FormField label="">
-        <Toggle.Checkbox checked={isDefault} onChange={setIsDefault} label="Set as default connection" />
+        <Toggle.Checkbox checked={isDefault} onChange={setIsDefault} label={t('connectionForm.setAsDefault')} />
       </FormField>
       {showResponsesApiToggle && (
         <FormField label="">
-          <Toggle.Checkbox checked={useResponsesApi} onChange={setUseResponsesApi} label="Use Responses API" hint="Use /v1/responses instead of /v1/chat/completions" />
+          <Toggle.Checkbox
+            checked={useResponsesApi}
+            onChange={setUseResponsesApi}
+            label={t('connectionForm.useResponsesApi')}
+            hint={t('connectionForm.useResponsesApiHint')}
+          />
         </FormField>
       )}
       {showSubscriptionApiToggle && (
         <FormField label="">
-          <Toggle.Checkbox checked={useSubscriptionApi} onChange={setUseSubscriptionApi} label="Use Subscription API" hint="Use /api/subscription/v1 to only use models from your NanoGPT subscription" />
+          <Toggle.Checkbox
+            checked={useSubscriptionApi}
+            onChange={setUseSubscriptionApi}
+            label={t('connectionForm.useSubscriptionApi')}
+            hint={t('connectionForm.useSubscriptionApiHint')}
+          />
         </FormField>
       )}
       {showNanoGptCachingToggle && (
@@ -488,25 +498,25 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
             <Toggle.Checkbox
               checked={nanogptCachingSettings.enabled}
               onChange={(checked) => setNanogptCachingSettings((current) => ({ ...current, enabled: checked }))}
-              label="Enable Prompt Caching"
-              hint="Route to cache-capable providers and pass NanoGPT's prompt_caching helper. Avoids stale responses when upstream caches collide."
+              label={t('connectionForm.enablePromptCaching')}
+              hint={t('connectionForm.enableNanoGptCachingHint')}
             />
           </FormField>
           {nanogptCachingSettings.enabled && (
             <>
-              <FormField label="Prompt Cache TTL" hint="How long NanoGPT should retain the cached prefix. Use 1 hour for slower flows at higher write cost.">
+              <FormField label={t('connectionForm.promptCacheTtl')} hint={t('connectionForm.nanoGptPromptCacheTtlHint')}>
                 <Select
                   value={nanogptCachingSettings.ttl}
                   onChange={(ttl) => setNanogptCachingSettings((current) => ({ ...current, ttl: ttl as '5m' | '1h' }))}
-                  options={NANOGPT_CACHE_TTL_OPTIONS}
+                  options={nanogptCacheTtlOptions}
                 />
               </FormField>
               <FormField label="">
                 <Toggle.Checkbox
                   checked={nanogptCachingSettings.stickyProvider}
                   onChange={(checked) => setNanogptCachingSettings((current) => ({ ...current, stickyProvider: checked }))}
-                  label="Sticky Provider"
-                  hint="Prefer the previously recorded upstream provider for cache hits. NanoGPT returns 503 on failover instead of switching providers, preserving cache integrity."
+                  label={t('connectionForm.stickyProvider')}
+                  hint={t('connectionForm.stickyProviderHint')}
                 />
               </FormField>
             </>
@@ -515,7 +525,12 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
       )}
       {showZaiCodingPlanToggle && (
         <FormField label="">
-          <Toggle.Checkbox checked={useZaiCodingPlanEndpoint} onChange={setUseZaiCodingPlanEndpoint} label="Use Coding Plan Endpoint" hint="Use /api/coding/paas/v4 for Z.AI Coding Plan access instead of the general /api/paas/v4 endpoint" />
+          <Toggle.Checkbox
+            checked={useZaiCodingPlanEndpoint}
+            onChange={setUseZaiCodingPlanEndpoint}
+            label={t('connectionForm.useCodingPlanEndpoint')}
+            hint={t('connectionForm.useCodingPlanEndpointHint')}
+          />
         </FormField>
       )}
       {showAnthropicPromptCachingToggle && (
@@ -528,28 +543,28 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
                 enabled: checked,
                 automatic: checked ? current.automatic : DEFAULT_ANTHROPIC_PROMPT_CACHING.automatic,
               }))}
-              label="Enable Prompt Caching"
-              hint="Automatically cache prompts to reduce cost and latency for repetitive prefixes"
+              label={t('connectionForm.enablePromptCaching')}
+              hint={t('connectionForm.enableAnthropicCachingHint')}
             />
           </FormField>
           {anthropicPromptCachingSettings.enabled && (
             <>
-              <FormField label="Prompt Cache TTL" hint="Anthropic defaults to a 5-minute cache. Use 1 hour for slower follow-up flows at higher write cost.">
+              <FormField label={t('connectionForm.promptCacheTtl')} hint={t('connectionForm.anthropicPromptCacheTtlHint')}>
                 <Select
                   value={anthropicPromptCachingSettings.ttl}
                   onChange={(ttl) => setAnthropicPromptCachingSettings((current) => ({ ...current, ttl: ttl as '5m' | '1h' }))}
-                  options={ANTHROPIC_CACHE_TTL_OPTIONS}
+                  options={anthropicCacheTtlOptions}
                 />
               </FormField>
               <FormField label="">
                 <Toggle.Checkbox
                   checked={anthropicPromptCachingSettings.automatic}
                   onChange={(checked) => setAnthropicPromptCachingSettings((current) => ({ ...current, automatic: checked }))}
-                  label="Use Automatic Caching"
-                  hint="Apply Anthropic's top-level automatic cache breakpoint to the last eligible block."
+                  label={t('connectionForm.useAutomaticCaching')}
+                  hint={t('connectionForm.useAutomaticCachingHint')}
                 />
               </FormField>
-              <FormField label="Explicit Cache Breakpoints" hint="Add Anthropic block-level breakpoints on request sections that stay stable across calls.">
+              <FormField label={t('connectionForm.explicitCacheBreakpoints')} hint={t('connectionForm.explicitCacheBreakpointsHint')}>
                 <div className={styles.toggleStack}>
                   <Toggle.Checkbox
                     checked={anthropicPromptCachingSettings.breakpoints.tools}
@@ -557,7 +572,7 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
                       ...current,
                       breakpoints: { ...current.breakpoints, tools: checked },
                     }))}
-                    label="Cache Tools"
+                    label={t('connectionForm.cacheTools')}
                   />
                   <Toggle.Checkbox
                     checked={anthropicPromptCachingSettings.breakpoints.system}
@@ -565,7 +580,7 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
                       ...current,
                       breakpoints: { ...current.breakpoints, system: checked },
                     }))}
-                    label="Cache System Prompt"
+                    label={t('connectionForm.cacheSystemPrompt')}
                   />
                   <Toggle.Checkbox
                     checked={anthropicPromptCachingSettings.breakpoints.messages}
@@ -573,7 +588,7 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
                       ...current,
                       breakpoints: { ...current.breakpoints, messages: checked },
                     }))}
-                    label="Cache Conversation Prefix"
+                    label={t('connectionForm.cacheConversationPrefix')}
                   />
                 </div>
               </FormField>
@@ -596,13 +611,18 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
         />
       )}
       <FormField label="">
-        <Toggle.Checkbox checked={bindReasoning} onChange={setBindReasoning} label="Bind reasoning settings" hint='Save current reasoning settings (including "Start Reply With") and auto-apply when this connection is selected' />
+        <Toggle.Checkbox
+          checked={bindReasoning}
+          onChange={setBindReasoning}
+          label={t('connectionForm.bindReasoningSettings')}
+          hint={t('connectionForm.bindReasoningSettingsHint')}
+        />
       </FormField>
       {bindReasoning && (
         <div className={styles.bindingCard}>
           <div className={styles.bindingCardHeader}>
             <div>
-              <div className={styles.bindingCardTitle}>Saved reasoning snapshot</div>
+              <div className={styles.bindingCardTitle}>{t('connectionForm.savedReasoningSnapshot')}</div>
               <div className={styles.bindingCardSummary}>{getReasoningBindingSummary(normalizedBoundReasoningSettings, boundPromptBias)}</div>
             </div>
             <Button
@@ -612,22 +632,22 @@ export default function ConnectionForm({ providers, profile, onSave, onCancel, o
                 setBoundReasoningSettings({ ...reasoningSettings })
                 setBoundPromptBias(promptBias)
               }}
-              title={bindingMatchesCurrent ? 'Snapshot already matches the current reasoning settings' : 'Replace the saved snapshot with the current reasoning settings'}
+              title={bindingMatchesCurrent ? t('connectionForm.snapshotAlreadyMatches') : t('connectionForm.replaceSavedSnapshot')}
             >
-              {bindingMatchesCurrent ? 'Captured' : 'Capture Current'}
+              {bindingMatchesCurrent ? t('connectionForm.captured') : t('connectionForm.captureCurrent')}
             </Button>
           </div>
           {!bindingMatchesCurrent && (
             <div className={styles.bindingCardHint}>
-              Current panel values differ from this connection's saved snapshot.
+              {t('connectionForm.currentValuesDiffer')}
             </div>
           )}
         </div>
       )}
       <div className={styles.formActions}>
-        <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+        <Button variant="ghost" size="sm" onClick={onCancel}>{t('connectionForm.cancel')}</Button>
         <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!name.trim()}>
-          {profile ? 'Save' : 'Create'}
+          {profile ? t('connectionForm.save') : t('connectionForm.create')}
         </Button>
       </div>
     </div>

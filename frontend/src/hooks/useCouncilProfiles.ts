@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import { councilApi, type CouncilProfileBinding, type CouncilSidecarConfig, type ResolvedCouncilProfile } from '@/api/council'
 import { settingsApi } from '@/api/settings'
@@ -71,6 +72,7 @@ async function loadGlobalSidecar(): Promise<CouncilSidecarConfig> {
 }
 
 export function useCouncilProfiles() {
+  const { t } = useTranslation('panels', { keyPrefix: 'councilManager.toast' })
   const councilSettings = useStore((s) => s.councilSettings)
   const councilPersistenceTarget = useStore((s) => s.councilPersistenceTarget)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -203,7 +205,7 @@ export function useCouncilProfiles() {
         pendingSidecarRef.current = null
         if (toSave) {
           void persistSidecar(toSave).catch(() => {
-            addToast({ type: 'error', message: 'Failed to save sidecar settings' })
+            addToast({ type: 'error', message: t('saveSidecarFailed') })
           })
         }
       }, SIDECAR_SAVE_DEBOUNCE_MS)
@@ -236,9 +238,9 @@ export function useCouncilProfiles() {
       })
       setDefaults(binding)
       if (activeChatId) await refreshResolved()
-      addToast({ type: 'success', message: 'Default council profile saved' })
+      addToast({ type: 'success', message: t('defaultSaved') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to save default council profile' })
+      addToast({ type: 'error', message: t('defaultSaveFailed') })
     } finally {
       setIsLoading(false)
     }
@@ -250,13 +252,13 @@ export function useCouncilProfiles() {
       await councilApi.deleteDefaults()
       setDefaults(null)
       await refreshResolved()
-      addToast({ type: 'info', message: 'Default council profile cleared' })
+      addToast({ type: 'info', message: t('defaultCleared') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to clear default council profile' })
+      addToast({ type: 'error', message: t('defaultClearFailed') })
     } finally {
       setIsLoading(false)
     }
-  }, [addToast, refreshResolved])
+  }, [addToast, refreshResolved, t])
 
   const bindToChat = useCallback(async () => {
     if (!activeChatId) return
@@ -268,9 +270,9 @@ export function useCouncilProfiles() {
       })
       setChatSlot({ for: activeChatId, binding })
       await refreshResolved()
-      addToast({ type: 'success', message: 'Council profile bound to this chat' })
+      addToast({ type: 'success', message: t('boundToChat') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to bind council profile to chat' })
+      addToast({ type: 'error', message: t('bindChatFailed') })
     } finally {
       setIsLoading(false)
     }
@@ -283,9 +285,9 @@ export function useCouncilProfiles() {
       await councilApi.deleteChatBinding(activeChatId)
       setChatSlot({ for: activeChatId, binding: null })
       await refreshResolved()
-      addToast({ type: 'info', message: 'Chat council binding removed' })
+      addToast({ type: 'info', message: t('chatBindingRemoved') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to remove chat council binding' })
+      addToast({ type: 'error', message: t('removeChatBindingFailed') })
     } finally {
       setIsLoading(false)
     }
@@ -301,9 +303,9 @@ export function useCouncilProfiles() {
       })
       setCharSlot({ for: activeCharacterId, binding })
       await refreshResolved()
-      addToast({ type: 'success', message: 'Council profile bound to this character' })
+      addToast({ type: 'success', message: t('boundToCharacter') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to bind council profile to character' })
+      addToast({ type: 'error', message: t('bindCharacterFailed') })
     } finally {
       setIsLoading(false)
     }
@@ -316,9 +318,9 @@ export function useCouncilProfiles() {
       await councilApi.deleteCharacterBinding(activeCharacterId)
       setCharSlot({ for: activeCharacterId, binding: null })
       await refreshResolved()
-      addToast({ type: 'info', message: 'Character council binding removed' })
+      addToast({ type: 'info', message: t('characterBindingRemoved') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to remove character council binding' })
+      addToast({ type: 'error', message: t('removeCharacterBindingFailed') })
     } finally {
       setIsLoading(false)
     }

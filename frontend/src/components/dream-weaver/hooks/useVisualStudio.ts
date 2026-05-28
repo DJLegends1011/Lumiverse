@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '@/lib/toast'
+import i18n from '@/i18n'
 import {
   dreamWeaverApi,
   normalizeDraftVisualAssets,
@@ -264,7 +265,7 @@ export function useVisualStudio(
         const job = await dreamWeaverApi.startVisualJob(sessionId, preparedAsset, selectedConnectionId)
         setActiveJobId(job.id)
       } catch {
-        toast.error('Failed to start generation. Check the image connection and try again.', { title: 'Dream Weaver' })
+        toast.error(i18n.t('dreamWeaver.toast.generationStartFailed'), { title: i18n.t('dreamWeaver.brand') })
       } finally {
         setGenerating(false)
       }

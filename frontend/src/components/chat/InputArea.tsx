@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect, type CSSProperties, type KeyboardEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { Send, RotateCw, CornerDownLeft, Square, FilePlus, Eye, UserCircle, Compass, MessageSquareQuote, Wrench, UserRound, UsersRound, UserPlus, Settings2, Home, MoreHorizontal, FolderOpen, Paperclip, X, StickyNote, Crown, ScrollText, MessageSquare, BrainCircuit, Drama, Layers, FileText, Braces, Globe, Plus, Mic, MicOff, LoaderCircle } from 'lucide-react'
 import { IconPlaylistAdd } from '@tabler/icons-react'
@@ -35,7 +36,6 @@ interface InputAreaProps {
 }
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform)
-const queueModLabel = isMac ? 'Cmd' : 'Ctrl'
 const TEXTAREA_MAX_HEIGHT = 180
 const STT_VISUALIZER_BARS = 18
 const STT_IDLE_BARS = Array.from({ length: STT_VISUALIZER_BARS }, (_, index) => {
@@ -176,6 +176,9 @@ function slugifyName(name: string): string {
 }
 
 export default function InputArea({ chatId }: InputAreaProps) {
+  const { t } = useTranslation('chat')
+  const { t: te } = useTranslation('errors')
+  const queueModLabel = isMac ? t('input.modCmd') : t('input.modCtrl')
   const navigate = useNavigate()
   const [text, setText] = useState('')
   const [lastImpersonateInput, setLastImpersonateInput] = useState<string>('')
@@ -598,7 +601,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
       return true
     } catch {
       setChatAddonStatesByPersona(previous)
-      toast.error('Failed to save add-on state for this chat')
+      toast.error(t('toast.failedSaveAddonState'))
       return false
     }
   }, [activePersonaId, chatId, chatAddonStatesByPersona])
@@ -619,7 +622,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
       const existing = Array.isArray(p.metadata?.addons) ? p.metadata.addons : []
       const addon: PersonaAddon = {
         id: uuidv7(),
-        label: label || 'Untitled add-on',
+        label: label || t('quickMenu.untitledAddon'),
         content,
         enabled: false,
         sort_order: existing.length,
@@ -633,13 +636,13 @@ export default function InputArea({ chatId }: InputAreaProps) {
       setNewAddonLabel('')
       setNewAddonContent('')
       setShowCreateAddon(false)
-      toast.success(overrideSaved ? 'Add-on created for this chat' : 'Add-on created, but could not enable it for this chat')
+      toast.success(overrideSaved ? t('toast.addonCreated') : t('toast.addonCreatedNotEnabled'))
     } catch {
-      toast.error('Failed to create add-on')
+      toast.error(t('toast.failedCreateAddon'))
     } finally {
       setCreatingAddon(false)
     }
-  }, [activePersonaId, creatingAddon, newAddonLabel, newAddonContent, persistChatAddonOverride])
+  }, [activePersonaId, creatingAddon, newAddonLabel, newAddonContent, persistChatAddonOverride, t])
 
   // iPhone-specific: match input bar bottom corners to device screen curvature
   const screenCornerRadius = useDeviceFrameRadius()
@@ -661,11 +664,11 @@ export default function InputArea({ chatId }: InputAreaProps) {
   const isListeningToSTT = sttStatus === 'starting' || sttStatus === 'listening' || sttStatus === 'processing'
   const showSTTIndicator = isListeningToSTT
   const sttIndicatorLabel = useMemo(() => {
-    if (sttStatus === 'starting') return voiceSettings.sttProvider === 'webspeech' ? 'Starting mic' : 'Preparing recording'
-    if (sttStatus === 'processing') return voiceSettings.sttProvider === 'webspeech' ? 'Finalizing transcript' : 'Transcribing audio'
-    if (sttStatus === 'listening') return voiceSettings.sttProvider === 'webspeech' ? 'Listening' : 'Recording'
+    if (sttStatus === 'starting') return voiceSettings.sttProvider === 'webspeech' ? t('input.sttStartingMic') : t('input.sttPreparingRecording')
+    if (sttStatus === 'processing') return voiceSettings.sttProvider === 'webspeech' ? t('input.sttFinalizingTranscript') : t('input.sttTranscribingAudio')
+    if (sttStatus === 'listening') return voiceSettings.sttProvider === 'webspeech' ? t('input.sttListening') : t('input.sttRecording')
     return ''
-  }, [sttStatus, voiceSettings.sttProvider])
+  }, [sttStatus, voiceSettings.sttProvider, t])
   const sttVisualizerBars = sttAudioFrame?.frequencies?.length ? sttAudioFrame.frequencies : STT_IDLE_BARS
   const sttVisualizerLevel = sttAudioFrame ? Math.max(sttAudioFrame.amplitude, sttAudioFrame.peak * 0.65) : 0.16
 
@@ -1006,18 +1009,18 @@ export default function InputArea({ chatId }: InputAreaProps) {
         if (isDoc) {
           // Document files → upload to chat databank for persistent reference
           try {
-            const chatLabel = characterName ? `${characterName} Chat` : 'Chat Documents'
+            const chatLabel = characterName ? t('toast.chatDocumentsNamed', { name: characterName }) : t('toast.chatDocuments')
             await databankApi.attachToChat(file, chatId, chatLabel)
             const docName = file.name.replace(/\.[^.]+$/, '')
-            toast.success(`"${docName}" added to chat databank`, { duration: 3000 })
+            toast.success(t('toast.docAddedToDatabank', { name: docName }), { duration: 3000 })
           } catch (err: any) {
-            toast.error(err?.body?.error || err?.message || `Failed to upload ${file.name}`, { title: 'Upload Failed' })
+            toast.error(err?.body?.error || err?.message || t('toast.uploadFileFailed', { name: file.name }), { title: t('toast.uploadFailed') })
           }
           continue
         }
 
         if (!isImage && !isAudio) {
-          toast.error(`Unsupported file type: ${file.name}`, { title: 'Upload Failed' })
+          toast.error(t('toast.unsupportedFileType', { name: file.name }), { title: t('toast.uploadFailed') })
           continue
         }
 
@@ -1036,12 +1039,12 @@ export default function InputArea({ chatId }: InputAreaProps) {
       }
     } catch (err: any) {
       console.error('[InputArea] Attachment upload failed:', err)
-      toast.error(err?.message || 'Failed to upload attachment', { title: 'Upload Failed' })
+      toast.error(err?.message || t('toast.failedUploadAttachment'), { title: t('toast.uploadFailed') })
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
-  }, [isDocumentFile, chatId, characterName])
+  }, [isDocumentFile, chatId, characterName, t])
 
   const removeAttachment = useCallback((imageId: string) => {
     setPendingAttachments((prev) => prev.filter((a) => a.image_id !== imageId))
@@ -1080,7 +1083,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
 
     try {
       const effectivePersonaId = sendPersonaId || activePersonaId
-      const effectivePersonaName = personas.find((p) => p.id === effectivePersonaId)?.name || 'User'
+      const effectivePersonaName = personas.find((p) => p.id === effectivePersonaId)?.name || t('userFallback')
       const extra: Record<string, any> = {}
       if (effectivePersonaId) extra.persona_id = effectivePersonaId
       if (attachments) extra.attachments = attachments
@@ -1093,10 +1096,10 @@ export default function InputArea({ chatId }: InputAreaProps) {
       })
       addMessage(msg)
       if (sendPersonaId) setSendPersonaId(null)
-      toast.info('Message queued', { duration: 1500 })
+      toast.info(t('toast.messageQueued'), { duration: 1500 })
     } catch (err: any) {
       console.error('[InputArea] Failed to queue message:', err)
-      toast.error(err?.body?.error || err?.message || 'Failed to queue message')
+      toast.error(err?.body?.error || err?.message || t('toast.failedQueueMessage'))
     } finally {
       sendingRef.current = false
     }
@@ -1128,7 +1131,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
 
     try {
       const effectivePersonaId = sendPersonaId || activePersonaId
-      const effectivePersonaName = personas.find((p) => p.id === effectivePersonaId)?.name || 'User'
+      const effectivePersonaName = personas.find((p) => p.id === effectivePersonaId)?.name || t('userFallback')
       const presetId = getActivePresetForGeneration() || undefined
       const genOpts: import('@/api/generate').GenerateRequest = {
         chat_id: chatId,
@@ -1229,9 +1232,9 @@ export default function InputArea({ chatId }: InputAreaProps) {
     } catch (err: any) {
       if (generationNonceRef.current !== nonce) return
       console.error('[InputArea] Failed to send:', err)
-      const msg = err?.body?.error || err?.message || 'Failed to start generation'
+      const msg = err?.body?.error || err?.message || te('failedToStartGeneration')
       setStreamingError(msg)
-      toast.error(msg, { title: 'Generation Failed' })
+      toast.error(msg, { title: t('toast.generationFailed') })
     } finally {
       sendingRef.current = false
     }
@@ -1347,9 +1350,9 @@ export default function InputArea({ chatId }: InputAreaProps) {
       // Remove the placeholder on failure
       useStore.getState().removeMessage(placeholderId)
       console.error('[InputArea] Failed to regenerate:', err)
-      const msg = err?.body?.error || err?.message || 'Failed to regenerate'
+      const msg = err?.body?.error || err?.message || te('failedToRegenerate')
       setStreamingError(msg)
-      toast.error(msg, { title: 'Regeneration Failed' })
+      toast.error(msg, { title: t('toast.regenerationFailed') })
     }
   }, [chatId, isStreaming, messages, isGroupChat, activeProfileId, activePersonaId, activeGenerationAddonStates, getActivePresetForGeneration, regenFeedback.position, retainCouncilForRegens, addMessage, beginStreaming, startStreaming, setStreamingError, consumeOneshotGuides])
 
@@ -1391,9 +1394,9 @@ export default function InputArea({ chatId }: InputAreaProps) {
     } catch (err: any) {
       if (generationNonceRef.current !== nonce) return
       console.error('[InputArea] Failed to continue:', err)
-      const msg = err?.body?.error || err?.message || 'Failed to continue'
+      const msg = err?.body?.error || err?.message || te('failedToContinue')
       setStreamingError(msg)
-      toast.error(msg, { title: 'Continue Failed' })
+      toast.error(msg, { title: t('toast.continueFailed') })
     }
   }, [chatId, isStreaming, messages, isGroupChat, activeProfileId, activePersonaId, activeGenerationAddonStates, getActivePresetForGeneration, retainCouncilForRegens, beginStreaming, startStreaming, setStreamingError, consumeOneshotGuides])
 
@@ -1430,9 +1433,9 @@ export default function InputArea({ chatId }: InputAreaProps) {
     } catch (err: any) {
       if (generationNonceRef.current !== nonce) return
       console.error('[InputArea] Failed to impersonate:', err)
-      const msg = err?.body?.error || err?.message || 'Failed to impersonate'
+      const msg = err?.body?.error || err?.message || te('failedToImpersonate')
       setStreamingError(msg)
-      toast.error(msg, { title: 'Impersonation Failed' })
+      toast.error(msg, { title: t('toast.impersonationFailed') })
     }
   }, [chatId, isStreaming, text, activeProfileId, activePersonaId, activeGenerationAddonStates, impersonationPresetId, getActivePresetForGeneration, beginStreaming, startStreaming, setStreamingError, consumeOneshotGuides, resizeTextarea])
 
@@ -1465,8 +1468,8 @@ export default function InputArea({ chatId }: InputAreaProps) {
         openModal('greetingPicker', {
           character,
           onSelect: async (greetingIndex: number) => {
-            const toastId = toast.info('Creating chat and preparing Memory Cortex in the background…', {
-              title: 'Starting Chat',
+            const toastId = toast.info(t('toast.creatingChatCortex'), {
+              title: t('toast.startingChat'),
               duration: 60_000,
               dismissible: false,
             })
@@ -1480,14 +1483,14 @@ export default function InputArea({ chatId }: InputAreaProps) {
             } catch (err) {
               toast.dismiss(toastId)
               console.error('[InputArea] Failed to create chat:', err)
-              toast.error('Failed to create chat')
+              toast.error(t('toast.failedCreateChat'))
             }
           },
         })
         return
       }
-      creationToastId = toast.info('Creating chat and preparing Memory Cortex in the background…', {
-        title: 'Starting Chat',
+      creationToastId = toast.info(t('toast.creatingChatCortex'), {
+        title: t('toast.startingChat'),
         duration: 60_000,
         dismissible: false,
       })
@@ -1498,7 +1501,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
     } catch (err) {
       if (creationToastId) toast.dismiss(creationToastId)
       console.error('[InputArea] Failed to start new chat:', err)
-      toast.error('Failed to start new chat')
+      toast.error(t('toast.failedStartNewChat'))
     }
   }, [activeCharacterId, isGroupChat, groupCharacterIds, navigate, openModal])
 
@@ -1507,8 +1510,8 @@ export default function InputArea({ chatId }: InputAreaProps) {
 
     let conversionToastId: string | null = null
     try {
-      conversionToastId = toast.info('Creating a new group chat from this conversation…', {
-        title: 'Converting Chat',
+      conversionToastId = toast.info(t('toast.creatingGroupFromChat'), {
+        title: t('toast.convertingChat'),
         duration: 60_000,
         dismissible: false,
       })
@@ -1522,12 +1525,12 @@ export default function InputArea({ chatId }: InputAreaProps) {
         chatId: converted.id,
         existingCharacterIds: [activeCharacterId],
       })
-      toast.success('Converted to group chat')
+      toast.success(t('toast.convertedToGroupChat'))
     } catch (err: any) {
       if (conversionToastId) toast.dismiss(conversionToastId)
       console.error('[InputArea] Failed to convert chat to group:', err)
-      toast.error(err?.body?.error || err?.message || 'Failed to convert chat', {
-        title: 'Conversion Failed',
+      toast.error(err?.body?.error || err?.message || t('toast.failedConvertChat'), {
+        title: t('toast.conversionFailed'),
       })
     }
   }, [chatId, activeCharacterId, isGroupChat, navigate, openModal])
@@ -1536,7 +1539,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
     if (dryRunning || isStreaming) return
     const presetId = getActivePresetForGeneration()
     if (!presetId) {
-      toast.warning('No preset selected. Create or select a preset to dry-run.')
+      toast.warning(t('toast.noPresetForDryRun'))
       return
     }
     setDryRunning(true)
@@ -1563,7 +1566,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
     if (resolvingMacros || isStreaming) return
     const template = text.trim()
     if (!template) {
-      toast.info('Nothing to resolve')
+      toast.info(t('toast.nothingToResolve'))
       return
     }
     setResolvingMacros(true)
@@ -1576,20 +1579,20 @@ export default function InputArea({ chatId }: InputAreaProps) {
         connection_id: activeProfileId || undefined,
       })
       if (res.text === text) {
-        toast.info('No macros found to resolve')
+        toast.info(t('toast.noMacrosFound'))
       } else {
         queueTextareaSelection(res.text.length)
         setText(res.text)
         const warns = res.diagnostics.filter((d) => d.level === 'warning' || d.level === 'error')
         if (warns.length > 0) {
-          toast.warning(`Macros resolved with ${warns.length} warning${warns.length !== 1 ? 's' : ''}`)
+          toast.warning(t('toast.macrosResolvedWithWarnings', { count: warns.length }))
         } else {
-          toast.success('Macros resolved')
+          toast.success(t('toast.macrosResolved'))
         }
       }
     } catch (err: any) {
       console.error('[InputArea] Macro resolution failed:', err)
-      const msg = err?.body?.error || err?.message || 'Failed to resolve macros'
+      const msg = err?.body?.error || err?.message || te('failedToResolveMacros')
       toast.error(msg)
     } finally {
       setResolvingMacros(false)
@@ -1761,14 +1764,14 @@ export default function InputArea({ chatId }: InputAreaProps) {
     if (!isSTTSupported) {
       toast.warning(
         voiceSettings.sttProvider === 'webspeech'
-          ? 'Speech recognition is not available in this browser'
-          : 'Audio recording is not supported in this browser',
+          ? t('toast.speechRecognitionUnavailable')
+          : t('toast.audioRecordingUnsupported'),
       )
       return
     }
 
     if (voiceSettings.sttProvider === 'connection' && !voiceSettings.sttConnectionId) {
-      toast.warning('Select an STT connection in Voice settings first')
+      toast.warning(t('toast.selectSttConnection'))
       openModal('settings')
       return
     }
@@ -1832,7 +1835,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
         sttShouldSendRef.current = false
         setSttAudioFrame(null)
         setSttStatus('idle')
-        toast.error(msg, { title: 'Speech-to-Text Failed' })
+        toast.error(msg, { title: t('toast.sttFailed') })
       })
 
       await engine.start()
@@ -1840,7 +1843,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
     } catch (err: any) {
       stopSTTSession('destroy')
       setSttStatus('idle')
-      toast.error(err?.message || 'Failed to start speech-to-text', { title: 'Speech-to-Text Failed' })
+      toast.error(err?.message || t('toast.sttFailed'), { title: t('toast.sttFailed') })
     }
   }, [isStreaming, isListeningToSTT, isSTTSupported, voiceSettings, text, openModal, applySTTTranscript, stopSTTSession, finalizeSTTTranscript])
 
@@ -1965,28 +1968,28 @@ export default function InputArea({ chatId }: InputAreaProps) {
       <div data-spindle-mount="chat_toolbar">
         {isStreaming && (
           <div className={styles.actionBar}>
-            <button type="button" className={styles.actionBtn} onClick={() => navigate('/')} title="Back to home">
+            <button type="button" className={styles.actionBtn} onClick={() => navigate('/')} title={t('input.backHome')}>
               <Home size={14} />
             </button>
           </div>
         )}
         {!isStreaming && (
           <div className={styles.actionBar}>
-            <button type="button" className={styles.actionBtn} onClick={() => navigate('/')} title="Back to home">
+            <button type="button" className={styles.actionBtn} onClick={() => navigate('/')} title={t('input.backHome')}>
               <Home size={14} />
             </button>
             <span className={styles.actionDivider} />
-            <button type="button" className={styles.actionBtn} onClick={handleRegenerate} title="Regenerate">
+            <button type="button" className={styles.actionBtn} onClick={handleRegenerate} title={t('input.regenerate')}>
               <RotateCw size={14} />
             </button>
-            <button type="button" className={styles.actionBtn} onClick={handleContinue} title="Continue">
+            <button type="button" className={styles.actionBtn} onClick={handleContinue} title={t('input.continue')}>
               <CornerDownLeft size={14} />
             </button>
             <button
               type="button"
               className={clsx(styles.actionBtn, openPopover === 'persona' && styles.actionBtnActive)}
               onClick={() => setOpenPopover((p) => (p === 'persona' ? null : 'persona'))}
-              title="Send next message as persona"
+              title={t('input.sendAsPersona')}
             >
               <UserCircle size={14} />
               {sendPersonaId && <span className={styles.badge}>1</span>}
@@ -2010,8 +2013,8 @@ export default function InputArea({ chatId }: InputAreaProps) {
                 }
               }
               const title = hasSelection
-                ? `Alternate fields${titleParts.length > 0 ? ` - ${titleParts.join(', ')}` : ''}`
-                : isGroupChat ? 'Group alternate fields' : 'Alternate fields'
+                ? t('input.alternateFieldsActive', { details: titleParts.join(', ') })
+                : isGroupChat ? t('input.groupAlternateFields') : t('input.alternateFields')
               return (
                 <button
                   type="button"
@@ -2038,7 +2041,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                   chatAddonOverrideCount > 0 && styles.actionBtnHasSelection,
                 )}
                 onClick={() => setOpenPopover((p) => (p === 'addons' ? null : 'addons'))}
-                title={chatAddonOverrideCount > 0 ? 'Persona add-ons — customized for this chat' : 'Persona add-ons'}
+                title={chatAddonOverrideCount > 0 ? t('input.personaAddonsCustomized') : t('input.personaAddons')}
               >
                 <IconPlaylistAdd size={14} />
               </button>
@@ -2047,7 +2050,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
               type="button"
               className={clsx(styles.actionBtn, openPopover === 'guides' && styles.actionBtnActive)}
               onClick={() => setOpenPopover((p) => (p === 'guides' ? null : 'guides'))}
-              title="Guided generations"
+              title={t('input.guidedGenerations')}
             >
               <Compass size={14} />
               {activeGuideCount > 0 && <span className={styles.badge}>{activeGuideCount}</span>}
@@ -2056,7 +2059,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
               type="button"
               className={clsx(styles.actionBtn, openPopover === 'quick' && styles.actionBtnActive)}
               onClick={() => setOpenPopover((p) => (p === 'quick' ? null : 'quick'))}
-              title="Quick replies"
+              title={t('input.quickReplies')}
             >
               <MessageSquareQuote size={14} />
             </button>
@@ -2064,7 +2067,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
               type="button"
               className={clsx(styles.actionBtn, openPopover === 'tools' && styles.actionBtnActive)}
               onClick={() => setOpenPopover((p) => (p === 'tools' ? null : 'tools'))}
-              title="Tools"
+              title={t('input.tools')}
             >
               <Wrench size={14} />
             </button>
@@ -2072,7 +2075,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
               type="button"
               className={clsx(styles.actionBtn, openPopover === 'extras' && styles.actionBtnActive)}
               onClick={() => setOpenPopover((p) => (p === 'extras' ? null : 'extras'))}
-              title="Extras"
+              title={t('input.extras')}
             >
               <MoreHorizontal size={14} />
             </button>
@@ -2094,23 +2097,23 @@ export default function InputArea({ chatId }: InputAreaProps) {
         <div className={styles.popoverSlotInner}>
           {renderPopover === 'guides' && (
             <div className={clsx(styles.popover, popoverClosing && styles.popoverClosing)}>
-              {guidedGenerations.length === 0 && <div className={styles.popEmpty}>No guided generations configured.</div>}
+              {guidedGenerations.length === 0 && <div className={styles.popEmpty}>{t('quickMenu.noGuidedGenerations')}</div>}
               {guidedGenerations.map((g) => (
                 <button key={g.id} type="button" className={styles.popRowBtn} onClick={() => toggleGuide(g.id)}>
                   <span>{g.name}</span>
-                  <span className={styles.popMeta}>{g.enabled ? 'ON' : 'OFF'} • {g.mode}</span>
+                  <span className={styles.popMeta}>{g.enabled ? t('on') : t('off')} • {g.mode}</span>
                 </button>
               ))}
               <button type="button" className={styles.popLink} onClick={() => {
                 setOpenPopover(null)
                 useStore.getState().openSettings('guided')
-              }}>Manage in settings</button>
+              }}>{t('quickMenu.manageInSettings')}</button>
             </div>
           )}
 
           {renderPopover === 'quick' && (
             <div className={clsx(styles.popover, popoverClosing && styles.popoverClosing)}>
-              {activeQuickReplySets.length === 0 && <div className={styles.popEmpty}>No enabled quick reply sets.</div>}
+              {activeQuickReplySets.length === 0 && <div className={styles.popEmpty}>{t('quickMenu.noQuickReplySets')}</div>}
               {activeQuickReplySets.map((set) => (
                 <div key={set.id} className={styles.quickSet}>
                   <div className={styles.quickSetName}>{set.name}</div>
@@ -2125,7 +2128,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                         setOpenPopover(null)
                       }}
                     >
-                      <span>{reply.label || 'Untitled reply'}</span>
+                      <span>{reply.label || t('quickMenu.untitledReply')}</span>
                     </button>
                   ))}
                 </div>
@@ -2133,7 +2136,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
               <button type="button" className={styles.popLink} onClick={() => {
                 setOpenPopover(null)
                 useStore.getState().openSettings('quickReplies')
-              }}>Manage in settings</button>
+              }}>{t('quickMenu.manageInSettings')}</button>
             </div>
           )}
 
@@ -2148,10 +2151,10 @@ export default function InputArea({ chatId }: InputAreaProps) {
                     setOpenPopover(null)
                   }}
                 >
-                  Clear one-shot persona
+                  {t('quickMenu.clearOneShotPersona')}
                 </button>
               )}
-              {personaList.length === 0 && <div className={styles.popEmpty}>No personas available.</div>}
+              {personaList.length === 0 && <div className={styles.popEmpty}>{t('quickMenu.noPersonas')}</div>}
               {personaList.map((p) => (
                 <button
                   key={p.id}
@@ -2194,7 +2197,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                   setOpenPopover(null)
                   openModal('manageChats', {
                     characterId: activeCharacterId,
-                    characterName: isGroupChat ? 'Group Chat' : (characterName || 'Character'),
+                    characterName: isGroupChat ? t('quickMenu.groupChat') : (characterName || t('characterFallback')),
                     isGroupChat,
                     groupCharacterIds,
                   })
@@ -2202,7 +2205,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
               >
                 <span className={styles.personaMain}>
                   <FolderOpen size={14} />
-                  <span>Manage Chats</span>
+                  <span>{t('quickMenu.manageChats')}</span>
                 </span>
               </button>
               <button
@@ -2230,7 +2233,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
               >
                 <span className={styles.personaMain}>
                   <Settings2 size={14} />
-                  <span>{isGroupChat ? 'Group Settings' : 'Chat Settings'}</span>
+                  <span>{isGroupChat ? t('quickMenu.groupSettings') : t('quickMenu.chatSettings')}</span>
                 </span>
               </button>
               {!isGroupChat && activeCharacterId && (
@@ -2244,7 +2247,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                 >
                   <span className={styles.personaMain}>
                     <UserPlus size={14} />
-                    <span>Convert to Group Chat</span>
+                    <span>{t('quickMenu.convertToGroupChat')}</span>
                   </span>
                 </button>
               )}
@@ -2258,7 +2261,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
               >
                 <span className={styles.personaMain}>
                   <UsersRound size={14} />
-                  <span>New Group Chat</span>
+                  <span>{t('quickMenu.newGroupChat')}</span>
                 </span>
               </button>
               <button
@@ -2271,7 +2274,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
               >
                 <span className={styles.personaMain}>
                   <StickyNote size={14} />
-                  <span>Author's Note</span>
+                  <span>{t('quickMenu.authorsNote')}</span>
                 </span>
               </button>
               <button
@@ -2280,25 +2283,25 @@ export default function InputArea({ chatId }: InputAreaProps) {
                 onClick={async () => {
                   setOpenPopover(null)
                   try {
-                    toast.info('Recompiling chat memories...')
+                    toast.info(t('toast.recompilingMemories'))
                     const res = await memoryCortexApi.warm(chatId, { force: true })
                     if (res.cortex.status === 'started') {
-                      toast.success('Memory rebuild started. Cortex progress will continue in the background.')
+                      toast.success(t('toast.memoryRebuildStarted'))
                     } else if (res.chatMemory.status === 'complete') {
-                      toast.success('Long-term chat memory rebuilt.')
+                      toast.success(t('toast.memoryRebuilt'))
                     } else if (res.reason === 'chat_vectorization_disabled') {
-                      toast.error('Long-term chat memory vectorization is not enabled')
+                      toast.error(t('toast.memoryVectorizationDisabled'))
                     } else {
-                      toast.info('No memory rebuild was needed for this chat.')
+                      toast.info(t('toast.noMemoryRebuildNeeded'))
                     }
                   } catch (err: any) {
-                    toast.error(err?.message || 'Failed to recompile memories')
+                    toast.error(err?.message || t('toast.failedRecompileMemories'))
                   }
                 }}
               >
                 <span className={styles.personaMain}>
                   <BrainCircuit size={14} />
-                  <span>Recompile Memories</span>
+                  <span>{t('quickMenu.recompileMemories')}</span>
                 </span>
               </button>
               {hasExpressions && !expressionDisplay.enabled && (
@@ -2312,7 +2315,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                 >
                   <span className={styles.personaMain}>
                     <Drama size={14} />
-                    <span>Show Expression Display</span>
+                    <span>{t('quickMenu.showExpressionDisplay')}</span>
                   </span>
                 </button>
               )}
@@ -2322,7 +2325,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
           {renderPopover === 'extras' && (
             <div className={clsx(styles.popover, popoverClosing && styles.popoverClosing)}>
               <div className={styles.extrasSection}>
-                <div className={styles.quickSetName}>Impersonate</div>
+                <div className={styles.quickSetName}>{t('quickMenu.impersonate')}</div>
                 {lastImpersonateInput && (
                   <button
                     type="button"
@@ -2339,7 +2342,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                     <span className={styles.personaMain}>
                       <ScrollText size={14} />
                       <span className={styles.personaNameGroup}>
-                        <span>Restore last input</span>
+                        <span>{t('quickMenu.restoreLastInput')}</span>
                         <span className={styles.personaTitle}>{lastImpersonateInput.length > 60 ? lastImpersonateInput.slice(0, 60) + '…' : lastImpersonateInput}</span>
                       </span>
                     </span>
@@ -2356,8 +2359,8 @@ export default function InputArea({ chatId }: InputAreaProps) {
                   <span className={styles.personaMain}>
                     <ScrollText size={14} />
                     <span className={styles.personaNameGroup}>
-                      <span>Preset Prompts</span>
-                      <span className={styles.personaTitle}>Full assembly with impersonate-triggered blocks</span>
+                      <span>{t('quickMenu.presetPrompts')}</span>
+                      <span className={styles.personaTitle}>{t('quickMenu.presetPromptsDesc')}</span>
                     </span>
                   </span>
                 </button>
@@ -2372,8 +2375,8 @@ export default function InputArea({ chatId }: InputAreaProps) {
                   <span className={styles.personaMain}>
                     <MessageSquare size={14} />
                     <span className={styles.personaNameGroup}>
-                      <span>One-liner</span>
-                      <span className={styles.personaTitle}>Chat history + impersonation nudge only</span>
+                      <span>{t('quickMenu.oneLiner')}</span>
+                      <span className={styles.personaTitle}>{t('quickMenu.oneLinerDesc')}</span>
                     </span>
                   </span>
                 </button>
@@ -2382,13 +2385,13 @@ export default function InputArea({ chatId }: InputAreaProps) {
                   className={styles.popRowBtn}
                   disabled
                   style={{ opacity: 0.4 }}
-                  title="Coming soon"
+                  title={t('quickMenu.comingSoon')}
                 >
                   <span className={styles.personaMain}>
                     <Crown size={14} />
                     <span className={styles.personaNameGroup}>
-                      <span>Sovereign Hand</span>
-                      <span className={styles.personaTitle}>Co-pilot guided impersonation (coming soon)</span>
+                      <span>{t('quickMenu.sovereignHand')}</span>
+                      <span className={styles.personaTitle}>{t('quickMenu.sovereignHandDesc')}</span>
                     </span>
                   </span>
                 </button>
@@ -2402,7 +2405,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                 >
                   <span className={styles.personaMain}>
                     <FilePlus size={14} />
-                    <span>New Chat</span>
+                    <span>{t('quickMenu.newChat')}</span>
                   </span>
                 </button>
                 {(() => {
@@ -2418,14 +2421,14 @@ export default function InputArea({ chatId }: InputAreaProps) {
                       }}
                       disabled={dryRunDisabled}
                       style={dryRunDisabled ? { opacity: 0.5 } : undefined}
-                      title={!hasPreset ? 'No preset selected' : undefined}
+                      title={!hasPreset ? t('quickMenu.noPresetSelected') : undefined}
                     >
                       <span className={styles.personaMain}>
                         <Eye size={14} />
                         <span className={styles.personaNameGroup}>
-                          <span>Dry Run</span>
+                          <span>{t('quickMenu.dryRun')}</span>
                           <span className={styles.personaTitle}>
-                            {hasPreset ? 'Preview the full prompt sent to the AI without generating' : 'Select a preset to enable dry run'}
+                            {hasPreset ? t('quickMenu.dryRunDesc') : t('quickMenu.dryRunSelectPreset')}
                           </span>
                         </span>
                       </span>
@@ -2445,8 +2448,8 @@ export default function InputArea({ chatId }: InputAreaProps) {
                   <span className={styles.personaMain}>
                     <Braces size={14} />
                     <span className={styles.personaNameGroup}>
-                      <span>Resolve Macros</span>
-                      <span className={styles.personaTitle}>Replace macros in input text ({isMac ? '⌘' : 'Ctrl'}+L)</span>
+                      <span>{t('quickMenu.resolveMacros')}</span>
+                      <span className={styles.personaTitle}>{t('quickMenu.resolveMacrosDesc', { mod: queueModLabel })}</span>
                     </span>
                   </span>
                 </button>
@@ -2457,11 +2460,11 @@ export default function InputArea({ chatId }: InputAreaProps) {
 
           {renderPopover === 'altFields' && (
             <div className={clsx(styles.popover, popoverClosing && styles.popoverClosing)}>
-              <div className={styles.quickSetName}>{isGroupChat ? 'Group Alternate Fields' : 'Alternate Fields'}</div>
+              <div className={styles.quickSetName}>{isGroupChat ? t('quickMenu.groupAlternateFields') : t('quickMenu.alternateFields')}</div>
               {isGroupChat ? (
                 <>
                   {groupScenarioMode !== 'individual' && (
-                    <div className={styles.popEmpty}>Scenario is controlled by Group Scenario settings.</div>
+                    <div className={styles.popEmpty}>{t('quickMenu.scenarioGroupControlled')}</div>
                   )}
                   {groupMembersWithAltFields.map(({ char, altFields }) => {
                     const memberSelections = groupAltFieldSelections[char.id] || {}
@@ -2494,7 +2497,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                           </span>
                           <span className={styles.personaNameGroup}>
                             <span>{char.name}</span>
-                            {memberSelectionCount > 0 && <span className={styles.personaTitle}>{memberSelectionCount} active</span>}
+                            {memberSelectionCount > 0 && <span className={styles.personaTitle}>{t('quickMenu.activeCount', { count: memberSelectionCount })}</span>}
                           </span>
                         </div>
                         <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
@@ -2508,7 +2511,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                                 <span style={{ textTransform: 'capitalize', fontSize: 'calc(11px * var(--lumiverse-font-scale, 1))', color: selectedId ? 'var(--lumiverse-primary)' : 'var(--lumiverse-text-dim)' }}>{field}</span>
                                 <select
                                   name={`group-alt-${field}`}
-                                  aria-label={`${field} variant for ${char.name}`}
+                                  aria-label={t('quickMenu.fieldVariantFor', { field, name: char.name })}
                                   style={{
                                     minWidth: 0,
                                     padding: '3px 6px',
@@ -2525,10 +2528,10 @@ export default function InputArea({ chatId }: InputAreaProps) {
                                   }}
                                   value={selectedId}
                                   disabled={isScenarioDisabled}
-                                  title={isScenarioDisabled ? 'Scenario is controlled by Group Scenario settings' : undefined}
+                                  title={isScenarioDisabled ? t('quickMenu.scenarioGroupControlled') : undefined}
                                   onChange={(e) => handleGroupAltFieldSelect(char.id, field, e.target.value || null)}
                                 >
-                                  <option value="">Default</option>
+                                  <option value="">{t('defaultOption')}</option>
                                   {variants.map((v) => (
                                     <option key={v.id} value={v.id}>{v.label}</option>
                                   ))}
@@ -2541,7 +2544,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                     )
                   })}
                   {groupMembersWithAltFields.length === 0 && (
-                    <div className={styles.popEmpty}>No group members have alternate fields configured.</div>
+                    <div className={styles.popEmpty}>{t('quickMenu.noGroupAltFields')}</div>
                   )}
                 </>
               ) : (
@@ -2579,7 +2582,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                         </span>
                         <select
                           name={`alt-${field}`}
-                          aria-label={`${field} variant`}
+                          aria-label={t('quickMenu.fieldVariant', { field })}
                           style={{
                             marginLeft: 8,
                             flex: 1,
@@ -2598,7 +2601,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                           value={selectedId}
                           onChange={(e) => handleAltFieldSelect(field, e.target.value || null)}
                         >
-                          <option value="">Default</option>
+                          <option value="">{t('defaultOption')}</option>
                           {variants.map((v) => (
                             <option key={v.id} value={v.id}>{v.label}</option>
                           ))}
@@ -2607,7 +2610,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                     )
                   })}
                   {Object.values(altFieldsData).every((arr) => !arr?.length) && (
-                    <div className={styles.popEmpty}>No alternate fields configured.</div>
+                    <div className={styles.popEmpty}>{t('quickMenu.noAltFields')}</div>
                   )}
                 </>
               )}
@@ -2617,12 +2620,12 @@ export default function InputArea({ chatId }: InputAreaProps) {
           {renderPopover === 'addons' && (
             <div className={clsx(styles.popover, popoverClosing && styles.popoverClosing)}>
               <div className={styles.addonPopoverHeader}>
-                <span>Persona Add-Ons</span>
+                <span>{t('quickMenu.personaAddons')}</span>
                 <button
                   type="button"
                   className={styles.addonCreateToggle}
                   onClick={() => setShowCreateAddon((v) => !v)}
-                  title="Create an add-on for this chat"
+                  title={t('quickMenu.createAddonForChat')}
                 >
                   <Plus size={12} />
                 </button>
@@ -2632,19 +2635,19 @@ export default function InputArea({ chatId }: InputAreaProps) {
                   <input
                     type="text"
                     name="addon-name"
-                    aria-label="Add-on name"
+                    aria-label={t('quickMenu.addonName')}
                     className={styles.addonCreateInput}
                     value={newAddonLabel}
                     onChange={(e) => setNewAddonLabel(e.target.value)}
-                    placeholder="Add-on name"
+                    placeholder={t('quickMenu.addonName')}
                   />
                   <textarea
                     name="addon-content"
-                    aria-label="Add-on content"
+                    aria-label={t('quickMenu.addonContent')}
                     className={styles.addonCreateTextarea}
                     value={newAddonContent}
                     onChange={(e) => setNewAddonContent(e.target.value)}
-                    placeholder="Add-on content..."
+                    placeholder={t('quickMenu.addonContent')}
                     rows={3}
                   />
                   <button
@@ -2653,7 +2656,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                     onClick={handleCreateChatAddon}
                     disabled={creatingAddon || (!newAddonLabel.trim() && !newAddonContent.trim())}
                   >
-                    {creatingAddon ? 'Creating...' : 'Create for this chat'}
+                    {creatingAddon ? t('quickMenu.creating') : t('quickMenu.createForChat')}
                   </button>
                 </div>
               )}
@@ -2668,9 +2671,9 @@ export default function InputArea({ chatId }: InputAreaProps) {
                     >
                       <span className={styles.personaMain}>
                         <IconPlaylistAdd size={13} style={{ opacity: addon.enabled ? 1 : 0.4, color: addon.enabled ? 'var(--lumiverse-primary)' : undefined }} />
-                        <span>{addon.label || 'Untitled add-on'}</span>
+                        <span>{addon.label || t('quickMenu.untitledAddon')}</span>
                       </span>
-                      <span className={styles.popMeta}>{addon.enabled ? 'ON' : 'OFF'}</span>
+                      <span className={styles.popMeta}>{addon.enabled ? t('on') : t('off')}</span>
                     </button>
                   ))}
                 </>
@@ -2678,7 +2681,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
               {effectiveAttachedGlobalAddons.length > 0 && (
                 <>
                   {effectivePersonaAddons.length > 0 && <div className={styles.popDivider} />}
-                  <div className={styles.quickSetName}>Global Add-Ons</div>
+                  <div className={styles.quickSetName}>{t('quickMenu.globalAddons')}</div>
                   {effectiveAttachedGlobalAddons.map((addon) => (
                     <button
                       key={addon.id}
@@ -2688,23 +2691,23 @@ export default function InputArea({ chatId }: InputAreaProps) {
                     >
                       <span className={styles.personaMain}>
                         <Globe size={13} style={{ opacity: addon.enabled ? 1 : 0.4, color: addon.enabled ? 'var(--lumiverse-info, #42a5f5)' : undefined }} />
-                        <span>{addon.label || 'Untitled global add-on'}</span>
+                        <span>{addon.label || t('quickMenu.untitledGlobalAddon')}</span>
                       </span>
-                      <span className={styles.popMeta}>{addon.enabled ? 'ON' : 'OFF'}</span>
+                      <span className={styles.popMeta}>{addon.enabled ? t('on') : t('off')}</span>
                     </button>
                   ))}
                 </>
               )}
               {!hasAddons && !showCreateAddon && (
-                <div className={styles.popEmpty}>No add-ons configured. Use + to create one for this chat.</div>
+                <div className={styles.popEmpty}>{t('quickMenu.noAddons')}</div>
               )}
             </div>
           )}
 
           {renderPopover === 'databank' && (
             <div className={clsx(styles.popover, popoverClosing && styles.popoverClosing)}>
-              <div className={styles.quickSetName}>Documents</div>
-              {databankResults.length === 0 && <div className={styles.popEmpty}>No matching documents.</div>}
+              <div className={styles.quickSetName}>{t('quickMenu.documents')}</div>
+              {databankResults.length === 0 && <div className={styles.popEmpty}>{t('quickMenu.noMatchingDocuments')}</div>}
               {databankResults.map((r, i) => (
                 <button
                   key={`${r.databankId}-${r.slug}`}
@@ -2727,8 +2730,8 @@ export default function InputArea({ chatId }: InputAreaProps) {
 
           {renderPopover === 'groupMember' && (
             <div className={clsx(styles.popover, popoverClosing && styles.popoverClosing)}>
-              <div className={styles.quickSetName}>Mention member</div>
-              {atResults.length === 0 && <div className={styles.popEmpty}>No matching members.</div>}
+              <div className={styles.quickSetName}>{t('quickMenu.mentionMember')}</div>
+              {atResults.length === 0 && <div className={styles.popEmpty}>{t('quickMenu.noMatchingMembers')}</div>}
               {atResults.map((r, i) => {
                 const avatarUrl = getCharacterAvatarThumbUrlById(r.id, r.image_id)
                 return (
@@ -2739,7 +2742,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                     style={r.muted ? { opacity: 0.55 } : undefined}
                     onMouseDown={(e) => { e.preventDefault(); handleAtSelect(r) }}
                     onMouseEnter={() => setAtActiveIdx(i)}
-                    title={r.muted ? `${r.name} (muted — mention will override)` : r.name}
+                    title={r.muted ? t('quickMenu.mutedMentionOverride', { name: r.name }) : r.name}
                   >
                     <span className={styles.personaMain}>
                       {avatarUrl ? (
@@ -2778,7 +2781,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                       )}
                       <span className={styles.personaNameGroup}>
                         <span>{r.name}</span>
-                        <span className={styles.personaTitle}>@{r.slug}{r.muted ? ' · muted' : ''}</span>
+                        <span className={styles.personaTitle}>@{r.slug}{r.muted ? t('quickMenu.mutedSuffix') : ''}</span>
                       </span>
                     </span>
                   </button>
@@ -2803,7 +2806,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
                 type="button"
                 className={styles.attachmentRemove}
                 onClick={() => removeAttachment(att.image_id)}
-                aria-label="Remove attachment"
+                aria-label={t('input.removeAttachment')}
               >
                 <X size={10} />
               </button>
@@ -2817,7 +2820,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
         ref={fileInputRef}
         type="file"
         name="chat-attachment"
-        aria-label="Attach files"
+        aria-label={t('input.attachFiles')}
         aria-hidden="true"
         tabIndex={-1}
         accept="image/*,audio/*,.txt,.md,.markdown,.csv,.tsv,.json,.xml,.html,.htm,.yaml,.yml,.log,.rst,.rtf"
@@ -2840,8 +2843,8 @@ export default function InputArea({ chatId }: InputAreaProps) {
           } as CSSProperties}
           onClick={sttStatus === 'processing' ? undefined : handleSTTToggle}
           disabled={sttStatus === 'processing'}
-          title={sttStatus === 'processing' ? 'Processing speech' : 'Stop speech-to-text'}
-          aria-label={sttStatus === 'processing' ? 'Processing speech' : 'Stop speech-to-text'}
+          title={sttStatus === 'processing' ? t('input.processingSpeech') : t('input.stopStt')}
+          aria-label={sttStatus === 'processing' ? t('input.processingSpeech') : t('input.stopStt')}
           aria-live="polite"
         >
           <span className={styles.sttRecordingStatus}>
@@ -2870,7 +2873,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
             })}
           </span>
           <span className={styles.sttRecordingHint}>
-            {sttStatus === 'processing' ? 'Transcribing…' : 'Tap to stop and transcribe'}
+            {sttStatus === 'processing' ? t('input.transcribing') : t('input.tapToStopTranscribe')}
           </span>
         </button>
       ) : (
@@ -2881,8 +2884,8 @@ export default function InputArea({ chatId }: InputAreaProps) {
               className={styles.attachBtn}
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              title="Attach image or audio"
-              aria-label="Attach file"
+              title={t('input.attachImageOrAudio')}
+              aria-label={t('input.attachFile')}
             >
               <Paperclip size={16} />
             </button>
@@ -2897,11 +2900,11 @@ export default function InputArea({ chatId }: InputAreaProps) {
               title={
                 !isSTTSupported
                   ? voiceSettings.sttProvider === 'webspeech'
-                    ? 'Speech recognition unavailable in this browser'
-                    : 'Audio recording unavailable in this browser'
-                  : 'Start speech-to-text'
+                    ? t('input.speechRecognitionUnavailable')
+                    : t('input.audioRecordingUnavailable')
+                  : t('input.startStt')
               }
-              aria-label="Start speech-to-text"
+              aria-label={t('input.startStt')}
               aria-pressed={false}
             >
               <Mic size={16} />
@@ -2915,7 +2918,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
             <textarea
               ref={textareaRef}
               name="chat-message"
-              aria-label="Message"
+              aria-label={t('input.message')}
               className={styles.textarea}
               value={text}
               onChange={handleInput}
@@ -2925,7 +2928,7 @@ export default function InputArea({ chatId }: InputAreaProps) {
               onCompositionEnd={handleCompositionEnd}
               onFocus={() => setInputFocused(true)}
               onBlur={() => setInputFocused(false)}
-              placeholder="Type a message..."
+              placeholder={t('input.placeholder')}
               rows={1}
               disabled={isStreaming}
             />
@@ -2936,8 +2939,8 @@ export default function InputArea({ chatId }: InputAreaProps) {
               type="button"
               className={clsx(styles.sendBtn, styles.sendBtnStop)}
               onClick={handleStop}
-              title="Stop generation"
-              aria-label="Stop generation"
+              title={t('input.stopGeneration')}
+              aria-label={t('input.stopGeneration')}
             >
               <Square size={16} />
             </button>
@@ -2951,17 +2954,17 @@ export default function InputArea({ chatId }: InputAreaProps) {
               onTouchCancel={handleSendTouchEnd}
               title={
                 text.trim() || pendingAttachments.length > 0
-                  ? `Send message (${queueModLabel}+click to queue)`
+                  ? t('input.sendMessageQueueHint', { mod: queueModLabel })
                   : hasQueuedMessages
-                    ? 'Send queued messages'
-                    : 'Nudge for a fresh reply'
+                    ? t('input.sendQueuedMessages')
+                    : t('input.nudgeFreshReply')
               }
               aria-label={
                 text.trim() || pendingAttachments.length > 0
-                  ? 'Send message'
+                  ? t('input.sendMessage')
                   : hasQueuedMessages
-                    ? 'Send queued messages'
-                    : 'Nudge for a fresh reply'
+                    ? t('input.sendQueuedMessages')
+                    : t('input.nudgeFreshReply')
               }
             >
               <Send size={16} />

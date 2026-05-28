@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react"
+import { useTranslation } from 'react-i18next'
 import { imageGenConnectionsApi } from "@/api/image-gen-connections"
 import NumericInput from "@/components/shared/NumericInput"
 import styles from "./ProviderParamRenderer.module.css"
@@ -128,6 +129,7 @@ function ModelComboControl({
   onChange: (key: string, value: any) => void
   connectionId: string | null | undefined
 }) {
+  const { t } = useTranslation('dreamWeaver')
   const [models, setModels] = useState<Array<{ id: string; label: string }> | null>(null)
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
@@ -162,7 +164,7 @@ function ModelComboControl({
           type="button"
           onClick={load}
           disabled={loading || !connectionId}
-          title="Browse available models"
+          title={t('studio.providerParams.browseModels')}
           style={{
             flexShrink: 0,
             padding: "0 6px",
@@ -193,10 +195,10 @@ function ModelComboControl({
             style={{ padding: "3px 8px", cursor: "pointer", fontSize: 11, opacity: 0.6 }}
             onClick={() => { onChange(paramKey, ""); setOpen(false) }}
           >
-            (clear / use default)
+            {t('studio.providerParams.clearDefault')}
           </div>
           {models.length === 0 ? (
-            <div style={{ padding: "3px 8px", fontSize: 11, opacity: 0.5 }}>No models found</div>
+            <div style={{ padding: "3px 8px", fontSize: 11, opacity: 0.5 }}>{t('studio.providerParams.noModelsFound')}</div>
           ) : (
             models.map((m) => (
               <div

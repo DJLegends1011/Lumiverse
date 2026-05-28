@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ModalShell } from '@/components/shared/ModalShell'
 import { useStore } from '@/store'
 import { imageGenApi } from '@/api/image-gen'
@@ -16,6 +17,8 @@ interface ImagePromptPreviewProps {
 }
 
 export default function ImagePromptPreviewModal() {
+  const { t } = useTranslation('modals')
+  const { t: tc } = useTranslation('common')
   const activeModal = useStore((s) => s.activeModal)
   const modalProps = useStore((s) => s.modalProps) as Partial<ImagePromptPreviewProps>
   const closeModal = useStore((s) => s.closeModal)
@@ -44,7 +47,7 @@ export default function ImagePromptPreviewModal() {
 
   const confirm = () => {
     if (!prompt.trim()) {
-      setError('Prompt cannot be empty')
+      setError(t('imagePromptPreview.emptyPrompt'))
       return
     }
     modalProps.onConfirm?.(prompt, negative)
@@ -65,7 +68,7 @@ export default function ImagePromptPreviewModal() {
       setPrompt(res.prompt || '')
       setNegative(res.negativePrompt || '')
     } catch (err: any) {
-      setError(err?.message || 'Failed to regenerate prompt')
+      setError(err?.message || t('imagePromptPreview.regenerateFailed'))
     } finally {
       setBusy(false)
     }
@@ -74,31 +77,31 @@ export default function ImagePromptPreviewModal() {
   return (
     <ModalShell isOpen={isOpen} onClose={cancel} maxWidth={640} maxHeight="85vh" className={styles.modal}>
       <div className={styles.header}>
-        <h3 className={styles.title}>Preview &amp; Edit Image Prompt</h3>
+        <h3 className={styles.title}>{t('imagePromptPreview.title')}</h3>
         <p className={styles.subtitle}>
-          This is the prompt that will be sent to the image generator. Edit it freely — the parser will be skipped on confirm.
+          {t('imagePromptPreview.subtitle')}
         </p>
       </div>
 
       <div className={styles.body}>
         <div className={styles.fieldGroup}>
-          <label className={styles.label}>Prompt</label>
+          <label className={styles.label}>{t('imagePromptPreview.promptLabel')}</label>
           <textarea
             className={styles.textarea}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="The final image prompt"
+            placeholder={t('imagePromptPreview.promptPlaceholder')}
             autoFocus
           />
         </div>
 
         <div className={styles.fieldGroup}>
-          <label className={styles.label}>Negative Prompt</label>
+          <label className={styles.label}>{t('imagePromptPreview.negativeLabel')}</label>
           <textarea
             className={`${styles.textarea} ${styles.textareaShort}`}
             value={negative}
             onChange={(e) => setNegative(e.target.value)}
-            placeholder="Optional negative prompt"
+            placeholder={t('imagePromptPreview.negativePlaceholder')}
           />
         </div>
 
@@ -106,7 +109,7 @@ export default function ImagePromptPreviewModal() {
 
         <div className={styles.actions}>
           <button type="button" className={`${styles.btn} ${styles.btnCancel}`} onClick={cancel} disabled={busy}>
-            Cancel
+            {tc('actions.cancel')}
           </button>
           <button
             type="button"
@@ -114,7 +117,7 @@ export default function ImagePromptPreviewModal() {
             onClick={regenerate}
             disabled={busy}
           >
-            {busy ? 'Regenerating…' : 'Re-run parser'}
+            {busy ? t('imagePromptPreview.regenerating') : t('imagePromptPreview.rerunParser')}
           </button>
           <button
             type="button"
@@ -122,7 +125,7 @@ export default function ImagePromptPreviewModal() {
             onClick={confirm}
             disabled={busy || !prompt.trim()}
           >
-            Generate
+            {t('imagePromptPreview.generate')}
           </button>
         </div>
       </div>

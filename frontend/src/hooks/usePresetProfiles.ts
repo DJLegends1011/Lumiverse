@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import { presetProfilesApi, type PresetProfileBinding } from '@/api/preset-profiles'
 import type { PromptBlock } from '@/lib/loom/types'
@@ -30,6 +31,7 @@ export function usePresetProfiles(
   presetId: string | null,
   blocks: PromptBlock[] | undefined,
 ) {
+  const { t } = useTranslation('panels', { keyPrefix: 'loomBuilder.toast' })
   const activeChatId = useStore((s) => s.activeChatId)
   const activeCharacterId = useStore((s) => s.activeCharacterId)
   const activeProfileId = useStore((s) => s.activeProfileId)
@@ -126,9 +128,9 @@ export function usePresetProfiles(
     try {
       const binding = await presetProfilesApi.captureDefaults(presetId, snapshotBlockStates(blocks))
       setDefaults(binding)
-      addToast({ type: 'success', message: 'Default block states captured' })
+      addToast({ type: 'success', message: t('defaultsCaptured') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to capture defaults' })
+      addToast({ type: 'error', message: t('captureDefaultsFailed') })
     } finally {
       setIsLoading(false)
     }
@@ -141,9 +143,9 @@ export function usePresetProfiles(
     try {
       await presetProfilesApi.deleteDefaults(presetId)
       setDefaults(null)
-      addToast({ type: 'info', message: 'Default block states cleared' })
+      addToast({ type: 'info', message: t('defaultsCleared') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to clear defaults' })
+      addToast({ type: 'error', message: t('clearDefaultsFailed') })
     } finally {
       setIsLoading(false)
     }
@@ -156,9 +158,9 @@ export function usePresetProfiles(
     try {
       const binding = await presetProfilesApi.setChatBinding(activeChatId, presetId, snapshotBlockStates(blocks))
       setChatSlot({ for: activeChatId, binding })
-      addToast({ type: 'success', message: 'Preset and block states bound to this chat' })
+      addToast({ type: 'success', message: t('boundToChat') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to bind to chat' })
+      addToast({ type: 'error', message: t('bindChatFailed') })
     } finally {
       setIsLoading(false)
     }
@@ -171,9 +173,9 @@ export function usePresetProfiles(
     try {
       await presetProfilesApi.deleteChatBinding(activeChatId)
       setChatSlot({ for: activeChatId, binding: null })
-      addToast({ type: 'info', message: 'Chat binding removed' })
+      addToast({ type: 'info', message: t('chatBindingRemoved') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to remove chat binding' })
+      addToast({ type: 'error', message: t('removeChatBindingFailed') })
     } finally {
       setIsLoading(false)
     }
@@ -186,9 +188,9 @@ export function usePresetProfiles(
     try {
       const binding = await presetProfilesApi.setCharacterBinding(activeCharacterId, presetId, snapshotBlockStates(blocks))
       setCharSlot({ for: activeCharacterId, binding })
-      addToast({ type: 'success', message: 'Preset and block states bound to this character' })
+      addToast({ type: 'success', message: t('boundToCharacter') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to bind to character' })
+      addToast({ type: 'error', message: t('bindCharacterFailed') })
     } finally {
       setIsLoading(false)
     }
@@ -201,9 +203,9 @@ export function usePresetProfiles(
     try {
       await presetProfilesApi.deleteCharacterBinding(activeCharacterId)
       setCharSlot({ for: activeCharacterId, binding: null })
-      addToast({ type: 'info', message: 'Character binding removed' })
+      addToast({ type: 'info', message: t('characterBindingRemoved') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to remove character binding' })
+      addToast({ type: 'error', message: t('removeCharacterBindingFailed') })
     } finally {
       setIsLoading(false)
     }
@@ -216,9 +218,9 @@ export function usePresetProfiles(
     try {
       const binding = await presetProfilesApi.setConnectionBinding(activeProfileId, presetId, snapshotBlockStates(blocks))
       setConnectionSlot({ for: activeProfileId, binding })
-      addToast({ type: 'success', message: 'Preset and block states bound to this connection profile' })
+      addToast({ type: 'success', message: t('boundToConnection') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to bind to connection profile' })
+      addToast({ type: 'error', message: t('bindConnectionFailed') })
     } finally {
       setIsLoading(false)
     }
@@ -231,9 +233,9 @@ export function usePresetProfiles(
     try {
       await presetProfilesApi.deleteConnectionBinding(activeProfileId)
       setConnectionSlot({ for: activeProfileId, binding: null })
-      addToast({ type: 'info', message: 'Connection profile binding removed' })
+      addToast({ type: 'info', message: t('connectionBindingRemoved') })
     } catch {
-      addToast({ type: 'error', message: 'Failed to remove connection profile binding' })
+      addToast({ type: 'error', message: t('removeConnectionBindingFailed') })
     } finally {
       setIsLoading(false)
     }

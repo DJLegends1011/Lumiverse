@@ -1,5 +1,6 @@
 import { Check, Crosshair, Maximize2, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import type {
   ComfyUIFieldMapping,
@@ -54,6 +55,8 @@ export function WorkflowEditorModal({
   onUpdateMappings,
   onClose,
 }: WorkflowEditorModalProps) {
+  const { t } = useTranslation('dreamWeaver')
+  const { t: tc } = useTranslation('common')
   const [mode, setMode] = useState<'import' | 'map'>(config ? 'map' : 'import')
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [pasted, setPasted] = useState('')
@@ -115,7 +118,7 @@ export function WorkflowEditorModal({
       setContextMenu(null)
       setMode('map')
     } catch (importError: any) {
-      setLocalError(importError?.message ?? 'Failed to import workflow JSON')
+      setLocalError(importError?.message ?? t('comfyui.workflowEditor.importFailed'))
     } finally {
       setImporting(false)
     }
@@ -126,7 +129,7 @@ export function WorkflowEditorModal({
       const text = await file.text()
       await handleImportPayload(JSON.parse(text))
     } catch (importError: any) {
-      setLocalError(importError?.message ?? 'Failed to import workflow JSON')
+      setLocalError(importError?.message ?? t('comfyui.workflowEditor.importFailed'))
     }
   }
 
@@ -134,7 +137,7 @@ export function WorkflowEditorModal({
     try {
       await handleImportPayload(JSON.parse(pasted))
     } catch (importError: any) {
-      setLocalError(importError?.message ?? 'Failed to parse workflow JSON')
+      setLocalError(importError?.message ?? t('comfyui.workflowEditor.parseFailed'))
     }
   }
 
@@ -182,22 +185,22 @@ export function WorkflowEditorModal({
       <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
         <header className={styles.header}>
           <div>
-            <p className={styles.eyebrow}>Workflow Editor</p>
-            <h3 className={styles.title}>ComfyUI Workflow</h3>
+            <p className={styles.eyebrow}>{t('comfyui.workflowEditor.eyebrow')}</p>
+            <h3 className={styles.title}>{t('comfyui.workflowEditor.title')}</h3>
           </div>
           <div className={styles.headerActions}>
             {replacingWorkflow ? (
               <button type="button" className={styles.secondaryButton} onClick={handleBackToMap}>
-                Back to Map
+                {t('comfyui.workflowEditor.backToMap')}
               </button>
             ) : mode === 'map' && config ? (
               <>
                 <button type="button" className={styles.secondaryButton} onClick={handleReplaceWorkflow}>
-                  Replace Workflow
+                  {t('comfyui.workflowEditor.replaceWorkflow')}
                 </button>
                 <button type="button" className={styles.primaryButton} onClick={onClose}>
                   <Check size={15} />
-                  Done
+                  {tc('actions.done')}
                 </button>
               </>
             ) : null}
@@ -205,7 +208,7 @@ export function WorkflowEditorModal({
               type="button"
               className={styles.closeButton}
               onClick={onClose}
-              aria-label="Close workflow editor"
+              aria-label={t('comfyui.workflowEditor.closeAria')}
             >
               <X size={18} />
             </button>
@@ -216,11 +219,13 @@ export function WorkflowEditorModal({
           <div className={styles.importPanel}>
             <div className={styles.importLead}>
               <div>
-                <p className={styles.panelEyebrow}>{replacingWorkflow ? 'Replace' : 'Import'}</p>
+                <p className={styles.panelEyebrow}>
+                  {replacingWorkflow ? t('comfyui.workflowEditor.replace') : t('comfyui.workflowEditor.import')}
+                </p>
                 <h4 className={styles.panelTitle}>
                   {replacingWorkflow
-                    ? 'Swap in a new ComfyUI export.'
-                    : 'Bring in the original ComfyUI export.'}
+                    ? t('comfyui.workflowEditor.replaceTitle')
+                    : t('comfyui.workflowEditor.importTitle')}
                 </h4>
               </div>
               <button
@@ -229,7 +234,7 @@ export function WorkflowEditorModal({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={importing}
               >
-                {importing ? 'Importing...' : 'Choose JSON'}
+                {importing ? t('comfyui.workflowEditor.importing') : t('comfyui.workflowEditor.chooseJson')}
               </button>
               <input
                 ref={fileInputRef}
@@ -251,8 +256,8 @@ export function WorkflowEditorModal({
 
             <p className={styles.panelHint}>
               {replacingWorkflow
-                ? 'Importing a new JSON replaces the current workflow and refreshes the mapping choices.'
-                : 'Image generation will pick up the usual prompt, sampler, seed, and size fields when it can, and you can expose anything else from the graph after import.'}
+                ? t('comfyui.workflowEditor.replaceHint')
+                : t('comfyui.workflowEditor.importHint')}
             </p>
 
             <textarea
@@ -260,7 +265,7 @@ export function WorkflowEditorModal({
               rows={10}
               value={pasted}
               onChange={(event) => setPasted(event.target.value)}
-              placeholder='{ "1": { "class_type": "..." } }'
+              placeholder={t('comfyui.workflowEditor.pastePlaceholder')}
             />
 
             <div className={styles.importActions}>
@@ -270,7 +275,7 @@ export function WorkflowEditorModal({
                 onClick={() => void handlePasteImport()}
                 disabled={importing || !pasted.trim()}
               >
-                Import Pasted JSON
+                {t('comfyui.workflowEditor.importPasted')}
               </button>
             </div>
           </div>
@@ -278,23 +283,21 @@ export function WorkflowEditorModal({
           <div className={styles.graphSection}>
             <div className={styles.graphHeader}>
               <div>
-                <p className={styles.panelEyebrow}>Map</p>
-                <h4 className={styles.panelTitle}>Click a node to map prompts or expose settings.</h4>
+                <p className={styles.panelEyebrow}>{t('comfyui.workflowEditor.mapEyebrow')}</p>
+                <h4 className={styles.panelTitle}>{t('comfyui.workflowEditor.mapTitle')}</h4>
               </div>
               <div className={styles.graphMeta}>
                 <span className={styles.metaText}>
-                  {mappedCount} mapped
                   {canRunWorkflow
-                    ? ' · Ready. You can leave now or expose more controls.'
-                    : ' · Map positive and negative prompts, then click Done.'}
+                    ? t('comfyui.workflowEditor.mappedMetaReady', { count: mappedCount })
+                    : t('comfyui.workflowEditor.mappedMetaNeedsPrompts', { count: mappedCount })}
                 </span>
               </div>
             </div>
 
             {hasFormatMismatch && (
               <div className={styles.notice}>
-                This workflow was recovered from legacy metadata. Re-import the original ComfyUI
-                export if the graph layout looks wrong.
+                {t('comfyui.workflowEditor.formatMismatch')}
               </div>
             )}
 
@@ -309,13 +312,13 @@ export function WorkflowEditorModal({
                   setContextMenu({ nodeId, classType, anchor })
                 }
               />
-              <div className={styles.graphToolDock} role="toolbar" aria-label="Workflow graph controls">
+              <div className={styles.graphToolDock} role="toolbar" aria-label={t('comfyui.workflowEditor.graphToolbarAria')}>
                 <button
                   type="button"
                   className={styles.graphToolButton}
                   onClick={() => graphRef.current?.zoomOut()}
-                  aria-label="Zoom out"
-                  title="Zoom out"
+                  aria-label={t('comfyui.workflowEditor.zoomOut')}
+                  title={t('comfyui.workflowEditor.zoomOut')}
                 >
                   <ZoomOut size={16} />
                 </button>
@@ -323,8 +326,8 @@ export function WorkflowEditorModal({
                   type="button"
                   className={styles.graphToolButton}
                   onClick={() => graphRef.current?.zoomIn()}
-                  aria-label="Zoom in"
-                  title="Zoom in"
+                  aria-label={t('comfyui.workflowEditor.zoomIn')}
+                  title={t('comfyui.workflowEditor.zoomIn')}
                 >
                   <ZoomIn size={16} />
                 </button>
@@ -332,8 +335,8 @@ export function WorkflowEditorModal({
                   type="button"
                   className={styles.graphToolButton}
                   onClick={() => graphRef.current?.fitToGraph()}
-                  aria-label="Fit graph"
-                  title="Fit graph"
+                  aria-label={t('comfyui.workflowEditor.fitGraph')}
+                  title={t('comfyui.workflowEditor.fitGraph')}
                 >
                   <Maximize2 size={16} />
                 </button>
@@ -341,16 +344,16 @@ export function WorkflowEditorModal({
                   type="button"
                   className={styles.graphToolButton}
                   onClick={() => graphRef.current?.resetView()}
-                  aria-label="Center graph"
-                  title="Center graph"
+                  aria-label={t('comfyui.workflowEditor.centerGraph')}
+                  title={t('comfyui.workflowEditor.centerGraph')}
                 >
                   <Crosshair size={16} />
                 </button>
               </div>
               <div className={styles.graphGuide}>
-                <span>Click a node to map it.</span>
-                <span>Drag to pan.</span>
-                <span>Ctrl/Cmd + wheel to zoom.</span>
+                <span>{t('comfyui.workflowEditor.guideClick')}</span>
+                <span>{t('comfyui.workflowEditor.guidePan')}</span>
+                <span>{t('comfyui.workflowEditor.guideZoom')}</span>
               </div>
             </div>
 

@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import { chatsApi } from '@/api/chats'
 import { generateApi } from '@/api/generate'
@@ -22,6 +23,9 @@ interface ContextMenuState extends ContextMenuPos {
 }
 
 export default function GroupChatMemberBar({ chatId }: GroupChatMemberBarProps) {
+  const { t } = useTranslation('chat')
+  const { t: tc } = useTranslation('common')
+  const { t: te } = useTranslation('errors')
   const groupCharacterIds = useStore((s) => s.groupCharacterIds)
   const mutedCharacterIds = useStore((s) => s.mutedCharacterIds)
   const characters = useStore((s) => s.characters)
@@ -58,7 +62,7 @@ export default function GroupChatMemberBar({ chatId }: GroupChatMemberBarProps) 
         startStreaming(res.generationId)
       } catch (err: any) {
         console.error('[GroupMemberBar] Force generate failed:', err)
-        const msg = err?.body?.error || err?.message || 'Failed to generate'
+        const msg = err?.body?.error || err?.message || te('failedToGenerate')
         setStreamingError(msg)
       }
     },
@@ -94,15 +98,15 @@ export default function GroupChatMemberBar({ chatId }: GroupChatMemberBarProps) 
       setContextMenu(null)
 
       if (groupCharacterIds.length <= 2) {
-        toast.warning('Cannot remove — group chats require at least 2 members')
+        toast.warning(t('groupChat.cannotRemoveMinMembers'))
         return
       }
 
       openModal('confirm', {
-        title: 'Remove from Group',
-        message: `Remove ${char?.name || 'this character'} from the group chat?`,
+        title: t('groupChat.removeFromGroup'),
+        message: t('groupChat.removeConfirmMessage', { name: char?.name || t('characterFallback') }),
         variant: 'danger',
-        confirmText: 'Remove',
+        confirmText: t('groupChat.removeConfirm'),
         onConfirm: async () => {
           try {
             await chatsApi.removeMember(chatId, characterId)
@@ -112,10 +116,10 @@ export default function GroupChatMemberBar({ chatId }: GroupChatMemberBarProps) 
             if (mutedCharacterIds.includes(characterId)) {
               setMutedCharacterIds(mutedCharacterIds.filter((id) => id !== characterId))
             }
-            toast.success(`${char?.name || 'Character'} removed from group`)
+            toast.success(t('groupChat.removedFromGroup', { name: char?.name || t('characterFallback') }))
           } catch (err: any) {
             console.error('[GroupMemberBar] Remove member failed:', err)
-            toast.error(err?.body?.error || 'Failed to remove member')
+            toast.error(err?.body?.error || t('groupChat.failedRemoveMember'))
           }
         },
       })
@@ -160,33 +164,33 @@ export default function GroupChatMemberBar({ chatId }: GroupChatMemberBarProps) 
     return [
       {
         key: 'force-gen',
-        label: 'Force Generate',
+        label: t('groupChat.forceGenerate'),
         icon: <IconBolt size={13} />,
         onClick: () => handleForceGenerateFromMenu(cid),
         disabled: isStreaming || contextIsMuted,
       },
       {
         key: 'toggle-mute',
-        label: contextIsMuted ? 'Unmute' : 'Mute',
+        label: contextIsMuted ? t('groupChat.unmute') : t('groupChat.mute'),
         icon: contextIsMuted ? <Volume2 size={13} /> : <VolumeX size={13} />,
         onClick: () => handleToggleMute(cid),
       },
       {
         key: 'voice',
-        label: overrideIds.has(cid) ? 'Voice (overridden)' : 'Voice…',
+        label: overrideIds.has(cid) ? t('groupChat.voiceOverridden') : t('groupChat.voiceMenu'),
         icon: <AudioLines size={13} />,
         onClick: () => handleOpenVoiceModal(cid),
       },
       { key: 'div', type: 'divider' as const },
       {
         key: 'remove',
-        label: 'Remove from Group',
+        label: t('groupChat.removeFromGroup'),
         icon: <UserMinus size={13} />,
         onClick: () => handleRemoveMember(cid),
         danger: true,
       },
     ]
-  }, [contextMenu, contextIsMuted, isStreaming, overrideIds, handleForceGenerateFromMenu, handleToggleMute, handleOpenVoiceModal, handleRemoveMember])
+  }, [contextMenu, contextIsMuted, isStreaming, overrideIds, handleForceGenerateFromMenu, handleToggleMute, handleOpenVoiceModal, handleRemoveMember, t])
 
   return (
     <div className={styles.barWrapper}>
@@ -212,7 +216,7 @@ export default function GroupChatMemberBar({ chatId }: GroupChatMemberBarProps) 
           type="button"
           className={styles.addMemberBtn}
           onClick={() => openModal('addGroupMember', { chatId })}
-          title="Add member to group"
+          title={t('groupChat.addMember')}
         >
           <Plus size={16} />
         </button>
@@ -240,6 +244,7 @@ interface MemberButtonProps {
 }
 
 function MemberButton({ id, characters, isActive, isMuted, isStreaming, hasVoiceOverride, onForceGenerate, onOpenContextMenu }: MemberButtonProps) {
+  const { t } = useTranslation('chat')
   const char = characters.find((c: any) => c.id === id)
   const talk = char?.talkativeness ?? 0.5
   const avatarUrl = getCharacterAvatarThumbUrl(char)
@@ -260,7 +265,7 @@ function MemberButton({ id, characters, isActive, isMuted, isStreaming, hasVoice
       )}
       onClick={() => onForceGenerate(id)}
       {...longPress}
-      title={char?.name || 'Character'}
+      title={char?.name || t('characterFallback')}
       disabled={isStreaming}
     >
       {char?.avatar_path || char?.image_id ? (
@@ -275,10 +280,10 @@ function MemberButton({ id, characters, isActive, isMuted, isStreaming, hasVoice
           {char?.name?.[0]?.toUpperCase() || '?'}
         </span>
       )}
-      <span className={styles.name}>{char?.name || 'Unknown'}</span>
+      <span className={styles.name}>{char?.name || t('unknown')}</span>
       {isMuted && <span className={styles.mutedBadge} />}
       {hasVoiceOverride && (
-        <span className={styles.voiceBadge} aria-hidden="true" title="Custom voice for this chat">
+        <span className={styles.voiceBadge} aria-hidden="true" title={t('groupChat.customVoice')}>
           <AudioLines size={9} strokeWidth={2.5} />
         </span>
       )}

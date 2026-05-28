@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { Search, UserPlus } from 'lucide-react'
@@ -16,6 +17,8 @@ import styles from './AddGroupMemberModal.module.css'
 const CHARS_PER_PAGE = 50
 
 export default function AddGroupMemberModal() {
+  const { t } = useTranslation('chat')
+  const { t: tc } = useTranslation('common')
   const closeModal = useStore((s) => s.closeModal)
   const modalProps = useStore((s) => s.modalProps)
   const groupCharacterIds = useStore((s) => s.groupCharacterIds)
@@ -93,10 +96,10 @@ export default function AddGroupMemberModal() {
       try {
         await chatsApi.addMember(chatId, charId)
         setGroupCharacterIds([...memberIds, charId])
-        toast.success(`${char?.name || 'Character'} added to group`)
+        toast.success(t('addGroupMember.addedToGroup', { name: char?.name || t('characterFallback') }))
       } catch (err: any) {
         console.error('[AddGroupMember] Failed:', err)
-        toast.error(err?.body?.error || 'Failed to add member')
+        toast.error(err?.body?.error || t('addGroupMember.failedAddMember'))
       } finally {
         setAddingId(null)
       }
@@ -149,9 +152,9 @@ export default function AddGroupMemberModal() {
 
           <div className={styles.header}>
             <UserPlus size={18} className={styles.headerIcon} />
-            <h3 className={styles.title}>Add Group Member</h3>
+            <h3 className={styles.title}>{t('addGroupMember.title')}</h3>
             <span className={styles.countBadge}>
-              {loading ? '...' : `${nonMemberCount} available`}
+              {loading ? '...' : t('addGroupMember.available', { count: nonMemberCount })}
             </span>
           </div>
 
@@ -161,11 +164,11 @@ export default function AddGroupMemberModal() {
               <input
                 type="text"
                 name="group-member-search"
-                aria-label="Search characters"
+                aria-label={t('addGroupMember.searchAria')}
                 className={styles.searchInput}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search characters..."
+                placeholder={t('addGroupMember.searchPlaceholder')}
                 autoFocus
               />
             </div>
@@ -215,8 +218,8 @@ export default function AddGroupMemberModal() {
                 {available.length === 0 && (
                   <div className={styles.emptyState}>
                     {nonMemberCount === 0
-                      ? 'All your characters are already in this group.'
-                      : 'No characters found.'}
+                      ? t('addGroupMember.allInGroup')
+                      : t('addGroupMember.noneFound')}
                   </div>
                 )}
               </div>
@@ -234,7 +237,7 @@ export default function AddGroupMemberModal() {
 
           <div className={styles.footer}>
             <button type="button" className={styles.footerBtn} onClick={closeModal}>
-              Done
+              {tc('actions.done')}
             </button>
           </div>
         </motion.div>

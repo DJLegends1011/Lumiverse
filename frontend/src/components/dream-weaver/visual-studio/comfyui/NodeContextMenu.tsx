@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import type {
   ComfyUIFieldMapping,
@@ -16,21 +17,22 @@ export interface NodeContextMenuProps {
   onClose: () => void
 }
 
-const SEMANTIC_OPTIONS: Array<{ value: ComfyUIMappedFieldSemantic; label: string }> = [
-  { value: 'positive_prompt', label: 'Positive Prompt' },
-  { value: 'negative_prompt', label: 'Negative Prompt' },
-  { value: 'seed', label: 'Seed' },
-  { value: 'steps', label: 'Steps' },
-  { value: 'cfg', label: 'CFG' },
-  { value: 'sampler_name', label: 'Sampler' },
-  { value: 'scheduler', label: 'Scheduler' },
-  { value: 'width', label: 'Width' },
-  { value: 'height', label: 'Height' },
-  { value: 'checkpoint', label: 'Checkpoint' },
-  { value: 'custom', label: 'Custom Setting' },
+const SEMANTIC_VALUES: ComfyUIMappedFieldSemantic[] = [
+  'positive_prompt',
+  'negative_prompt',
+  'seed',
+  'steps',
+  'cfg',
+  'sampler_name',
+  'scheduler',
+  'width',
+  'height',
+  'checkpoint',
+  'custom',
 ]
 
 export function NodeContextMenu(props: NodeContextMenuProps) {
+  const { t } = useTranslation('dreamWeaver')
   const ref = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState(props.anchor)
 
@@ -83,7 +85,7 @@ export function NodeContextMenu(props: NodeContextMenuProps) {
     >
       <div className={styles.header}>
         <div className={styles.classType}>{props.classType}</div>
-        <div className={styles.nodeId}>Node #{props.nodeId}</div>
+        <div className={styles.nodeId}>{t('comfyui.nodeMenu.nodeId', { id: props.nodeId })}</div>
       </div>
       <div className={styles.fields}>
         {props.availableFields.map((field) => {
@@ -102,15 +104,15 @@ export function NodeContextMenu(props: NodeContextMenuProps) {
                   props.onToggleField(field.fieldName, value === '' ? null : value)
                 }}
               >
-                <option value="">Not mapped</option>
-                {SEMANTIC_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                <option value="">{t('comfyui.nodeMenu.notMapped')}</option>
+                {SEMANTIC_VALUES.map((semantic) => (
+                  <option key={semantic} value={semantic}>
+                    {t(`comfyui.nodeMenu.semantics.${semantic}`)}
                   </option>
                 ))}
               </select>
               {mapping?.autoDetected && (
-                <div className={styles.autoDetectedHint}>Auto-detected</div>
+                <div className={styles.autoDetectedHint}>{t('comfyui.nodeMenu.autoDetected')}</div>
               )}
             </div>
           )

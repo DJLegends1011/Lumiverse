@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import SearchableSelect from '@/components/shared/SearchableSelect'
 import { ttsConnectionsApi } from '@/api/tts-connections'
@@ -39,12 +40,15 @@ interface VoicePickerProps {
 export default function VoicePicker({
   value,
   onChange,
-  clearLabel = 'Use default',
+  clearLabel,
   clearable = true,
-  ariaLabel = 'Voice',
+  ariaLabel,
   disabled,
   portal,
 }: VoicePickerProps) {
+  const { t } = useTranslation('shared', { keyPrefix: 'voicePicker' })
+  const resolvedClearLabel = clearLabel ?? t('useDefault')
+  const resolvedAriaLabel = ariaLabel ?? t('ariaLabel')
   const ttsProfiles = useStore((s) => s.ttsProfiles)
   const ttsProviders = useStore((s) => s.ttsProviders)
 
@@ -126,34 +130,34 @@ export default function VoicePicker({
   return (
     <div className={styles.picker} data-disabled={disabled || undefined}>
       <div className={styles.row}>
-        <span className={styles.label}>Connection</span>
+        <span className={styles.label}>{t('connection')}</span>
         <SearchableSelect
           value={value?.connectionId ?? ''}
           onChange={handleConnectionChange}
           options={connectionOptions}
-          placeholder="Select a connection…"
-          searchPlaceholder="Search connections…"
-          ariaLabel={`${ariaLabel} connection`}
-          emptyMessage="No TTS connections configured"
+          placeholder={t('selectConnection')}
+          searchPlaceholder={t('searchConnections')}
+          ariaLabel={t('connectionAria', { label: resolvedAriaLabel })}
+          emptyMessage={t('noConnections')}
           clearable={clearable}
-          clearLabel={clearLabel}
+          clearLabel={resolvedClearLabel}
           portal={portal}
         />
       </div>
 
       {activeConnection && (
         <div className={styles.row}>
-          <span className={styles.label}>Voice</span>
+          <span className={styles.label}>{t('voice')}</span>
           <SearchableSelect
             value={value?.voice ?? ''}
             onChange={handleVoiceChange}
             options={voiceOptions}
-            placeholder={voicesLoading ? 'Loading voices…' : 'Select a voice…'}
-            searchPlaceholder="Search voices…"
-            ariaLabel={`${ariaLabel} voice`}
-            emptyMessage={voicesLoading ? 'Loading…' : 'No voices available — use the connection default'}
+            placeholder={voicesLoading ? t('loadingVoices') : t('selectVoice')}
+            searchPlaceholder={t('searchVoices')}
+            ariaLabel={t('voiceAria', { label: resolvedAriaLabel })}
+            emptyMessage={voicesLoading ? t('loading') : t('noVoices')}
             clearable
-            clearLabel="Connection default"
+            clearLabel={t('connectionDefault')}
             portal={portal}
           />
         </div>

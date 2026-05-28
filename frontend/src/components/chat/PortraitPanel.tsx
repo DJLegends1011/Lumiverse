@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Spinner } from '@/components/shared/Spinner'
 import { CloseButton } from '@/components/shared/CloseButton'
 import { useStore } from '@/store'
@@ -52,6 +53,7 @@ function GalleryMosaicCell({ item, className, onOpen, onPreview }: GalleryMosaic
 }
 
 export default function PortraitPanel({ side = 'right', mobileDrawer = false, open = false }: PortraitPanelProps) {
+  const { t } = useTranslation('chat')
   const activeCharacterId = useStore((s) => s.activeCharacterId)
   const activeChatId = useStore((s) => s.activeChatId)
   const activeChatAvatarId = useStore((s) => s.activeChatAvatarId)
@@ -101,7 +103,7 @@ export default function PortraitPanel({ side = 'right', mobileDrawer = false, op
   const contextMenuItems: ContextMenuEntry[] = contextMenu ? [
     {
       key: 'set-chat-background',
-      label: 'Set as Chat Background',
+      label: t('portrait.setChatBackground'),
       disabled: !activeChatId,
       onClick: () => setGalleryImageAsChatBackground(contextMenu.item),
     },

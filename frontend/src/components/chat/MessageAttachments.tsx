@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, type CSSProperties } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Trash2 } from 'lucide-react'
 import type { MessageAttachment } from '@/types/api'
 import { imagesApi } from '@/api/images'
@@ -31,6 +32,7 @@ function getImageFrameStyle(att: MessageAttachment): CSSProperties | undefined {
 }
 
 export default function MessageAttachments({ attachments, isUser, chatId, messageId }: MessageAttachmentsProps) {
+  const { t } = useTranslation('chat')
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const [contextMenuPos, setContextMenuPos] = useState<ContextMenuPos | null>(null)
   const [targetImageId, setTargetImageId] = useState<string | null>(null)
@@ -62,7 +64,7 @@ export default function MessageAttachments({ attachments, isUser, chatId, messag
         useStore.getState().updateMessage(messageId, updated)
       }
     } catch (err: any) {
-      addToast({ type: 'error', title: 'Could not remove image', message: err?.body?.error || err?.message || 'Unknown error' })
+      addToast({ type: 'error', title: t('attachments.couldNotRemoveImage'), message: err?.body?.error || err?.message || 'Unknown error' })
     }
   }, [addToast, chatId, closeContextMenu, messageId, targetImageId])
 
@@ -95,12 +97,12 @@ export default function MessageAttachments({ attachments, isUser, chatId, messag
   const contextMenuItems: ContextMenuEntry[] = useMemo(() => [
     {
       key: 'remove-image',
-      label: 'Remove image',
+      label: t('attachments.removeImage'),
       icon: <Trash2 size={14} />,
       danger: true,
       onClick: () => { void removeAttachment() },
     },
-  ], [removeAttachment])
+  ], [removeAttachment, t])
 
   const images = attachments.filter((a) => a.type === 'image')
   const audios = attachments.filter((a) => a.type === 'audio')

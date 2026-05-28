@@ -1,4 +1,5 @@
 import { Sparkles, X } from "lucide-react";
+import { useTranslation } from 'react-i18next'
 import { Spinner } from "@/components/shared/Spinner";
 import type { DreamWeaverSession } from "@/api/dream-weaver";
 import type { useSuiteRunner } from "../hooks/useSuiteRunner";
@@ -12,15 +13,13 @@ interface Props {
   onDismiss: () => void;
 }
 
-const SUITE_DESCRIPTIONS: Record<"character" | "scenario", string> = {
-  character:
-    "Runs name, appearance, personality, scenario, first message, and voice in sequence — or run tools individually below.",
-  scenario:
-    "Runs title, premise, main character (appearance/personality/voice), opening scene, then batches a supporting cast and lorebook entries — or run tools individually below.",
-};
-
 export function SuiteRunner({ suite, workspaceKind, onDismiss }: Props) {
-  const description = SUITE_DESCRIPTIONS[workspaceKind === "scenario" ? "scenario" : "character"];
+  const { t } = useTranslation('dreamWeaver')
+  const { t: tc } = useTranslation('common')
+  const description = workspaceKind === "scenario"
+    ? t('studio.suite.descriptionScenario')
+    : t('studio.suite.descriptionCharacter');
+
   if (suite.state === "idle") {
     return (
       <div className={styles.banner}>
@@ -29,7 +28,7 @@ export function SuiteRunner({ suite, workspaceKind, onDismiss }: Props) {
             <Sparkles size={13} />
           </span>
           <div className={styles.bannerText}>
-            <span className={styles.bannerTitle}>Generate everything at once?</span>
+            <span className={styles.bannerTitle}>{t('studio.suite.title')}</span>
             <span className={styles.bannerDesc}>
               {description}
             </span>
@@ -37,9 +36,9 @@ export function SuiteRunner({ suite, workspaceKind, onDismiss }: Props) {
         </div>
         <div className={styles.bannerActions}>
           <button className={styles.runBtn} onClick={() => void suite.start()}>
-            Run Full Suite
+            {t('studio.suite.runFullSuite')}
           </button>
-          <button className={styles.dismissBtn} onClick={onDismiss} aria-label="Dismiss">
+          <button className={styles.dismissBtn} onClick={onDismiss} aria-label={t('studio.suite.dismissAria')}>
             <X size={13} />
           </button>
         </div>
@@ -52,7 +51,7 @@ export function SuiteRunner({ suite, workspaceKind, onDismiss }: Props) {
       <div className={styles.banner} data-running role="status" aria-live="polite">
         <Spinner size={14} />
         <span className={styles.runningText}>
-          Running full suite…
+          {t('studio.suite.running')}
         </span>
       </div>
     );
@@ -62,9 +61,9 @@ export function SuiteRunner({ suite, workspaceKind, onDismiss }: Props) {
     return (
       <div className={styles.banner} data-done role="status" aria-live="polite">
         <span className={styles.doneText}>
-          {suite.queued || suite.total} tools ready — review results below, then accept what you like.
+          {t('studio.suite.done', { count: suite.queued || suite.total })}
         </span>
-        <button className={styles.dismissBtn} onClick={onDismiss} aria-label="Dismiss">
+        <button className={styles.dismissBtn} onClick={onDismiss} aria-label={t('studio.suite.dismissAria')}>
           <X size={13} />
         </button>
       </div>
@@ -74,9 +73,9 @@ export function SuiteRunner({ suite, workspaceKind, onDismiss }: Props) {
   if (suite.state === "error") {
     return (
       <div className={styles.banner} data-error role="alert">
-        <span className={styles.errorText}>Suite failed: {suite.errorMessage}</span>
-        <button className={styles.runBtn} onClick={() => void suite.start()}>Retry</button>
-        <button className={styles.dismissBtn} onClick={onDismiss} aria-label="Dismiss">
+        <span className={styles.errorText}>{t('studio.suite.failed', { message: suite.errorMessage })}</span>
+        <button className={styles.runBtn} onClick={() => void suite.start()}>{tc('actions.retry')}</button>
+        <button className={styles.dismissBtn} onClick={onDismiss} aria-label={t('studio.suite.dismissAria')}>
           <X size={13} />
         </button>
       </div>

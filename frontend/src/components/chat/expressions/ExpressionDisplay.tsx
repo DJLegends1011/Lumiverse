@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { Minus, X } from 'lucide-react'
@@ -13,6 +14,7 @@ import { useLongPress } from '@/hooks/useLongPress'
 import styles from './ExpressionDisplay.module.css'
 
 export default function ExpressionDisplay() {
+  const { t } = useTranslation('chat')
   const activeCharacterId = useStore((s) => s.activeCharacterId)
   const characters = useStore((s) => s.characters)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -381,7 +383,7 @@ export default function ExpressionDisplay() {
   const contextMenuItems: ContextMenuEntry[] = useMemo(() => [
     ...(['small', 'medium', 'large'] as const).map((preset) => ({
       key: `size-${preset}`,
-      label: `Size: ${preset.charAt(0).toUpperCase() + preset.slice(1)}`,
+      label: t(`expressionDisplay.size${preset.charAt(0).toUpperCase()}${preset.slice(1)}` as 'expressionDisplay.sizeSmall'),
       active: display.sizePreset === preset,
       onClick: () => selectSize(preset),
     })),
@@ -391,7 +393,7 @@ export default function ExpressionDisplay() {
       type: 'custom' as const,
       content: (
         <div className={styles.opacityRow}>
-          <span>Opacity</span>
+          <span>{t('expressionDisplay.opacity')}</span>
           <input
             type="range"
             className={styles.opacitySlider}
@@ -407,28 +409,28 @@ export default function ExpressionDisplay() {
     { key: 'div-2', type: 'divider' as const },
     {
       key: 'frame',
-      label: display.frameless ? 'Show Frame' : 'Hide Frame',
+      label: display.frameless ? t('expressionDisplay.showFrame') : t('expressionDisplay.hideFrame'),
       onClick: () => { setExpressionDisplay({ frameless: !display.frameless }); setContextMenu(null) },
     },
     {
       key: 'click-through',
-      label: display.clickThrough ? 'Disable Click-Through' : 'Enable Click-Through',
+      label: display.clickThrough ? t('expressionDisplay.disableClickThrough') : t('expressionDisplay.enableClickThrough'),
       active: display.clickThrough,
       onClick: () => { setExpressionDisplay({ clickThrough: !display.clickThrough }); setContextMenu(null) },
     },
     {
       key: 'minimize',
-      label: 'Minimize',
+      label: t('expressionDisplay.minimize'),
       onClick: () => { toggleMinimized(); setContextMenu(null) },
     },
     {
       key: 'hide',
-      label: 'Hide Expression Display',
+      label: t('expressionDisplay.hide'),
       onClick: () => { setExpressionDisplay({ enabled: false }); setContextMenu(null) },
     },
     {
       key: 'reset',
-      label: 'Reset Position',
+      label: t('expressionDisplay.resetPosition'),
       onClick: () => {
         const nx = window.innerWidth - containerSize.width - 24
         const ny = window.innerHeight - containerSize.height - 100
@@ -437,7 +439,7 @@ export default function ExpressionDisplay() {
         setContextMenu(null)
       },
     },
-  ], [display.sizePreset, display.opacity, display.frameless, display.clickThrough, containerSize, selectSize, setExpressionDisplay, toggleMinimized])
+  ], [display.sizePreset, display.opacity, display.frameless, display.clickThrough, containerSize, selectSize, setExpressionDisplay, toggleMinimized, t])
 
   // ── Visibility gate ──
   if (!display.enabled) return null

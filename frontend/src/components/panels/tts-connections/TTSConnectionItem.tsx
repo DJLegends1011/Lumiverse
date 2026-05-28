@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import { Volume2, Trash2, Edit3, Zap, Check, Loader, Star, Copy, MoreVertical } from 'lucide-react'
 import { ttsConnectionsApi } from '@/api/tts-connections'
 import type { TtsConnectionProfile, TtsProviderInfo, CreateTtsConnectionInput } from '@/types/api'
@@ -21,7 +23,10 @@ interface Props {
   onDelete: () => void
 }
 
-export default function TTSConnectionItem({ profile, providers, onUpdate, onDuplicate, onDelete }: Props) {
+export default function TTSConnectionItem({
+ profile, providers, onUpdate, onDuplicate, onDelete }: Props) {
+  const { t: tc } = useTranslation('common')
+  const { t } = useTranslation('panels')
   const [editing, setEditing] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
@@ -40,11 +45,11 @@ export default function TTSConnectionItem({ profile, providers, onUpdate, onDupl
       const result = await ttsConnectionsApi.test(profile.id)
       setTestResult({ success: result.success, message: result.message })
     } catch (err: any) {
-      setTestResult({ success: false, message: err.message || 'Connection failed' })
+      setTestResult({ success: false, message: err.message || t('connectionItem.connectionFailed') })
     } finally {
       setTesting(false)
     }
-  }, [profile.id])
+  }, [profile.id, t])
 
   const handleSaveEdit = useCallback(async (input: CreateTtsConnectionInput) => {
     try {
@@ -97,7 +102,7 @@ export default function TTSConnectionItem({ profile, providers, onUpdate, onDupl
           </div>
         </div>
         <div className={styles.itemActions}>
-          <button type="button" className={styles.actionBtn} onClick={() => setEditing(true)} title="Edit">
+          <button type="button" className={styles.actionBtn} onClick={() => setEditing(true)} title={tc('actions.edit')}>
             <Edit3 size={13} />
           </button>
           <button
@@ -107,7 +112,7 @@ export default function TTSConnectionItem({ profile, providers, onUpdate, onDupl
               const rect = e.currentTarget.getBoundingClientRect()
               setMenuPos({ x: rect.right, y: rect.bottom + 4 })
             }}
-            title="More actions"
+            title={t('connectionItem.moreActions')}
           >
             <MoreVertical size={13} />
           </button>
@@ -115,10 +120,10 @@ export default function TTSConnectionItem({ profile, providers, onUpdate, onDupl
             position={menuPos}
             onClose={() => setMenuPos(null)}
             items={[
-              { key: 'test', label: testing ? 'Testing...' : 'Test connection', icon: <Zap size={14} />, onClick: () => { setMenuPos(null); handleTest() }, disabled: testing },
-              { key: 'duplicate', label: 'Duplicate', icon: <Copy size={14} />, onClick: () => { setMenuPos(null); onDuplicate() } },
+              { key: 'test', label: testing ? t('connectionItem.testing') : t('connectionItem.testConnection'), icon: <Zap size={14} />, onClick: () => { setMenuPos(null); handleTest() }, disabled: testing },
+              { key: 'duplicate', label: t('connectionItem.duplicate'), icon: <Copy size={14} />, onClick: () => { setMenuPos(null); onDuplicate() } },
               { key: 'div', type: 'divider' as const },
-              { key: 'delete', label: 'Delete', icon: <Trash2 size={14} />, onClick: () => { setMenuPos(null); onDelete() }, danger: true },
+              { key: 'delete', label: t('connectionItem.delete'), icon: <Trash2 size={14} />, onClick: () => { setMenuPos(null); onDelete() }, danger: true },
             ] satisfies ContextMenuEntry[]}
           />
         </div>

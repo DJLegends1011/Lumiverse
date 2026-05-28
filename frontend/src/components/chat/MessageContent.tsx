@@ -1,4 +1,5 @@
 import { useMemo, useRef, useLayoutEffect, useState, useEffect, useCallback, useSyncExternalStore, useDeferredValue } from 'react'
+import { useTranslation } from 'react-i18next'
 import { marked } from 'marked'
 import { highlightCode } from '@/lib/codeHighlight'
 import { parseOOC } from '@/lib/oocParser'
@@ -16,6 +17,7 @@ import {
 } from '@/lib/spindle/message-interceptors'
 import { SpindleMessageWidgets } from '@/lib/spindle/message-widgets'
 import { useStore } from '@/store'
+import i18n from '@/i18n'
 import { useDisplayRegex } from '@/hooks/useDisplayRegex'
 import { OOCBlock as OOCBlockComponent, OOCIrcChatRoom } from './ooc'
 import type { IrcEntry } from './ooc'
@@ -42,14 +44,16 @@ const renderer = createEmphasisAwareRenderer({
 })
 
 renderer.code = ({ text, lang }) => {
+  const copyTitle = i18n.t('messageContent.copyCode', { ns: 'chat' })
+  const copyLabel = i18n.t('messageContent.copy', { ns: 'chat' })
+  const copyBtn = `<button type="button" class="${styles.codeCopy}" data-code-copy title="${escapeHtml(copyTitle)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>${escapeHtml(copyLabel)}</span></button>`
   if (lang) {
     const highlighted = highlightCode(text, lang)
-    return `<div class="${styles.codeBlock}"><div class="${styles.codeHeader}"><span class="${styles.codeLang}">${escapeHtml(lang)}</span><button type="button" class="${styles.codeCopy}" data-code-copy title="Copy code"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span></button></div><pre><code class="hljs">${highlighted}</code></pre></div>`
+    return `<div class="${styles.codeBlock}"><div class="${styles.codeHeader}"><span class="${styles.codeLang}">${escapeHtml(lang)}</span>${copyBtn}</div><pre><code class="hljs">${highlighted}</code></pre></div>`
   }
-  // Fenced block with no lang — still render as block
   if (text.includes('\n')) {
     const highlighted = highlightCode(text)
-    return `<div class="${styles.codeBlock}"><div class="${styles.codeHeader}"><span class="${styles.codeLang}">text</span><button type="button" class="${styles.codeCopy}" data-code-copy title="Copy code"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span></button></div><pre><code class="hljs">${highlighted}</code></pre></div>`
+    return `<div class="${styles.codeBlock}"><div class="${styles.codeHeader}"><span class="${styles.codeLang}">text</span>${copyBtn}</div><pre><code class="hljs">${highlighted}</code></pre></div>`
   }
   return `<code>${escapeHtml(text)}</code>`
 }
@@ -1072,7 +1076,7 @@ function extractTrustedYouTubeEmbed(iframeHtml: string): TrustedYouTubeEmbed | n
   if (!src) return null
 
   const rawTitle = (iframe.getAttribute('title') || '').trim()
-  const title = rawTitle.slice(0, 120) || 'YouTube video'
+  const title = rawTitle.slice(0, 120) || i18n.t('messageContent.youtubeVideo', { ns: 'chat' })
   return { src, title }
 }
 
@@ -1176,10 +1180,10 @@ function attachCodeCopyHandler(root: HTMLElement | ShadowRoot): () => void {
     copyTextToClipboard(text).then(() => {
       const label = btn.querySelector('span')
       if (label) {
-        label.textContent = 'Copied!'
+        label.textContent = i18n.t('messageContent.copied', { ns: 'chat' })
         btn.classList.add(styles.codeCopied)
         setTimeout(() => {
-          label.textContent = 'Copy'
+          label.textContent = i18n.t('messageContent.copy', { ns: 'chat' })
           btn.classList.remove(styles.codeCopied)
         }, 2000)
       }
@@ -1392,14 +1396,15 @@ export default function MessageContent({
   chatId,
   depth = 0,
 }: MessageContentProps) {
+  const { t } = useTranslation('chat')
   const activeCharacterId = useStore((s) => s.activeCharacterId)
   const characters = useStore((s) => s.characters)
   const isGroupChat = useStore((s) => s.isGroupChat)
   const groupCharacterIds = useStore((s) => s.groupCharacterIds)
 
   const charName = useMemo(
-    () => characters.find((c) => c.id === activeCharacterId)?.name ?? 'Assistant',
-    [characters, activeCharacterId],
+    () => characters.find((c) => c.id === activeCharacterId)?.name ?? t('assistantFallback'),
+    [characters, activeCharacterId, t],
   )
 
   // Merge Risu asset maps from active character (and all group members in group chats)

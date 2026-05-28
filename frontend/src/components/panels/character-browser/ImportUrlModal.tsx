@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import { Spinner } from '@/components/shared/Spinner'
 import { CloseButton } from '@/components/shared/CloseButton'
@@ -19,6 +20,7 @@ export default function ImportUrlModal({
   loading,
   error,
 }: ImportUrlModalProps) {
+  const { t } = useTranslation('panels')
   const [url, setUrl] = useState('')
   const mouseDownTargetRef = useRef<EventTarget | null>(null)
 
@@ -40,30 +42,30 @@ export default function ImportUrlModal({
     <div className={styles.overlay} onMouseDown={(e) => { mouseDownTargetRef.current = e.target }} onClick={(e) => e.target === e.currentTarget && mouseDownTargetRef.current === e.currentTarget && onClose()}>
       <div className={styles.modal}>
         <div className={styles.header}>
-          <h3 className={styles.title}>Import from URL</h3>
+          <h3 className={styles.title}>{t('characterBrowser.importFromUrlTitle')}</h3>
           <CloseButton onClick={onClose} />
         </div>
         <form onSubmit={handleSubmit}>
           <p className={styles.hint}>
-            Paste a character URL from Chub, JannyAI, or other supported sources.
+            {t('characterBrowser.importFromUrlHint')}
           </p>
           <input
             type="url"
             className={styles.input}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://chub.ai/characters/..."
+            placeholder={t('characterBrowser.importUrlPlaceholder')}
             autoFocus
             disabled={loading}
           />
           {error && <div className={styles.error}>{error}</div>}
           <div className={styles.actions}>
             <button type="button" className={styles.cancelBtn} onClick={onClose} disabled={loading}>
-              Cancel
+              {t('characterBrowser.cancel')}
             </button>
             <button type="submit" className={styles.importBtn} disabled={!url.trim() || loading}>
               {loading ? <Spinner size={14} /> : null}
-              Import
+              {t('characterBrowser.import')}
             </button>
           </div>
         </form>

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import ConfirmationModal from '@/components/shared/ConfirmationModal'
 import SettingsModal from './SettingsModal'
@@ -29,6 +30,7 @@ import ImagePromptPreviewModal from './ImagePromptPreviewModal'
 import { DreamWeaverStudio } from '@/components/dream-weaver/DreamWeaverStudio'
 
 export default function ModalContainer() {
+  const { t } = useTranslation('modals')
   const settingsModalOpen = useStore((s) => s.settingsModalOpen)
   const closeSettings = useStore((s) => s.closeSettings)
   useEffect(() => {
@@ -51,8 +53,8 @@ export default function ModalContainer() {
       {activeModal === 'confirm' && (
         <ConfirmationModal
           isOpen={true}
-          title={modalProps.title || 'Confirm'}
-          message={modalProps.message || 'Are you sure?'}
+          title={modalProps.title || t('confirm.defaultTitle')}
+          message={modalProps.message || t('confirm.defaultMessage')}
           variant={modalProps.variant || 'safe'}
           confirmText={modalProps.confirmText}
           onConfirm={() => {

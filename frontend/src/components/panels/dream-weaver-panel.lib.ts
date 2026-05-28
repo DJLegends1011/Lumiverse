@@ -1,4 +1,5 @@
 import type { DreamWeaverSession } from '@/api/dream-weaver'
+import i18n from '@/i18n'
 
 export const DEFAULT_VISIBLE_SESSIONS = 5
 
@@ -14,11 +15,16 @@ export interface DreamWeaverSelectablePersona {
 }
 
 export function getDreamWeaverSessionTitle(session: DreamWeaverSession): string {
-  return session.session_number > 0 ? `Session #${session.session_number}` : 'Session'
+  return session.session_number > 0
+    ? i18n.t('session.titleNumbered', { ns: 'dreamWeaver', number: session.session_number })
+    : i18n.t('session.title', { ns: 'dreamWeaver' })
 }
 
 export function getDreamWeaverSessionPreview(session: DreamWeaverSession): string {
-  return session.dream_text || (session.workspace_kind === 'scenario' ? 'Blank scenario studio' : 'Blank character studio')
+  if (session.dream_text) return session.dream_text
+  return session.workspace_kind === 'scenario'
+    ? i18n.t('session.previewScenario', { ns: 'dreamWeaver' })
+    : i18n.t('session.previewCharacter', { ns: 'dreamWeaver' })
 }
 
 export function formatDreamWeaverSessionTimestamp(updatedAt: number, now = new Date()): string {
@@ -27,7 +33,10 @@ export function formatDreamWeaverSessionTimestamp(updatedAt: number, now = new D
   const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
 
   if (startOfDate.getTime() === startOfToday.getTime()) {
-    return `Today, ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+    return i18n.t('session.todayAt', {
+      ns: 'dreamWeaver',
+      time: date.toLocaleTimeString(i18n.language, { hour: 'numeric', minute: '2-digit' }),
+    })
   }
 
   if (date.getFullYear() === now.getFullYear()) {
@@ -48,7 +57,7 @@ export function buildDreamWeaverSessionArchive(
   if (normalizedQuery) {
     const matches = sortedSessions.filter((session) => buildSearchableText(session).includes(normalizedQuery))
     return matches.length
-      ? [{ key: 'results', label: 'Results', sessions: matches }]
+      ? [{ key: 'results', label: i18n.t('archive.results', { ns: 'dreamWeaver' }), sessions: matches }]
       : []
   }
 
@@ -63,9 +72,9 @@ export function buildDreamWeaverSessionArchive(
   }
 
   const groupOrder: Array<Pick<SessionArchiveGroup, 'key' | 'label'>> = [
-    { key: 'today', label: 'Today' },
-    { key: 'thisWeek', label: 'This Week' },
-    { key: 'older', label: 'Older' },
+    { key: 'today', label: i18n.t('archive.today', { ns: 'dreamWeaver' }) },
+    { key: 'thisWeek', label: i18n.t('archive.thisWeek', { ns: 'dreamWeaver' }) },
+    { key: 'older', label: i18n.t('archive.older', { ns: 'dreamWeaver' }) },
   ]
 
   return groupOrder

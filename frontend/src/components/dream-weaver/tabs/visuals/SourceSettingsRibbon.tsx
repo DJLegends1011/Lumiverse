@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { getVisualStudioLabel } from '../../lib/visual-studio-model'
 import type { VisualStudioModel } from '../../hooks/useVisualStudio'
 import { ProviderParamRenderer } from '../../components/ProviderParamRenderer'
@@ -14,32 +16,37 @@ interface SourceSettingsRibbonProps {
   worldStale: boolean
 }
 
-function getWorkspaceMessage(visuals: VisualStudioModel): string {
+function getWorkspaceMessage(t: TFunction<'dreamWeaver'>, visuals: VisualStudioModel): string {
   if (visuals.connections.length === 0) {
-    return 'No image sources are available yet.'
+    return t('visuals.ribbon.noSourcesAvailable')
   }
 
   if (!visuals.selectedConnection) {
-    return 'Choose a source to unlock generation controls.'
+    return t('visuals.ribbon.chooseSourceUnlock')
   }
 
   switch (visuals.workspaceState) {
     case 'needs_workflow':
-      return 'Import a ComfyUI workflow.'
+      return t('visuals.ribbon.importWorkflow')
     case 'needs_mapping':
-      return 'Map the positive and negative prompts.'
+      return t('visuals.ribbon.mapPrompts')
     case 'failed':
-      return 'The last generation failed.'
+      return t('visuals.ribbon.lastFailed')
     default:
       return visuals.selectedConnection
-        ? `${getVisualStudioLabel(visuals.selectedConnection.provider as any)} is ready.`
+        ? t('visuals.ribbon.providerReady', {
+            provider: getVisualStudioLabel(visuals.selectedConnection.provider as any),
+          })
         : ''
   }
 }
 
 export function SourceSettingsRibbon({ visuals, worldStale }: SourceSettingsRibbonProps) {
+  const { t } = useTranslation('dreamWeaver')
+
   if (!visuals.selectedAsset) return null
   const asset = visuals.selectedAsset
+  const workspaceMessage = getWorkspaceMessage(t, visuals)
 
   const isComfyUI = visuals.selectedConnection?.provider === 'comfyui'
   const mappedControls = isComfyUI && visuals.comfyui.config
@@ -55,16 +62,16 @@ export function SourceSettingsRibbon({ visuals, worldStale }: SourceSettingsRibb
   return (
     <aside className={styles.ribbon}>
       <div className={styles.section}>
-        <div className={styles.sectionLabel}>Source</div>
+        <div className={styles.sectionLabel}>{t('visuals.ribbon.source')}</div>
         {visuals.connections.length === 0 ? (
-          <div className={styles.sourceValue}>No sources configured</div>
+          <div className={styles.sourceValue}>{t('visuals.ribbon.noSourcesConfigured')}</div>
         ) : showSourceSelect ? (
           <select
             className={styles.select}
             value={visuals.selectedConnectionId ?? ''}
             onChange={(event) => visuals.onSelectConnection(event.target.value || null)}
           >
-            <option value="">Choose source</option>
+            <option value="">{t('visuals.ribbon.chooseSource')}</option>
             {visuals.connections.map((connection) => (
               <option key={connection.id} value={connection.id}>
                 {connection.name}
@@ -74,34 +81,34 @@ export function SourceSettingsRibbon({ visuals, worldStale }: SourceSettingsRibb
         ) : (
           <div className={styles.sourceValue}>{visuals.selectedConnection?.name}</div>
         )}
-        {getWorkspaceMessage(visuals) ? <p className={styles.meta}>{getWorkspaceMessage(visuals)}</p> : null}
-        {worldStale && <p className={styles.warning}>World content is stale.</p>}
+        {workspaceMessage ? <p className={styles.meta}>{workspaceMessage}</p> : null}
+        {worldStale && <p className={styles.warning}>{t('visuals.ribbon.worldStale')}</p>}
       </div>
 
       {isComfyUI ? (
         <>
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
-              <span className={styles.sectionLabel}>Workflow</span>
-              <span className={styles.metaInline}>{mappedCount} mapped</span>
+              <span className={styles.sectionLabel}>{t('visuals.ribbon.workflow')}</span>
+              <span className={styles.metaInline}>{t('visuals.ribbon.mappedCount', { count: mappedCount })}</span>
             </div>
             <button
               type="button"
               className={styles.workflowButton}
               onClick={visuals.openWorkflowEditor}
             >
-              {visuals.comfyui.config ? 'Edit Workflow' : 'Import Workflow'}
+              {visuals.comfyui.config ? t('visuals.ribbon.editWorkflow') : t('visuals.ribbon.importWorkflowButton')}
             </button>
             <p className={styles.meta}>
               {canRunWorkflow
-                ? 'Prompt mappings are ready.'
-                : 'Map positive and negative prompts first.'}
+                ? t('visuals.ribbon.mappingsReady')
+                : t('visuals.ribbon.mapPromptsFirst')}
             </p>
           </div>
 
           {mappedControls.length > 0 && (
             <div className={styles.section}>
-              <div className={styles.sectionLabel}>Settings</div>
+              <div className={styles.sectionLabel}>{t('visuals.ribbon.settings')}</div>
               <div className={styles.controlGrid}>
                 {mappedControls.map((control) => (
                   <label
@@ -120,7 +127,7 @@ export function SourceSettingsRibbon({ visuals, worldStale }: SourceSettingsRibb
                           )
                         }
                       >
-                        <option value="">Auto</option>
+                        <option value="">{t('visuals.ribbon.auto')}</option>
                         {(control.options ?? []).map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
@@ -148,7 +155,7 @@ export function SourceSettingsRibbon({ visuals, worldStale }: SourceSettingsRibb
         </>
       ) : visuals.selectedConnection ? (
         <div className={styles.section}>
-          <div className={styles.sectionLabel}>Provider Settings</div>
+          <div className={styles.sectionLabel}>{t('visuals.ribbon.providerSettings')}</div>
           {visuals.providerSchema ? (
             <ProviderParamRenderer
               schema={visuals.providerSchema}
@@ -157,7 +164,7 @@ export function SourceSettingsRibbon({ visuals, worldStale }: SourceSettingsRibb
               connectionId={visuals.selectedConnectionId}
             />
           ) : (
-            <p className={styles.meta}>This source does not expose extra controls yet.</p>
+            <p className={styles.meta}>{t('visuals.ribbon.noExtraControls')}</p>
           )}
         </div>
       ) : null}

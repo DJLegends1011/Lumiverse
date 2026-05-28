@@ -8,6 +8,8 @@ import { CloseButton } from '@/components/shared/CloseButton'
 import ContextMenu, { type ContextMenuEntry, type ContextMenuPos } from '@/components/shared/ContextMenu'
 import { useLongPress } from '@/hooks/useLongPress'
 import { DRAWER_TABS, adaptExtensionTabs, applyDrawerTabOrder, sanitizeDrawerTabOrder, sanitizeHiddenDrawerTabIds } from '@/lib/drawer-tab-registry'
+import { translateDrawerField } from '@/lib/i18n/resolveLabel'
+import { useTranslation } from 'react-i18next'
 import styles from './ViewportDrawer.module.css'
 import DOMPurify from 'dompurify'
 import clsx from 'clsx'
@@ -28,6 +30,8 @@ function ExtensionTabContent({ tabId }: { tabId: string }) {
 }
 
 export default function ViewportDrawer() {
+  const { t } = useTranslation('panels')
+  const { t: ts } = useTranslation('settings')
   const drawerOpen = useStore((s) => s.drawerOpen)
   const drawerTab = useStore((s) => s.drawerTab)
   const openDrawer = useStore((s) => s.openDrawer)
@@ -125,7 +129,7 @@ export default function ViewportDrawer() {
   const contextMenuItems: ContextMenuEntry[] = [
     {
       key: 'toggle-labels',
-      label: showTabLabels ? 'Hide tab labels' : 'Show tab labels',
+      label: showTabLabels ? t('viewportDrawer.hideTabLabels') : t('viewportDrawer.showTabLabels'),
       danger: showTabLabels,
       onClick: () => {
         updateDrawer({ showTabLabels: !showTabLabels })
@@ -134,7 +138,7 @@ export default function ViewportDrawer() {
     },
     {
       key: 'configure-tabs',
-      label: 'Configure Tabs',
+      label: t('viewportDrawer.configureTabs'),
       onClick: () => {
         setContextMenu(null)
         openModal('configureTabs')
@@ -212,10 +216,10 @@ export default function ViewportDrawer() {
                       onTouchStart={tabQuickMenu.onTouchStart}
                       onTouchMove={tabQuickMenu.onTouchMove}
                       onTouchEnd={tabQuickMenu.onTouchEnd}
-                      title={tab.tabName}
+                      title={translateDrawerField(tab.id, 'tabName', tab.tabName)}
                     >
                       <Icon size={20} strokeWidth={1.5} />
-                      {showTabLabels && <span className={styles.tabLabel}>{tab.shortName}</span>}
+                      {showTabLabels && <span className={styles.tabLabel}>{translateDrawerField(tab.id, 'shortName', tab.shortName)}</span>}
                     </button>
                   )
                 })}
@@ -262,7 +266,7 @@ export default function ViewportDrawer() {
                 type="button"
                 className={styles.tabBtn}
                 onClick={() => openSettings()}
-                title="Settings"
+                title={ts('title', { defaultValue: 'Settings' })}
               >
                 <Settings size={18} />
               </button>
@@ -272,7 +276,15 @@ export default function ViewportDrawer() {
           <div className={styles.panel}>
             <div className={styles.panelHeader}>
               <h2 className={styles.panelTitle}>
-                {activeTab === 'profile' && isGroupChat ? 'Group' : (activeTabConfig?.tabHeaderTitle ?? activeTabConfig?.tabName ?? 'Panel')}
+                {activeTab === 'profile' && isGroupChat
+                  ? t('group')
+                  : activeTabConfig
+                    ? translateDrawerField(
+                        activeTabConfig.id,
+                        'tabHeaderTitle',
+                        activeTabConfig.tabHeaderTitle ?? activeTabConfig.tabName,
+                      )
+                    : t('panel', { defaultValue: 'Panel' })}
               </h2>
               <CloseButton onClick={closeDrawer} />
             </div>

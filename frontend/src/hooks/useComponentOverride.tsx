@@ -2,6 +2,7 @@ import React, { useMemo, useRef } from 'react'
 import { useStore } from '@/store'
 import { transpileComponent } from '@/lib/componentTranspiler'
 import { toast } from '@/lib/toast'
+import i18n from '@/i18n'
 
 /**
  * ErrorBoundary that falls back to the default component on crash.
@@ -21,7 +22,7 @@ class OverrideErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error) {
     console.error(`[ComponentOverride] ${this.props.componentName} crashed:`, error)
-    toast.error(`Custom ${this.props.componentName} crashed — falling back to default`)
+    toast.error(i18n.t('common.toast.componentCrashed', { name: this.props.componentName }))
   }
 
   // Reset error state when the override source changes
@@ -87,7 +88,7 @@ export function useComponentOverride<P extends Record<string, any>>(
   // Show transpile errors once (not on every render)
   if (compiled?.error && compiled.error !== prevErrorRef.current) {
     prevErrorRef.current = compiled.error
-    toast.error(`${componentName} override: ${compiled.error}`)
+    toast.error(i18n.t('common.toast.overrideError', { name: componentName, error: compiled.error }))
   } else if (!compiled?.error) {
     prevErrorRef.current = null
   }
@@ -138,7 +139,7 @@ export function useOverrideRender(
 
   if (compiled?.error && compiled.error !== prevErrorRef.current) {
     prevErrorRef.current = compiled.error
-    toast.error(`${componentName} override: ${compiled.error}`)
+    toast.error(i18n.t('common.toast.overrideError', { name: componentName, error: compiled.error }))
   } else if (!compiled?.error) {
     prevErrorRef.current = null
   }
@@ -175,7 +176,7 @@ class OverrideFallbackBoundary extends React.Component<
 
   componentDidCatch(error: Error) {
     console.error(`[ComponentOverride] ${this.props.componentName} crashed:`, error)
-    toast.error(`Custom ${this.props.componentName} crashed — falling back to default`)
+    toast.error(i18n.t('common.toast.componentCrashed', { name: this.props.componentName }))
   }
 
   componentDidUpdate(prevProps: any) {

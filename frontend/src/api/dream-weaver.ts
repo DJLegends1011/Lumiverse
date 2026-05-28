@@ -1,6 +1,7 @@
 import * as apiClient from './client'
 import type { ComfyUICapabilities } from './image-gen'
 import { generateUUID } from '@/lib/uuid'
+import i18n from '@/i18n'
 
 export interface DreamWeaverAlternateField {
   id: string
@@ -222,7 +223,7 @@ export function createDefaultVisualAssets(): DreamWeaverVisualAsset[] {
     {
       id: 'portrait-main',
       asset_type: 'card_portrait',
-      label: 'Main Portrait',
+      label: i18n.t('dreamWeaver:visuals.portrait.mainPortrait'),
       prompt: '',
       negative_prompt: '',
       macro_tokens: [],

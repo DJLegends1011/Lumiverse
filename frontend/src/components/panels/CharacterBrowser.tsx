@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useCharacterBrowser } from '@/hooks/useCharacterBrowser'
 import { charactersApi } from '@/api/characters'
 import { worldBooksApi } from '@/api/world-books'
@@ -65,6 +66,8 @@ function CharacterSkeletons({ viewMode }: { viewMode: CharacterViewMode }) {
 }
 
 export default function CharacterBrowser() {
+  const { t: ts } = useTranslation('settings')
+  const { t } = useTranslation('panels')
   const browser = useCharacterBrowser()
   const setEditingCharacterId = useStore((s) => s.setEditingCharacterId)
   const openModal = useStore((s) => s.openModal)
@@ -128,16 +131,16 @@ export default function CharacterBrowser() {
     try {
       const result = await charactersApi.importTagLibrary(file)
       await browser.reloadAllCharacters()
-      toast.success(formatTagLibraryImportToastMessage(result), {
-        title: 'TagLibrary import complete',
+      toast.success(formatTagLibraryImportToastMessage(ts, result), {
+        title: ts('migration.tagLibraryImportComplete'),
         duration: 7000,
       })
     } catch (err: any) {
-      toast.error(err?.body?.error || err?.message || 'Failed to import TagLibrary backup')
+      toast.error(err?.body?.error || err?.message || ts('migration.tagLibraryImportFailed'))
     } finally {
       setTagLibraryImporting(false)
     }
-  }, [browser])
+  }, [browser, ts])
 
   const handleConfirmDelete = useCallback(() => {
     browser.batchDelete()
@@ -200,10 +203,13 @@ export default function CharacterBrowser() {
               <span className={styles.importProgressFilename}>{browser.importProgress.filename}</span>
               <span className={styles.importProgressStep}>
                 {browser.importProgress.step === 'uploading'
-                  ? `Uploading\u2026 ${browser.importProgress.percent}%`
+                  ? t('characterBrowser.uploading', { percent: browser.importProgress.percent })
                   : browser.importProgress.step === 'gallery'
-                    ? `Adding to gallery\u2026 ${browser.importProgress.galleryCurrent}/${browser.importProgress.galleryTotal}`
-                    : 'Processing\u2026'}
+                    ? t('characterBrowser.addingToGallery', {
+                        current: browser.importProgress.galleryCurrent,
+                        total: browser.importProgress.galleryTotal,
+                      })
+                    : t('characterBrowser.processing')}
               </span>
             </div>
             <div className={styles.importProgressBar}>
@@ -225,7 +231,7 @@ export default function CharacterBrowser() {
       {browser.importError && (
         <div className={styles.importError}>
           <span>{browser.importError}</span>
-          <button type="button" onClick={browser.clearImportError}>Dismiss</button>
+          <button type="button" onClick={browser.clearImportError}>{t('characterBrowser.dismiss')}</button>
         </div>
       )}
 
@@ -246,7 +252,7 @@ export default function CharacterBrowser() {
             <CharacterSkeletons viewMode={browser.viewMode} />
           ) : browser.totalFiltered === 0 ? (
             <div className={styles.emptyState}>
-              {browser.searchQuery ? 'No characters match your search' : 'No characters yet'}
+              {browser.searchQuery ? t('characterBrowser.noSearchResults') : t('characterBrowser.noCharactersYet')}
             </div>
           ) : browser.viewMode === 'grid' || browser.viewMode === 'single' ? (
             <CharacterGrid
@@ -299,10 +305,10 @@ export default function CharacterBrowser() {
         isOpen={confirmDelete}
         onConfirm={handleConfirmDelete}
         onCancel={() => setConfirmDelete(false)}
-        title="Delete Characters"
-        message={`Are you sure you want to delete ${browser.batchSelected.length} character(s)? This cannot be undone.`}
+        title={t('characterBrowser.deleteCharactersTitle')}
+        message={t('characterBrowser.deleteCharactersMessage', { count: browser.batchSelected.length })}
         variant="danger"
-        confirmText="Delete"
+        confirmText={t('characterBrowser.delete')}
       />
 
       <ConfirmationModal
@@ -316,13 +322,16 @@ export default function CharacterBrowser() {
           } catch { /* silent — user can still import from editor */ }
         }}
         onCancel={() => browser.clearPendingLorebookImport()}
-        title="Import Embedded Lorebook"
+        title={t('characterBrowser.importLorebookTitle')}
         message={
           browser.pendingLorebookImport
-            ? `"${browser.pendingLorebookImport.name}" contains an embedded lorebook with ${getEmbeddedCharacterBookEntryCount(browser.pendingLorebookImport.extensions)} entries. Import it as a World Book?`
+            ? t('characterBrowser.importLorebookMessage', {
+                name: browser.pendingLorebookImport.name,
+                count: getEmbeddedCharacterBookEntryCount(browser.pendingLorebookImport.extensions),
+              })
             : ''
         }
-        confirmText="Import"
+        confirmText={t('characterBrowser.import')}
       />
 
       <BulkImportProgressModal

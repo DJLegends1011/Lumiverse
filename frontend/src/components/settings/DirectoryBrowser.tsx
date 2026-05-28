@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Folder, ArrowUp, ChevronRight } from 'lucide-react'
 import { stMigrationApi, type BrowseResult, type FileConnectionConfig } from '@/api/st-migration'
 import styles from './DirectoryBrowser.module.css'
@@ -10,6 +11,7 @@ interface DirectoryBrowserProps {
 }
 
 export default function DirectoryBrowser({ onNavigate, initialPath, connection }: DirectoryBrowserProps) {
+  const { t } = useTranslation('settings')
   const [data, setData] = useState<BrowseResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -26,11 +28,11 @@ export default function DirectoryBrowser({ onNavigate, initialPath, connection }
       setManualPath(result.path)
       onNavigate?.(result.path)
     } catch (err: any) {
-      setError(err?.body?.error || err?.message || 'Failed to browse directory')
+      setError(err?.body?.error || err?.message || t('directoryBrowser.browseFailed'))
     } finally {
       setLoading(false)
     }
-  }, [onNavigate, connection])
+  }, [onNavigate, connection, t])
 
   useEffect(() => {
     // For remote connections, start at root. For local, use default (home dir).
@@ -66,7 +68,7 @@ export default function DirectoryBrowser({ onNavigate, initialPath, connection }
 
       <div className={styles.list}>
         {loading ? (
-          <div className={styles.loading}>Loading...</div>
+          <div className={styles.loading}>{t('directoryBrowser.loading')}</div>
         ) : error ? (
           <div className={styles.error}>{error}</div>
         ) : (
@@ -78,10 +80,10 @@ export default function DirectoryBrowser({ onNavigate, initialPath, connection }
               </button>
             )}
             {data?.entries.length === 0 && !data?.parent && (
-              <div className={styles.empty}>No directories found</div>
+              <div className={styles.empty}>{t('directoryBrowser.noDirectories')}</div>
             )}
             {data?.entries.length === 0 && data?.parent && (
-              <div className={styles.empty}>Empty directory</div>
+              <div className={styles.empty}>{t('directoryBrowser.emptyDirectory')}</div>
             )}
             {data?.entries.map((entry) => (
               <button
@@ -104,7 +106,7 @@ export default function DirectoryBrowser({ onNavigate, initialPath, connection }
           value={manualPath}
           onChange={(e) => setManualPath(e.target.value)}
           onKeyDown={handleManualSubmit}
-          placeholder={isRemote ? 'Enter remote path and press Enter' : 'Enter path and press Enter'}
+          placeholder={isRemote ? t('directoryBrowser.pathPlaceholderRemote') : t('directoryBrowser.pathPlaceholderLocal')}
         />
       </div>
     </div>

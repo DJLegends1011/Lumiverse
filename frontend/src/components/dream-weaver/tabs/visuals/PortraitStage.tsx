@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type {
   DreamWeaverVisualAsset,
   DreamWeaverVisualJob,
@@ -14,21 +15,27 @@ interface PortraitStageProps {
   onRegenerate: () => void
 }
 
-function getProgressMessage(job: DreamWeaverVisualJob | null): string | null {
+function getProgressMessage(
+  t: ReturnType<typeof useTranslation<'dreamWeaver'>>['t'],
+  job: DreamWeaverVisualJob | null,
+): string | null {
   const message = job?.progress && typeof job.progress.message === 'string'
     ? job.progress.message
     : null
   if (message) return message
-  if (job?.status === 'queued') return 'Queued for generation'
-  if (job?.status === 'running') return 'Generating portrait'
+  if (job?.status === 'queued') return t('visuals.portrait.queued')
+  if (job?.status === 'running') return t('visuals.portrait.generatingPortrait')
   return null
 }
 
-function getPublicErrorMessage(error: string | null): string | null {
+function getPublicErrorMessage(
+  t: ReturnType<typeof useTranslation<'dreamWeaver'>>['t'],
+  error: string | null,
+): string | null {
   if (!error) return null
   return error.toLowerCase().includes('timed out')
-    ? 'Image generation timed out. Try again with a shorter prompt or a longer timeout.'
-    : 'Image generation failed. Check the image connection and try again.'
+    ? t('visuals.portrait.errorTimeout')
+    : t('visuals.portrait.errorGeneric')
 }
 
 export function PortraitStage({
@@ -40,44 +47,48 @@ export function PortraitStage({
   onDismiss,
   onRegenerate,
 }: PortraitStageProps) {
-  const progressMessage = getProgressMessage(activeJob)
+  const { t } = useTranslation('dreamWeaver')
+  const { t: tc } = useTranslation('common')
+  const progressMessage = getProgressMessage(t, activeJob)
   const errorMessage =
     activeJob?.status === 'failed' && typeof activeJob.error === 'string'
-      ? getPublicErrorMessage(activeJob.error)
+      ? getPublicErrorMessage(t, activeJob.error)
       : null
 
   if (candidateImageUrl) {
-    const acceptLabel = acceptedImageUrl ? 'Replace Portrait' : 'Accept Portrait'
+    const acceptLabel = acceptedImageUrl
+      ? t('visuals.portrait.replacePortrait')
+      : t('visuals.portrait.acceptPortrait')
 
     return (
       <section className={styles.stage}>
         <div className={styles.stageHeader}>
           <div>
-            <p className={styles.eyebrow}>Portrait</p>
-            <h3 className={styles.title}>{asset?.label ?? 'Main Portrait'}</h3>
+            <p className={styles.eyebrow}>{t('visuals.portrait.eyebrow')}</p>
+            <h3 className={styles.title}>{asset?.label ?? t('visuals.portrait.mainPortrait')}</h3>
           </div>
-          <span className={styles.status}>Candidate Ready</span>
+          <span className={styles.status}>{t('visuals.portrait.candidateReady')}</span>
         </div>
         <div className={styles.compareGrid}>
           <div className={styles.pane}>
-            <div className={styles.paneLabel}>Accepted</div>
+            <div className={styles.paneLabel}>{t('visuals.portrait.accepted')}</div>
             {acceptedImageUrl ? (
-              <img src={acceptedImageUrl} alt="Accepted portrait" className={styles.image} referrerPolicy="no-referrer" />
+              <img src={acceptedImageUrl} alt={t('visuals.portrait.acceptedAlt')} className={styles.image} referrerPolicy="no-referrer" />
             ) : (
-              <div className={styles.emptyImage}>No accepted portrait yet.</div>
+              <div className={styles.emptyImage}>{t('visuals.portrait.noAcceptedYet')}</div>
             )}
           </div>
           <div className={styles.pane}>
-            <div className={styles.paneLabel}>New Result</div>
-            <img src={candidateImageUrl} alt="Candidate portrait" className={styles.image} referrerPolicy="no-referrer" />
+            <div className={styles.paneLabel}>{t('visuals.portrait.newResult')}</div>
+            <img src={candidateImageUrl} alt={t('visuals.portrait.candidateAlt')} className={styles.image} referrerPolicy="no-referrer" />
           </div>
         </div>
         <div className={styles.actions}>
           <button type="button" className={styles.secondaryAction} onClick={onDismiss}>
-            Dismiss
+            {t('visuals.portrait.dismiss')}
           </button>
           <button type="button" className={styles.secondaryAction} onClick={onRegenerate}>
-            Regenerate
+            {t('visuals.portrait.regenerate')}
           </button>
           <button
             type="button"
@@ -95,22 +106,22 @@ export function PortraitStage({
     <section className={styles.stage}>
       <div className={styles.stageHeader}>
         <div>
-          <p className={styles.eyebrow}>Portrait</p>
-          <h3 className={styles.title}>{asset?.label ?? 'Main Portrait'}</h3>
+          <p className={styles.eyebrow}>{t('visuals.portrait.eyebrow')}</p>
+          <h3 className={styles.title}>{asset?.label ?? t('visuals.portrait.mainPortrait')}</h3>
         </div>
         {activeJob?.status === 'queued' || activeJob?.status === 'running' ? (
-          <span className={styles.status}>Generating</span>
+          <span className={styles.status}>{t('visuals.portrait.generating')}</span>
         ) : null}
       </div>
 
       <div className={styles.hero}>
         {acceptedImageUrl ? (
-          <img src={acceptedImageUrl} alt={asset?.label ?? 'Accepted portrait'} className={styles.image} referrerPolicy="no-referrer" />
+          <img src={acceptedImageUrl} alt={asset?.label ?? t('visuals.portrait.acceptedAlt')} className={styles.image} referrerPolicy="no-referrer" />
         ) : (
           <div className={styles.emptyImage}>
-            <span className={styles.emptyTitle}>No portrait yet.</span>
+            <span className={styles.emptyTitle}>{t('visuals.portrait.noPortraitTitle')}</span>
             <span className={styles.emptyBody}>
-              Choose the default image source, shape the prompts, then generate.
+              {t('visuals.portrait.noPortraitBody')}
             </span>
           </div>
         )}
@@ -126,7 +137,7 @@ export function PortraitStage({
         <div className={styles.errorBanner}>
           <span>{errorMessage}</span>
           <button type="button" className={styles.secondaryAction} onClick={onRegenerate}>
-            Retry
+            {tc('actions.retry')}
           </button>
         </div>
       )}

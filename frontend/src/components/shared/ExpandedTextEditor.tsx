@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, type ChangeEvent, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 import { Minimize2, Maximize2, Hash, Search } from 'lucide-react'
 import { getMacroCatalog } from '@/api/macros'
@@ -195,6 +196,7 @@ export default function ExpandedTextEditor({
   inline,
   markdownOnly,
 }: ExpandedTextEditorProps) {
+  const { t } = useTranslation('shared', { keyPrefix: 'expandedTextEditor' })
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const highlightRef = useRef<HTMLDivElement>(null)
   const overlayMouseDownRef = useRef<EventTarget | null>(null)
@@ -327,11 +329,11 @@ export default function ExpandedTextEditor({
               onClick={() => { if (!showMacros) loadMacros(); setShowMacros(!showMacros) }}
               type="button"
             >
-              <Hash size={12} /> {showMacros ? 'Hide Macros' : 'Insert Macro'}
+              <Hash size={12} /> {showMacros ? t('hideMacros') : t('insertMacro')}
             </button>
           )}
         </div>
-        <button className={s.closeBtn} onClick={onClose} title="Collapse editor" type="button">
+        <button className={s.closeBtn} onClick={onClose} title={t('collapseEditor')} type="button">
           <Minimize2 size={18} />
         </button>
       </div>
@@ -343,7 +345,7 @@ export default function ExpandedTextEditor({
                 <Search size={12} style={{ color: 'var(--lumiverse-text-dim)', flexShrink: 0 }} />
                 <input
                   className={s.macroSearchInput}
-                  placeholder="Search macros..."
+                  placeholder={t('searchMacros')}
                   value={macroSearch}
                   onChange={e => setMacroSearch(e.target.value)}
                   autoFocus
@@ -441,6 +443,7 @@ export function ExpandableTextarea({
   /** Forwarded to the full-screen editor. See ExpandedTextEditor.markdownOnly. */
   markdownOnly?: boolean
 }) {
+  const { t } = useTranslation('shared', { keyPrefix: 'expandedTextEditor' })
   const [expanded, setExpanded] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const cursorPosRef = useRef<number | null>(null)
@@ -493,7 +496,7 @@ export function ExpandableTextarea({
       <button
         className={s.expandBtn}
         onClick={handleExpand}
-        title="Expand editor"
+        title={t('expandEditor')}
         type="button"
       >
         <Maximize2 size={13} />

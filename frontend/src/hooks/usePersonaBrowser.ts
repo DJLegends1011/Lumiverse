@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import Fuse from 'fuse.js'
 import { personasApi } from '@/api/personas'
 import { imagesApi } from '@/api/images'
@@ -9,6 +10,7 @@ import type { Persona, CreatePersonaInput, UpdatePersonaInput } from '@/types/ap
 const SEARCH_DEBOUNCE_MS = 150
 
 export function usePersonaBrowser() {
+  const { t } = useTranslation('panels', { keyPrefix: 'personaManager.toast' })
   const [currentPage, setCurrentPage] = useState(1)
   const personasPerPage = useStore((s) => s.personasPerPage)
   const setSetting = useStore((s) => s.setSetting)
@@ -282,15 +284,15 @@ export function usePersonaBrowser() {
       const deactivating = activePersonaId === id
       setActivePersona(deactivating ? null : id)
       if (deactivating) {
-        toast.info('Persona deactivated')
+        toast.info(t('personaDeactivated'))
       } else {
         const persona = personas.find((p) => p.id === id)
         if (persona) {
-          toast.info(`Switched to persona: ${persona.name}`)
+          toast.info(t('switchedToPersona', { name: persona.name }))
         }
       }
     },
-    [activePersonaId, setActivePersona, personas]
+    [activePersonaId, setActivePersona, personas, t]
   )
 
   const refresh = useCallback(async () => {

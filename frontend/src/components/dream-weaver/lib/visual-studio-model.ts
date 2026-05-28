@@ -7,6 +7,7 @@ import type {
   DreamWeaverVisualReference,
 } from '@/api/dream-weaver'
 import { BASE_URL } from '@/api/client'
+import i18n from '@/i18n'
 import { imagesApi } from '@/api/images'
 import { hasComfyRequiredPromptMappings } from '../visual-studio/comfyui/mapped-fields'
 
@@ -57,9 +58,9 @@ export interface VisualJobImageReference {
 
 export function getVisualAssetHintItems(): VisualAssetHintItem[] {
   return [
-    { id: 'portrait', label: 'Portrait', state: 'active' },
-    { id: 'expressions', label: 'Expressions', state: 'muted' },
-    { id: 'gallery', label: 'Gallery', state: 'muted' },
+    { id: 'portrait', label: i18n.t('visuals.hints.portrait', { ns: 'dreamWeaver' }), state: 'active' },
+    { id: 'expressions', label: i18n.t('visuals.hints.expressions', { ns: 'dreamWeaver' }), state: 'muted' },
+    { id: 'gallery', label: i18n.t('visuals.hints.gallery', { ns: 'dreamWeaver' }), state: 'muted' },
   ]
 }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'motion/react'
 import { MessageSquarePlus, MessageSquare, Trash2, Users, LogOut } from 'lucide-react'
 import { Spinner } from '@/components/shared/Spinner'
@@ -7,42 +8,31 @@ import { chatsApi } from '@/api/chats'
 import { wsClient } from '@/ws/client'
 import { EventType } from '@/ws/events'
 import { getCharacterAvatarLargeUrlById } from '@/lib/avatarUrls'
+import { formatRelativeTime } from '@/lib/formatRelativeTime'
 import { useStore } from '@/store'
 import { useScrollGate } from '@/hooks/useScrollGate'
 import LazyImage from '@/components/shared/LazyImage'
 import type { GroupedRecentChat } from '@/types/api'
 import styles from './LandingPage.module.css'
 import clsx from 'clsx'
+import type { TFunction } from 'i18next'
 
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now()
-  const diff = now - timestamp * 1000
-  const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return 'Just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days}d ago`
-  return new Date(timestamp * 1000).toLocaleDateString()
-}
-
-function getRecentChatDisplayName(item: GroupedRecentChat): string {
+function getRecentChatDisplayName(item: GroupedRecentChat, t: TFunction<'landing'>): string {
   return item.is_group
-    ? (item.group_name || item.latest_chat_name || 'Group Chat')
+    ? (item.group_name || item.latest_chat_name || t('groupChat'))
     : item.character_name
 }
 
-function getRecentChatSubtitle(item: GroupedRecentChat): string {
-  const displayName = getRecentChatDisplayName(item)
+function getRecentChatSubtitle(item: GroupedRecentChat, t: TFunction<'landing'>): string {
+  const displayName = getRecentChatDisplayName(item, t)
   if (item.latest_chat_name && item.latest_chat_name !== displayName) {
     return item.latest_chat_name
   }
 
-  if (item.is_group && item.chat_count > 1) return 'Choose from group threads'
-  if (item.is_group) return 'Resume the latest group thread'
-  if (item.chat_count > 1) return 'Choose from recent conversations'
-  return 'Resume conversation'
+  if (item.is_group && item.chat_count > 1) return t('subtitle.chooseGroupThreads')
+  if (item.is_group) return t('subtitle.resumeGroupThread')
+  if (item.chat_count > 1) return t('subtitle.chooseConversations')
+  return t('subtitle.resumeConversation')
 }
 
 function getRecentChatKey(item: GroupedRecentChat): string {
@@ -158,6 +148,7 @@ function SkeletonListItem({ index }: { index: number }) {
 }
 
 function EmptyState() {
+  const { t } = useTranslation('landing')
   return (
     <motion.div
       className={styles.emptyState}
@@ -167,8 +158,8 @@ function EmptyState() {
       <div className={styles.emptyIcon}>
         <MessageSquarePlus size={48} strokeWidth={1} />
       </div>
-      <h3>No recent chats</h3>
-      <p>Start a conversation with a character to begin</p>
+      <h3>{t('empty.title')}</h3>
+      <p>{t('empty.description')}</p>
     </motion.div>
   )
 }
@@ -186,6 +177,7 @@ interface ChatCardProps {
 }
 
 function ChatCard({ item, onClick, onDelete }: ChatCardProps) {
+  const { t } = useTranslation('landing')
   const tiltRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLDivElement>(null)
   const rectRef = useRef<DOMRect | null>(null)
@@ -241,7 +233,7 @@ function ChatCard({ item, onClick, onDelete }: ChatCardProps) {
     rectRef.current = null
   }, [])
 
-  const displayName = getRecentChatDisplayName(item)
+  const displayName = getRecentChatDisplayName(item, t)
 
   return (
     <div
@@ -263,7 +255,7 @@ function ChatCard({ item, onClick, onDelete }: ChatCardProps) {
               e.stopPropagation()
               onDelete()
             }}
-            title="Delete chat"
+            title={t('deleteChat')}
           >
             <Trash2 size={14} strokeWidth={1.5} />
           </button>
@@ -294,9 +286,10 @@ function ChatCard({ item, onClick, onDelete }: ChatCardProps) {
 }
 
 function ChatListItem({ item, onClick, onDelete }: ChatCardProps) {
+  const { t } = useTranslation('landing')
   const isGroup = item.is_group && item.group_character_ids && item.group_character_ids.length > 0
-  const displayName = getRecentChatDisplayName(item)
-  const subtitle = getRecentChatSubtitle(item)
+  const displayName = getRecentChatDisplayName(item, t)
+  const subtitle = getRecentChatSubtitle(item, t)
 
   return (
     <div className={clsx(styles.listItem, isGroup && styles.listItemGroup)}>
@@ -308,7 +301,7 @@ function ChatListItem({ item, onClick, onDelete }: ChatCardProps) {
             e.stopPropagation()
             onDelete()
           }}
-          title="Delete chat"
+          title={t('deleteChat')}
         >
           <Trash2 size={14} strokeWidth={1.5} />
         </button>
@@ -336,7 +329,7 @@ function ChatListItem({ item, onClick, onDelete }: ChatCardProps) {
                   {item.chat_count}
                 </span>
               ) : (
-                <span className={styles.listStatusPill}>Active</span>
+                <span className={styles.listStatusPill}>{t('active')}</span>
               )}
             </div>
           </div>
@@ -347,6 +340,8 @@ function ChatListItem({ item, onClick, onDelete }: ChatCardProps) {
 }
 
 export default function LandingPage() {
+  const { t } = useTranslation('landing')
+  const { t: tc } = useTranslation('common')
   const navigate = useNavigate()
   const landingPageChatsDisplayed = useStore((s) => s.landingPageChatsDisplayed)
   const landingPageLayoutMode = useStore((s) => s.landingPageLayoutMode)
@@ -354,7 +349,7 @@ export default function LandingPage() {
   const openModal = useStore((s) => s.openModal)
   const logout = useStore((s) => s.logout)
   const authUser = useStore((s) => s.user)
-  const accountLabel = authUser?.username || authUser?.name || 'Account'
+  const accountLabel = authUser?.username || authUser?.name || t('account')
 
   const [items, setItems] = useState<GroupedRecentChat[]>([])
   const [loading, setLoading] = useState(true)
@@ -404,14 +399,12 @@ export default function LandingPage() {
     fetchChats()
   }, [fetchChats])
 
-  // Listen for chat deletions (from command palette, chat view, etc.) and refresh
   useEffect(() => {
     return wsClient.on(EventType.CHAT_DELETED, () => {
       fetchChats()
     })
   }, [fetchChats])
 
-  // Infinite scroll: load more when sentinel is visible
   useEffect(() => {
     const sentinel = sentinelRef.current
     if (!sentinel || items.length >= total || loading) return
@@ -434,7 +427,7 @@ export default function LandingPage() {
         if (item.chat_count > 1 && groupCharacterIds.length > 1) {
           openModal('manageChats', {
             characterId: item.character_id,
-            characterName: getRecentChatDisplayName(item),
+            characterName: getRecentChatDisplayName(item, t),
             isGroupChat: true,
             groupCharacterIds,
           })
@@ -455,19 +448,19 @@ export default function LandingPage() {
         onSelect: (chatId: string) => navigate(`/chat/${chatId}`)
       })
     },
-    [navigate, openModal]
+    [navigate, openModal, t]
   )
 
   const handleDeleteChat = useCallback(
     (item: GroupedRecentChat) => {
       const label = item.is_group
-        ? `group chat "${item.group_name || item.latest_chat_name || 'Untitled'}"`
-        : `chat with ${item.character_name}`
+        ? t('deleteLabelGroup', { name: item.group_name || item.latest_chat_name || t('untitled') })
+        : t('deleteLabelChat', { name: item.character_name })
       openModal('confirm', {
-        title: 'Delete Chat',
-        message: `This will permanently delete your ${label}. This action cannot be undone.`,
+        title: t('deleteChatTitle'),
+        message: t('deleteChatConfirm', { label }),
         variant: 'danger',
-        confirmText: 'Delete',
+        confirmText: tc('actions.delete'),
         onConfirm: async () => {
           try {
             await chatsApi.delete(item.latest_chat_id)
@@ -479,7 +472,7 @@ export default function LandingPage() {
         },
       })
     },
-    [openModal]
+    [openModal, t, tc]
   )
 
   const handleNewChat = useCallback(() => {
@@ -488,9 +481,9 @@ export default function LandingPage() {
 
   const handleLogout = useCallback(() => {
     openModal('confirm', {
-      title: 'Log out',
-      message: 'You\u2019ll be signed out on this device. Other devices stay signed in.',
-      confirmText: 'Log out',
+      title: t('logOut.title'),
+      message: t('logOut.message'),
+      confirmText: t('logOut.confirm'),
       onConfirm: async () => {
         try {
           await logout()
@@ -499,30 +492,26 @@ export default function LandingPage() {
         }
       },
     })
-  }, [openModal, logout])
+  }, [openModal, logout, t])
 
   const hasMore = items.length < total
 
   return (
     <div className={styles.container} ref={scrollRef}>
-      {/* Ambient background */}
       <div className={styles.bg}>
         <div className={clsx(styles.bgGlow, styles.bgGlow1)} />
         <div className={clsx(styles.bgGlow, styles.bgGlow2)} />
         <div className={clsx(styles.bgGlow, styles.bgGlow3)} />
       </div>
 
-      {/* Grid pattern */}
       <div className={styles.grid} />
 
-      {/* Main content */}
       <motion.div
         className={styles.content}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Header */}
         <motion.header
           className={styles.header}
           initial={{ opacity: 0, y: -20 }}
@@ -553,9 +542,9 @@ export default function LandingPage() {
               </svg>
             </div>
             <div className={styles.logoText}>
-              <h1>Lumiverse</h1>
+              <h1>{tc('appName')}</h1>
               <button type="button" className={styles.taglineBtn} onClick={handleNewChat}>
-                <span>Continue your story</span>
+                <span>{t('tagline')}</span>
                 <MessageSquarePlus size={13} strokeWidth={1.5} />
               </button>
             </div>
@@ -564,14 +553,13 @@ export default function LandingPage() {
             type="button"
             className={styles.accountBtn}
             onClick={handleLogout}
-            title="Log out of this device"
+            title={t('logOutTitle')}
           >
             <span className={styles.accountName}>{accountLabel}</span>
             <LogOut size={13} strokeWidth={1.5} />
           </button>
         </motion.header>
 
-        {/* Main grid */}
         <main className={styles.main}>
           <AnimatePresence mode="wait">
             {!settingsLoaded ? (
@@ -592,8 +580,8 @@ export default function LandingPage() {
               </motion.div>
             ) : error && items.length === 0 ? (
               <motion.div key="error" className={styles.errorState} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                <p>Failed to load chats</p>
-                <button onClick={fetchChats} className={styles.primaryBtn} type="button">Try Again</button>
+                <p>{t('loadFailed')}</p>
+                <button onClick={fetchChats} className={styles.primaryBtn} type="button">{t('tryAgain')}</button>
               </motion.div>
             ) : items.length === 0 ? (
               <EmptyState key="empty" />
@@ -627,27 +615,25 @@ export default function LandingPage() {
             )}
           </AnimatePresence>
 
-          {/* Infinite scroll sentinel */}
           {hasMore && (
             <div ref={sentinelRef} className={styles.loadMoreSentinel}>
               {loadingMore && (
                 <div className={styles.loadingMore}>
                   <Spinner size={16} />
-                  <span>Loading more chats...</span>
+                  <span>{t('loadingMore')}</span>
                 </div>
               )}
             </div>
           )}
         </main>
 
-        {/* Footer */}
         <motion.footer
           className={styles.footer}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.6 }}
         >
-          <p>Select a character to continue your journey</p>
+          <p>{t('footer')}</p>
         </motion.footer>
       </motion.div>
     </div>

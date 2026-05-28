@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import { Link2, Trash2, Edit3, Zap, Check, Star, BrainCircuit, Copy, LogIn, RefreshCw, MoreVertical } from 'lucide-react'
 import { connectionsApi } from '@/api/connections'
 import { buildOpenRouterOAuthCallbackUrl, openrouterApi, type OpenRouterCreditsInfo } from '@/api/openrouter'
@@ -40,7 +42,7 @@ function formatCompactCount(value: number) {
 }
 
 function formatTimeUntil(resetAt: number | null) {
-  if (!resetAt) return 'Unknown'
+  if (!resetAt) return ''
 
   const diffMs = Math.max(0, resetAt - Date.now())
   const totalMinutes = Math.floor(diffMs / 60000)
@@ -63,7 +65,9 @@ interface ConnectionItemProps {
   onDelete: () => void
 }
 
-export default function ConnectionItem({ profile, isActive, providers, onSelect, onUpdate, onDuplicate, onDelete }: ConnectionItemProps) {
+export default function ConnectionItem({
+profile, isActive, providers, onSelect, onUpdate, onDuplicate, onDelete }: ConnectionItemProps) {
+  const { t } = useTranslation('panels')
   const [editing, setEditing] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
@@ -78,6 +82,7 @@ export default function ConnectionItem({ profile, isActive, providers, onSelect,
   const isNanoGpt = profile.provider === 'nanogpt'
   const showCredits = isOpenRouter && isActive && profile.has_api_key && !editing
   const showNanoGptUsage = isNanoGpt && isActive && profile.has_api_key && !editing
+  const unknownReset = t('connectionItem.unknown')
 
   // Fetch credits when this is the active OpenRouter connection
   useEffect(() => {
@@ -130,7 +135,7 @@ export default function ConnectionItem({ profile, isActive, providers, onSelect,
       const result = await connectionsApi.test(profile.id)
       setTestResult({ success: result.success, message: result.message })
     } catch (err: any) {
-      setTestResult({ success: false, message: err.message || 'Connection failed' })
+      setTestResult({ success: false, message: err.message || t('connectionItem.connectionFailed') })
     } finally {
       setTesting(false)
     }
@@ -265,29 +270,29 @@ export default function ConnectionItem({ profile, isActive, providers, onSelect,
             <Button
               size="icon-sm" variant="ghost"
               onClick={handleOAuthLogin}
-              title={profile.has_api_key ? 'Re-authorize with OpenRouter' : 'Sign in with OpenRouter'}
+              title={profile.has_api_key ? t('connectionItem.reauthorizeOpenRouter') : t('connectionItem.signInOpenRouter')}
               disabled={oauthLoading}
               icon={oauthLoading ? <Spinner size={13} /> : <LogIn size={13} />}
             />
           )}
-          <Button size="icon-sm" variant="ghost" onClick={() => setEditing(true)} title="Edit" icon={<Edit3 size={13} />} />
+          <Button size="icon-sm" variant="ghost" onClick={() => setEditing(true)} title={t('connectionItem.edit')} icon={<Edit3 size={13} />} />
           <Button
             size="icon-sm" variant="ghost"
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect()
               setMenuPos({ x: rect.right, y: rect.bottom + 4 })
             }}
-            title="More actions"
+            title={t('connectionItem.moreActions')}
             icon={<MoreVertical size={13} />}
           />
           <ContextMenu
             position={menuPos}
             onClose={() => setMenuPos(null)}
             items={[
-              { key: 'test', label: testing ? 'Testing...' : 'Test connection', icon: <Zap size={14} />, onClick: () => { setMenuPos(null); handleTest() }, disabled: testing },
-              { key: 'duplicate', label: 'Duplicate', icon: <Copy size={14} />, onClick: () => { setMenuPos(null); onDuplicate() } },
+              { key: 'test', label: testing ? t('connectionItem.testing') : t('connectionItem.testConnection'), icon: <Zap size={14} />, onClick: () => { setMenuPos(null); handleTest() }, disabled: testing },
+              { key: 'duplicate', label: t('connectionItem.duplicate'), icon: <Copy size={14} />, onClick: () => { setMenuPos(null); onDuplicate() } },
               { key: 'div', type: 'divider' as const },
-              { key: 'delete', label: 'Delete', icon: <Trash2 size={14} />, onClick: () => { setMenuPos(null); onDelete() }, danger: true },
+              { key: 'delete', label: t('connectionItem.delete'), icon: <Trash2 size={14} />, onClick: () => { setMenuPos(null); onDelete() }, danger: true },
             ] satisfies ContextMenuEntry[]}
           />
         </div>
@@ -295,7 +300,7 @@ export default function ConnectionItem({ profile, isActive, providers, onSelect,
       {isOpenRouter && !profile.has_api_key && !editing && (
         <button type="button" className={styles.oauthBanner} onClick={handleOAuthLogin} disabled={oauthLoading}>
           {oauthLoading ? <Spinner size={12} /> : <LogIn size={12} />}
-          <span>Sign in with OpenRouter to get an API key</span>
+          <span>{t('connectionItem.signInOpenRouterHint')}</span>
         </button>
       )}
       {testResult && (
@@ -306,21 +311,21 @@ export default function ConnectionItem({ profile, isActive, providers, onSelect,
       {showCredits && credits && (
         <div className={styles.creditsBar}>
           <div className={styles.creditCell}>
-            <span className={styles.creditLabel}>Remaining</span>
+            <span className={styles.creditLabel}>{t('connectionItem.remaining')}</span>
             <span className={styles.creditValue}>
               {credits.limit_remaining !== null && credits.limit !== null
                 ? `$${credits.limit_remaining.toFixed(2)} / $${credits.limit.toFixed(2)}`
                 : credits.limit_remaining !== null
                   ? `$${credits.limit_remaining.toFixed(2)}`
-                  : 'Unlimited'}
+                  : t('connectionItem.unlimited')}
             </span>
           </div>
           <div className={styles.creditCell}>
-            <span className={styles.creditLabel}>Today</span>
+            <span className={styles.creditLabel}>{t('connectionItem.today')}</span>
             <span className={styles.creditValue}>${credits.usage_daily.toFixed(4)}</span>
           </div>
           <div className={styles.creditCell}>
-            <span className={styles.creditLabel}>This month</span>
+            <span className={styles.creditLabel}>{t('connectionItem.thisMonth')}</span>
             <span className={styles.creditValue}>${credits.usage_monthly.toFixed(4)}</span>
           </div>
           <button type="button" className={styles.creditsRefresh} onClick={refreshCredits} disabled={creditsLoading}>
@@ -331,7 +336,7 @@ export default function ConnectionItem({ profile, isActive, providers, onSelect,
       {showNanoGptUsage && nanoGptUsage?.weeklyInputTokens && (
         <div className={clsx(styles.creditsBar, styles.nanoGptUsageBar)}>
           <div className={styles.creditCell}>
-            <span className={styles.creditLabel}>Remaining</span>
+            <span className={styles.creditLabel}>{t('connectionItem.remaining')}</span>
             <span className={styles.creditValue}>
               {nanoGptUsage.limits.weeklyInputTokens !== null
                 ? `${formatCompactCount(nanoGptUsage.weeklyInputTokens.remaining)} / ${formatCompactCount(nanoGptUsage.limits.weeklyInputTokens)}`
@@ -339,12 +344,12 @@ export default function ConnectionItem({ profile, isActive, providers, onSelect,
             </span>
           </div>
           <div className={styles.creditCell}>
-            <span className={styles.creditLabel}>Used</span>
+            <span className={styles.creditLabel}>{t('connectionItem.used')}</span>
             <span className={styles.creditValue}>{formatCompactCount(nanoGptUsage.weeklyInputTokens.used)}</span>
           </div>
           <div className={styles.creditCell}>
-            <span className={styles.creditLabel}>Resets In</span>
-            <span className={styles.creditValue}>{formatTimeUntil(nanoGptUsage.weeklyInputTokens.resetAt)}</span>
+            <span className={styles.creditLabel}>{t('connectionItem.resetsIn')}</span>
+            <span className={styles.creditValue}>{formatTimeUntil(nanoGptUsage.weeklyInputTokens.resetAt) || unknownReset}</span>
           </div>
           <button type="button" className={styles.creditsRefresh} onClick={refreshNanoGptUsage} disabled={nanoGptUsageLoading}>
             {nanoGptUsageLoading ? <Spinner size={10} /> : <RefreshCw size={10} />}

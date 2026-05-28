@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import styles from './Pagination.module.css'
 import clsx from 'clsx'
@@ -22,6 +23,7 @@ export default function Pagination({
   onPerPageChange,
   totalItems,
 }: PaginationProps) {
+  const { t } = useTranslation('shared', { keyPrefix: 'pagination' })
   const handlePrev = useCallback(() => {
     if (currentPage > 1) onPageChange(currentPage - 1)
   }, [currentPage, onPageChange])
@@ -61,7 +63,7 @@ export default function Pagination({
               </option>
             ))}
           </select>
-          <span className={styles.perPageLabel}>per page</span>
+          <span className={styles.perPageLabel}>{t('perPage')}</span>
         </div>
       )}
 
@@ -72,7 +74,7 @@ export default function Pagination({
             className={styles.navBtn}
             onClick={handlePrev}
             disabled={currentPage <= 1}
-            aria-label="Previous page"
+            aria-label={t('previousPage')}
           >
             <ChevronLeft size={14} />
           </button>
@@ -99,7 +101,7 @@ export default function Pagination({
             className={styles.navBtn}
             onClick={handleNext}
             disabled={currentPage >= totalPages}
-            aria-label="Next page"
+            aria-label={t('nextPage')}
           >
             <ChevronRight size={14} />
           </button>
@@ -108,7 +110,7 @@ export default function Pagination({
 
       {totalItems !== undefined && (
         <span className={styles.info}>
-          {totalItems} total
+          {t('total', { count: totalItems })}
         </span>
       )}
     </div>

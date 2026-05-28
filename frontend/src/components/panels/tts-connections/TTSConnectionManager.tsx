@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ttsConnectionsApi } from '@/api/tts-connections'
 import { useStore } from '@/store'
 import ConfirmationModal from '@/components/shared/ConfirmationModal'
@@ -9,6 +10,7 @@ import type { TtsConnectionProfile, CreateTtsConnectionInput } from '@/types/api
 import styles from '../ConnectionManager.module.css'
 
 export default function TTSConnectionManager() {
+  const { t } = useTranslation('panels')
   const profiles = useStore((s) => s.ttsProfiles)
   const setProfiles = useStore((s) => s.setTtsProfiles)
   const addProfile = useStore((s) => s.addTtsProfile)
@@ -103,7 +105,7 @@ export default function TTSConnectionManager() {
   }, [deleteTarget, removeProfile])
 
   if (loading) {
-    return <div className={styles.loading}>Loading TTS connections...</div>
+    return <div className={styles.loading}>{t('ttsConnectionManager.loading')}</div>
   }
 
   return (
@@ -111,7 +113,7 @@ export default function TTSConnectionManager() {
       {!creating && (
         <button type="button" className={styles.createBtn} onClick={() => setCreating(true)}>
           <Plus size={14} />
-          <span>New TTS Connection</span>
+          <span>{t('ttsConnectionManager.newConnection')}</span>
         </button>
       )}
 
@@ -135,17 +137,17 @@ export default function TTSConnectionManager() {
           />
         ))}
         {profiles.length === 0 && !creating && (
-          <div className={styles.empty}>No TTS connections configured.</div>
+          <div className={styles.empty}>{t('ttsConnectionManager.empty')}</div>
         )}
       </div>
 
       {deleteTarget && (
         <ConfirmationModal
-          title="Delete TTS Connection"
-          message={`Delete "${deleteTarget.name}"? This cannot be undone.`}
+          title={t('ttsConnectionManager.deleteTitle')}
+          message={t('ttsConnectionManager.deleteMessage', { name: deleteTarget.name })}
           isOpen={true}
           variant="danger"
-          confirmText="Delete"
+          confirmText={t('ttsConnectionManager.deleteConfirm')}
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
         />

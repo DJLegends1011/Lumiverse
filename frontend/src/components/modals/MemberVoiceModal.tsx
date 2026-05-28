@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import { ModalShell } from '@/components/shared/ModalShell'
 import { CloseButton } from '@/components/shared/CloseButton'
@@ -32,6 +33,9 @@ function readVoiceRef(value: unknown): VoiceRef | null {
  * object on each save to avoid clobbering siblings.
  */
 export default function MemberVoiceModal() {
+  const { t } = useTranslation('modals', { keyPrefix: 'memberVoice' })
+  const { t: tc } = useTranslation('common')
+
   const closeModal = useStore((s) => s.closeModal)
   const modalProps = useStore((s) => s.modalProps)
   const activeChatMetadata = useStore((s) => s.activeChatMetadata)
@@ -104,7 +108,7 @@ export default function MemberVoiceModal() {
       closeModal()
     } catch (err: any) {
       console.error('[MemberVoiceModal] Save failed:', err)
-      toast.error(err?.body?.error || err?.message || 'Failed to save voice override')
+      toast.error(err?.body?.error || err?.message || t('saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -119,24 +123,25 @@ export default function MemberVoiceModal() {
       <CloseButton onClick={closeModal} variant="solid" position="absolute" />
 
       <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <h3 style={{ margin: 0, fontSize: 16 }}>Voice — {character.name}</h3>
+        <h3 style={{ margin: 0, fontSize: 16 }}>{t('title', { name: character.name })}</h3>
         <div style={{ fontSize: 12, color: 'var(--text-secondary, #a0a0a8)' }}>
-          Override {character.name}&apos;s voice for this chat only. Leave unset to use
-          {characterDefault ? ' the character’s default voice' : ' the global default'}.
+          {characterDefault
+            ? t('hintWithDefault', { name: character.name })
+            : t('hintGlobal', { name: character.name })}
         </div>
 
         <VoicePicker
           value={draft}
           onChange={setDraft}
-          ariaLabel={`${character.name} voice`}
-          clearLabel={characterDefault ? 'Use character default' : 'Use global default'}
+          ariaLabel={t('ariaVoice', { name: character.name })}
+          clearLabel={characterDefault ? t('useCharacterDefault') : t('useGlobalDefault')}
           portal
         />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-          <Button onClick={closeModal} disabled={saving} variant="ghost">Cancel</Button>
+          <Button onClick={closeModal} disabled={saving} variant="ghost">{tc('actions.cancel')}</Button>
           <Button onClick={save} disabled={saving} variant="primary">
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t('saving') : tc('actions.save')}
           </Button>
         </div>
       </div>

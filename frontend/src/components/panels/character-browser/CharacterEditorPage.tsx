@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { X, Upload, Trash2, Copy, MessageSquare, User, Plus, ImagePlus, Download, Code2 } from 'lucide-react'
@@ -53,18 +55,6 @@ const DEBOUNCE_MS = 2000
 
 type TabId = 'core' | 'system' | 'greetings' | 'identity' | 'gallery' | 'expressions' | 'voice' | 'imageLora' | 'advanced'
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'core', label: 'Core Prompts' },
-  { id: 'system', label: 'System' },
-  { id: 'greetings', label: 'Greetings' },
-  { id: 'identity', label: 'Identity' },
-  { id: 'gallery', label: 'Gallery' },
-  { id: 'expressions', label: 'Expressions' },
-  { id: 'voice', label: 'Voice' },
-  { id: 'imageLora', label: 'Image LoRA' },
-  { id: 'advanced', label: 'Advanced' },
-]
-
 interface GalleryGridItemProps {
   item: CharacterGalleryItem
   onRemove: (itemId: string) => void
@@ -72,6 +62,7 @@ interface GalleryGridItemProps {
 }
 
 function GalleryGridItem({ item, onRemove, onOpenMenu }: GalleryGridItemProps) {
+  const { t } = useTranslation('panels')
   const longPress = useLongPress({
     onLongPress: (pos) => onOpenMenu(item, pos),
   })
@@ -80,7 +71,7 @@ function GalleryGridItem({ item, onRemove, onOpenMenu }: GalleryGridItemProps) {
     <div className={styles.galleryItem} {...longPress}>
       <LazyImage
         src={characterGalleryApi.smallUrl(item.image_id)}
-        alt={item.caption || 'Gallery image'}
+        alt={item.caption || t('characterEditor.galleryImage')}
         className={styles.galleryThumb}
         fallback={<div className={styles.galleryThumbPlaceholder} />}
       />
@@ -88,7 +79,7 @@ function GalleryGridItem({ item, onRemove, onOpenMenu }: GalleryGridItemProps) {
         type="button"
         className={styles.galleryRemoveBtn}
         onClick={() => onRemove(item.id)}
-        title="Remove from gallery"
+        title={t('characterEditor.removeFromGallery')}
       >
         <X size={12} />
       </button>
@@ -101,6 +92,21 @@ function isRecord(value: unknown): value is Record<string, any> {
 }
 
 export default function CharacterEditorPage() {
+  const { t } = useTranslation('panels')
+  const { t: tc } = useTranslation('common')
+
+  const tabs = useMemo<{ id: TabId; label: string }[]>(() => [
+    { id: 'core', label: t('characterEditor.tabs.core') },
+    { id: 'system', label: t('characterEditor.tabs.system') },
+    { id: 'greetings', label: t('characterEditor.tabs.greetings') },
+    { id: 'identity', label: t('characterEditor.tabs.identity') },
+    { id: 'gallery', label: t('characterEditor.tabs.gallery') },
+    { id: 'expressions', label: t('characterEditor.tabs.expressions') },
+    { id: 'voice', label: t('characterEditor.tabs.voice') },
+    { id: 'imageLora', label: t('characterEditor.tabs.imageLora') },
+    { id: 'advanced', label: t('characterEditor.tabs.advanced') },
+  ], [t])
+
   const editingCharacterId = useStore((s) => s.editingCharacterId)
   const setEditingCharacterId = useStore((s) => s.setEditingCharacterId)
   const allCharacters = useStore((s) => s.characters)
@@ -272,15 +278,15 @@ export default function CharacterEditorPage() {
         if (items.length > 0) setGalleryItems((prev) => [...prev, ...items])
         if (skipped.length > 0) {
           const names = skipped.map((s) => s.name).join(', ')
-          toast.error(`Skipped ${skipped.length} ${skipped.length === 1 ? 'file' : 'files'}: ${names}`)
+          toast.error(t('characterEditor.gallerySkipped', { count: skipped.length, names }))
         }
       } catch (err: any) {
-        toast.error(err?.body?.error || err?.message || 'Gallery upload failed')
+        toast.error(err?.body?.error || err?.message || t('characterEditor.galleryUploadFailed'))
       } finally {
         setGalleryUploading(false)
       }
     },
-    [editingCharacterId]
+    [editingCharacterId, t]
   )
 
   const handleGalleryRemove = useCallback(
@@ -294,7 +300,7 @@ export default function CharacterEditorPage() {
 
   const setGalleryImageAsChatBackground = useCallback(async (item: CharacterGalleryItem) => {
     if (!activeChatId) {
-      toast.error('Open a chat first to set its background')
+      toast.error(t('characterEditor.openChatForBackground'))
       return
     }
     const wallpaper: WallpaperRef = { image_id: item.image_id, type: 'image' }
@@ -303,16 +309,16 @@ export default function CharacterEditorPage() {
       setActiveChatWallpaper(wallpaper)
       setSceneBackground(null)
       setGalleryContextMenu(null)
-      toast.success('Chat background updated')
+      toast.success(t('characterEditor.chatBackgroundUpdated'))
     } catch (err: any) {
-      toast.error(err?.body?.error || err?.message || 'Failed to update chat background')
+      toast.error(err?.body?.error || err?.message || t('characterEditor.chatBackgroundFailed'))
     }
-  }, [activeChatId, setActiveChatWallpaper, setSceneBackground])
+  }, [activeChatId, setActiveChatWallpaper, setSceneBackground, t])
 
   const galleryContextMenuItems: ContextMenuEntry[] = galleryContextMenu ? [
     {
       key: 'set-chat-background',
-      label: 'Set as Chat Background',
+      label: t('characterEditor.setAsChatBackground'),
       disabled: !activeChatId,
       onClick: () => setGalleryImageAsChatBackground(galleryContextMenu.item),
     },
@@ -631,10 +637,10 @@ export default function CharacterEditorPage() {
           void flushExtensionsSave()
         }, DEBOUNCE_MS)
       } catch {
-        setJsonError('Invalid JSON')
+        setJsonError(t('characterEditor.invalidJson'))
       }
     },
-    [flushExtensionsSave]
+    [flushExtensionsSave, t]
   )
 
   const handleBindRegex = useCallback(
@@ -643,10 +649,10 @@ export default function CharacterEditorPage() {
       try {
         await updateRegexScript(scriptId, { scope: 'character', scope_id: editingCharacterId })
       } catch (err: any) {
-        toast.error(err.body?.error || err.message || 'Failed to bind regex')
+        toast.error(err.body?.error || err.message || t('characterEditor.bindRegexFailed'))
       }
     },
-    [editingCharacterId, updateRegexScript]
+    [editingCharacterId, updateRegexScript, t]
   )
 
   const handleUnbindRegex = useCallback(
@@ -654,7 +660,7 @@ export default function CharacterEditorPage() {
       try {
         await updateRegexScript(scriptId, { scope: 'global', scope_id: null })
       } catch (err: any) {
-        toast.error(err.body?.error || err.message || 'Failed to unbind regex')
+        toast.error(err.body?.error || err.message || t('characterEditor.unbindRegexFailed'))
       }
     },
     [updateRegexScript]
@@ -730,7 +736,7 @@ export default function CharacterEditorPage() {
           id: newId,
           image_id: image.id,
           original_image_id: originalImage.id,
-          label: 'New Avatar',
+          label: t('characterEditor.newAvatar'),
         }
         mutateExtensions((ext) => {
           const currentAlts = (ext.alternate_avatars || []) as AlternateAvatarEntry[]
@@ -795,19 +801,19 @@ export default function CharacterEditorPage() {
     setExporting(true)
     setShowExportMenu(false)
     const formatLabel = format === 'charx' ? 'CHARX' : format === 'png' ? 'PNG' : 'JSON'
-    const toastId = toast.info(`Preparing ${formatLabel} export\u2026`, { title: 'Exporting', duration: 60_000, dismissible: false })
+    const toastId = toast.info(t('characterEditor.preparingExport', { format: formatLabel }), { title: t('characterEditor.exporting'), duration: 60_000, dismissible: false })
     try {
       await charactersApi.exportCharacter(editingCharacterId, format, character.name)
       toast.dismiss(toastId)
-      toast.success(`${character.name} exported as ${formatLabel}`)
+      toast.success(t('characterEditor.exportSuccess', { name: character.name, format: formatLabel }))
     } catch (err) {
       console.error('[Export] Failed:', err)
       toast.dismiss(toastId)
-      toast.error(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      toast.error(t('characterEditor.exportFailed', { error: err instanceof Error ? err.message : t('characterEditor.unknownError') }))
     } finally {
       setExporting(false)
     }
-  }, [editingCharacterId, character])
+  }, [editingCharacterId, character, t])
 
   // Close export menu on outside click
   useEffect(() => {
@@ -857,7 +863,7 @@ export default function CharacterEditorPage() {
           >
             {!character ? (
               <div className={styles.header}>
-                <span className={styles.creatorText}>Character not found</span>
+                <span className={styles.creatorText}>{t('characterEditor.notFound')}</span>
                 <CloseButton onClick={close} variant="solid" />
               </div>
             ) : (
@@ -869,7 +875,7 @@ export default function CharacterEditorPage() {
                     onClick={() => { if (avatarUploadProgress === null) fileRef.current?.click() }}
                     onDrop={handleAvatarDrop}
                     onDragOver={(e) => e.preventDefault()}
-                    title="Click or drop to change avatar"
+                    title={t('characterEditor.changeAvatar')}
                   >
                     <LazyImage
                       key={avatarKey}
@@ -904,15 +910,15 @@ export default function CharacterEditorPage() {
                       className={styles.nameInput}
                       value={name}
                       onChange={(e) => handleNameChange(e.target.value)}
-                      placeholder="Character name"
+                      placeholder={t('characterEditor.characterName')}
                     />
-                    {character.creator && <span className={styles.creatorText}>by {character.creator}</span>}
+                    {character.creator && <span className={styles.creatorText}>{t('characterEditor.byCreator', { name: character.creator })}</span>}
                   </div>
 
-                  {saving && <span className={styles.savingIndicator}>Saving...</span>}
+                  {saving && <span className={styles.savingIndicator}>{t('characterEditor.saving')}</span>}
 
                   <div className={styles.headerActions}>
-                    <Button size="icon" variant="ghost" onClick={handleOpenChat} title="Open Chat">
+                    <Button size="icon" variant="ghost" onClick={handleOpenChat} title={t('characterEditor.openChat')}>
                       <MessageSquare size={14} />
                     </Button>
                     <div className={styles.exportWrapper} ref={exportMenuRef}>
@@ -920,7 +926,7 @@ export default function CharacterEditorPage() {
                         size="icon"
                         variant="ghost"
                         onClick={() => !exporting && setShowExportMenu((v) => !v)}
-                        title="Export"
+                        title={tc('actions.export')}
                         disabled={exporting}
                       >
                         {exporting
@@ -929,20 +935,20 @@ export default function CharacterEditorPage() {
                       </Button>
                       {showExportMenu && (
                         <div className={styles.exportDropdown}>
-                          <button onClick={() => handleExport('json')}>Export as JSON (CCSv3)</button>
-                          <button onClick={() => handleExport('png')}>Export as PNG (Embedded)</button>
-                          <button onClick={() => handleExport('charx')}>Export as CHARX (Lumiverse)</button>
+                          <button onClick={() => handleExport('json')}>{t('characterEditor.exportJson')}</button>
+                          <button onClick={() => handleExport('png')}>{t('characterEditor.exportPng')}</button>
+                          <button onClick={() => handleExport('charx')}>{t('characterEditor.exportCharx')}</button>
                         </div>
                       )}
                     </div>
-                    <Button size="icon" variant="ghost" onClick={handleDuplicate} title="Duplicate">
+                    <Button size="icon" variant="ghost" onClick={handleDuplicate} title={t('characterEditor.duplicate')}>
                       <Copy size={14} />
                     </Button>
                     <Button
                       size="icon"
                       variant="danger-ghost"
                       onClick={() => setShowDeleteConfirm(true)}
-                      title="Delete"
+                      title={tc('actions.delete')}
                     >
                       <Trash2 size={14} />
                     </Button>
@@ -953,7 +959,7 @@ export default function CharacterEditorPage() {
 
                 {/* Tab bar */}
                 <div className={styles.tabBar}>
-                  {TABS.map((tab) => (
+                  {tabs.map((tab) => (
                     <button
                       key={tab.id}
                       type="button"
@@ -971,16 +977,16 @@ export default function CharacterEditorPage() {
                     <>
                       {dreamWeaverMetadata && (
                         <Field
-                          label="Appearance"
-                          helper="Appearance data for Dream Weaver characters."
+                          label={t('characterEditor.appearance')}
+                          helper={t('characterEditor.appearanceHelper')}
                           value={getDreamWeaverAppearanceText(dreamWeaverMetadata)}
                           onChange={handleDreamWeaverAppearanceChange}
                           rows={4}
                         />
                       )}
                       <AlternateFieldEditor
-                        label="Description"
-                        helper="The character's physical appearance, backstory, and other details."
+                        label={t('characterEditor.description')}
+                        helper={t('characterEditor.descriptionHelper')}
                         value={fields.description || ''}
                         alternates={character?.extensions?.alternate_fields?.description}
                         onChange={(v) => handleFieldChange('description', v)}
@@ -988,8 +994,8 @@ export default function CharacterEditorPage() {
                         rows={5}
                       />
                       <AlternateFieldEditor
-                        label="Personality"
-                        helper="Key personality traits and behavioral patterns."
+                        label={t('characterEditor.personality')}
+                        helper={t('characterEditor.personalityHelper')}
                         value={fields.personality || ''}
                         alternates={character?.extensions?.alternate_fields?.personality}
                         onChange={(v) => handleFieldChange('personality', v)}
@@ -997,8 +1003,8 @@ export default function CharacterEditorPage() {
                         rows={4}
                       />
                       <AlternateFieldEditor
-                        label="Scenario"
-                        helper="The setting or situation for the roleplay."
+                        label={t('characterEditor.scenario')}
+                        helper={t('characterEditor.scenarioHelper')}
                         value={fields.scenario || ''}
                         alternates={character?.extensions?.alternate_fields?.scenario}
                         onChange={(v) => handleFieldChange('scenario', v)}
@@ -1012,9 +1018,9 @@ export default function CharacterEditorPage() {
                     <>
                       {dreamWeaverMetadata && (
                         <div className={styles.fieldGroup}>
-                          <span className={styles.fieldLabel}>Voice Guidance</span>
+                          <span className={styles.fieldLabel}>{t('characterEditor.voiceGuidance')}</span>
                           <span className={styles.fieldHelper}>
-                            Structured voice rules are used at runtime first, compiled guidance remains the fallback.
+                            {t('characterEditor.voiceGuidanceHelper')}
                           </span>
                           <VoiceGuidanceEditor
                             voice={dreamWeaverMetadata.voiceGuidance || EMPTY_DREAM_WEAVER_VOICE_GUIDANCE}
@@ -1023,15 +1029,15 @@ export default function CharacterEditorPage() {
                         </div>
                       )}
                       <Field
-                        label="System Prompt"
-                        helper="Instructions injected at the start of every conversation."
+                        label={t('characterEditor.systemPrompt')}
+                        helper={t('characterEditor.systemPromptHelper')}
                         value={fields.system_prompt || ''}
                         onChange={(v) => handleFieldChange('system_prompt', v)}
                         rows={6}
                       />
                       <Field
-                        label="Post-History Instructions"
-                        helper="Instructions injected after the chat history (jailbreak position)."
+                        label={t('characterEditor.postHistory')}
+                        helper={t('characterEditor.postHistoryHelper')}
                         value={fields.post_history_instructions || ''}
                         onChange={(v) => handleFieldChange('post_history_instructions', v)}
                         rows={4}
@@ -1042,33 +1048,33 @@ export default function CharacterEditorPage() {
                   {activeTab === 'greetings' && (
                     <>
                       <Field
-                        label="First Message"
-                        helper="The opening message the character sends when starting a new chat."
+                        label={t('characterEditor.firstMessage')}
+                        helper={t('characterEditor.firstMessageHelper')}
                         value={fields.first_mes || ''}
                         onChange={(v) => handleFieldChange('first_mes', v)}
                         rows={5}
                       />
                       <Field
-                        label="Message Examples"
-                        helper="Example dialogues showing how the character speaks (use <START> to separate)."
+                        label={t('characterEditor.messageExamples')}
+                        helper={t('characterEditor.messageExamplesHelper')}
                         value={fields.mes_example || ''}
                         onChange={(v) => handleFieldChange('mes_example', v)}
                         rows={5}
                       />
                       <div className={styles.fieldGroup}>
-                        <span className={styles.fieldLabel}>Alternate Greetings</span>
+                        <span className={styles.fieldLabel}>{t('characterEditor.alternateGreetings')}</span>
                         <span className={styles.fieldHelper}>
-                          Alternative first messages that can be randomly selected.
+                          {t('characterEditor.alternateGreetingsHelper')}
                         </span>
                         {alternateGreetings.map((greeting, i) => (
                           <div key={i} className={styles.greetingItem}>
                             <div className={styles.greetingHeader}>
-                              <span className={styles.greetingLabel}>Greeting #{i + 1}</span>
+                              <span className={styles.greetingLabel}>{t('characterEditor.greetingNumber', { n: i + 1 })}</span>
                               <button
                                 type="button"
                                 className={styles.removeBtn}
                                 onClick={() => handleRemoveGreeting(i)}
-                                title="Remove"
+                                title={t('characterEditor.remove')}
                               >
                                 <X size={12} />
                               </button>
@@ -1078,13 +1084,13 @@ export default function CharacterEditorPage() {
                               value={greeting}
                               onChange={(v) => handleGreetingChange(i, v)}
                               rows={3}
-                              title={`Greeting #${i + 1}`}
-                              placeholder="Alternate greeting..."
+                              title={t('characterEditor.greetingNumber', { n: i + 1 })}
+                              placeholder={t('characterEditor.alternateGreetingPlaceholder')}
                             />
                           </div>
                         ))}
                         <button type="button" className={styles.addBtn} onClick={handleAddGreeting}>
-                          <Plus size={12} /> Add Greeting
+                          <Plus size={12} /> {t('characterEditor.addGreeting')}
                         </button>
                       </div>
                     </>
@@ -1093,29 +1099,29 @@ export default function CharacterEditorPage() {
                   {activeTab === 'identity' && (
                     <>
                       <Field
-                        label="Alternate Character Name"
-                        helper="Used as {{char}} in prompts and as the chat display name. Leaves the card's title untouched."
+                        label={t('characterEditor.alternateName')}
+                        helper={t('characterEditor.alternateNameHelper')}
                         value={alternateCharacterName}
                         onChange={handleAlternateCharacterNameChange}
                         multiline={false}
                       />
                       <Field
-                        label="Creator"
-                        helper="Who created this character."
+                        label={t('characterEditor.creator')}
+                        helper={t('characterEditor.creatorHelper')}
                         value={fields.creator || ''}
                         onChange={(v) => handleFieldChange('creator', v)}
                         multiline={false}
                       />
                       <Field
-                        label="Creator Notes"
-                        helper="Notes from the creator about how to use the character."
+                        label={t('characterEditor.creatorNotes')}
+                        helper={t('characterEditor.creatorNotesHelper')}
                         value={fields.creator_notes || ''}
                         onChange={(v) => handleFieldChange('creator_notes', v)}
                         rows={4}
                       />
                       <div className={styles.fieldGroup}>
-                        <span className={styles.fieldLabel}>Tags</span>
-                        <span className={styles.fieldHelper}>Categories and labels for organization.</span>
+                        <span className={styles.fieldLabel}>{t('characterEditor.tags')}</span>
+                        <span className={styles.fieldHelper}>{t('characterEditor.tagsHelper')}</span>
                         <div className={styles.tagsList}>
                           {tags.map((tag) => (
                             <span key={tag} className={styles.tag}>
@@ -1136,7 +1142,7 @@ export default function CharacterEditorPage() {
                               value={newTag}
                               onChange={(e) => setNewTag(e.target.value)}
                               onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
-                              placeholder="Add tag..."
+                              placeholder={t('characterEditor.addTag')}
                             />
                             <button
                               type="button"
@@ -1164,9 +1170,9 @@ export default function CharacterEditorPage() {
                   {activeTab === 'gallery' && (
                     <div className={styles.galleryTab}>
                       <div className={styles.galleryHeader}>
-                        <span className={styles.fieldLabel}>Image Gallery</span>
+                        <span className={styles.fieldLabel}>{t('characterEditor.imageGallery')}</span>
                         <span className={styles.fieldHelper}>
-                          Upload images for this character. These are personal to your account.
+                          {t('characterEditor.imageGalleryHelper')}
                         </span>
                       </div>
 
@@ -1187,7 +1193,7 @@ export default function CharacterEditorPage() {
                           disabled={galleryUploading}
                         >
                           <ImagePlus size={20} />
-                          <span>{galleryUploading ? 'Uploading...' : 'Add Images'}</span>
+                          <span>{galleryUploading ? t('characterEditor.uploading') : t('characterEditor.addImages')}</span>
                         </button>
                       </div>
 
@@ -1204,9 +1210,9 @@ export default function CharacterEditorPage() {
                         <div className={styles.galleryExtract}>
                           <Download size={14} />
                           <div className={styles.galleryExtractInfo}>
-                            <span className={styles.fieldLabel}>Embedded Images</span>
+                            <span className={styles.fieldLabel}>{t('characterEditor.embeddedImages')}</span>
                             <span className={styles.fieldHelper}>
-                              {embeddedImageCount} image{embeddedImageCount !== 1 ? 's' : ''} found in character data
+                              {t('characterEditor.embeddedImagesFound', { count: embeddedImageCount })}
                             </span>
                           </div>
                           <button
@@ -1215,7 +1221,7 @@ export default function CharacterEditorPage() {
                             disabled={extracting}
                             onClick={handleGalleryExtract}
                           >
-                            {extracting ? 'Importing...' : 'Import All'}
+                            {extracting ? t('characterEditor.importing') : t('characterEditor.importAll')}
                           </button>
                         </div>
                       )}
@@ -1247,19 +1253,19 @@ export default function CharacterEditorPage() {
                   {activeTab === 'advanced' && (
                     <>
                       <div className={styles.fieldGroup}>
-                        <span className={styles.fieldLabel}>Attached World Books</span>
-                        <span className={styles.fieldHelper}>Used by prompt assembly for world info activation. Attach multiple for richer lore.</span>
+                        <span className={styles.fieldLabel}>{t('characterEditor.attachedWorldBooks')}</span>
+                        <span className={styles.fieldHelper}>{t('characterEditor.attachedWorldBooksHelper')}</span>
                         <div className={styles.charWbHeader}>
                           <SearchableSelect
                             multi
                             value={attachedWorldBookIds}
                             onChange={(ids) => { void handleWorldBookIdsChange(ids) }}
                             options={worldBooks.map((wb) => ({ value: wb.id, label: wb.name, group: wb.folder || undefined }))}
-                            placeholder="Add world books…"
-                            triggerLabel="Add"
+                            placeholder={t('characterEditor.addWorldBooks')}
+                            triggerLabel={t('characterEditor.add')}
                             triggerIcon={<Plus size={11} />}
-                            searchPlaceholder="Search world books…"
-                            emptyMessage="No world books available"
+                            searchPlaceholder={t('characterEditor.searchWorldBooks')}
+                            emptyMessage={t('characterEditor.noWorldBooks')}
                             className={styles.charWbSelect}
                             portal
                             minWidth={260}
@@ -1271,12 +1277,12 @@ export default function CharacterEditorPage() {
                               const wb = worldBooks.find((b) => b.id === id)
                               return (
                                 <span key={id} className={styles.charWbPill}>
-                                  <span className={styles.charWbPillName}>{wb?.name || 'Unknown'}</span>
+                                  <span className={styles.charWbPillName}>{wb?.name || t('characterEditor.unknown')}</span>
                                   <button
                                     type="button"
                                     className={styles.charWbPillRemove}
                                     onClick={() => handleRemoveWorldBook(id)}
-                                    title="Remove world book"
+                                    title={t('characterEditor.removeWorldBook')}
                                   >
                                     <X size={10} />
                                   </button>
@@ -1285,7 +1291,7 @@ export default function CharacterEditorPage() {
                             })}
                           </div>
                         ) : (
-                          <span className={styles.charWbHint}>No world books attached</span>
+                          <span className={styles.charWbHint}>{t('characterEditor.noWorldBooksAttached')}</span>
                         )}
                       </div>
 
@@ -1293,9 +1299,9 @@ export default function CharacterEditorPage() {
                         <div className={styles.lorebookImportSection}>
                           <IconNotebook size={14} />
                           <div className={styles.lorebookImportInfo}>
-                            <span className={styles.fieldLabel}>Embedded Lorebook</span>
+                            <span className={styles.fieldLabel}>{t('characterEditor.embeddedLorebook')}</span>
                             <span className={styles.fieldHelper}>
-                              {getEmbeddedCharacterBookEntryCount(character.extensions)} entries found in character card
+                              {t('characterEditor.embeddedLorebookEntries', { count: getEmbeddedCharacterBookEntryCount(character.extensions) })}
                             </span>
                           </div>
                           {lorebookResult ? (
@@ -1315,21 +1321,21 @@ export default function CharacterEditorPage() {
                                     const currentIds = getCharacterWorldBookIds(ext)
                                     return setCharacterWorldBookIds(ext, [...currentIds, res.world_book.id])
                                   }, true)
-                                  setLorebookResult(`Imported ${res.entry_count} entries into "${res.world_book.name}" and attached it`)
+                                  setLorebookResult(t('characterEditor.lorebookImported', { count: res.entry_count, name: res.world_book.name }))
                                 } catch {
                                   setLorebookImporting(false)
                                 }
                               }}
                             >
-                              {lorebookImporting ? 'Importing...' : 'Import Lorebook'}
+                              {lorebookImporting ? t('characterEditor.importing') : t('characterEditor.importLorebook')}
                             </button>
                           )}
                         </div>
                       )}
                       <div className={styles.fieldGroup}>
-                        <span className={styles.fieldLabel}>Character-Bound Regex Scripts</span>
+                        <span className={styles.fieldLabel}>{t('characterEditor.boundRegex')}</span>
                         <span className={styles.fieldHelper}>
-                          Regex scripts attached to this character. These will be bundled with .charx exports.
+                          {t('characterEditor.boundRegexHelper')}
                         </span>
 
                         {boundRegexScripts.length > 0 && (
@@ -1344,7 +1350,7 @@ export default function CharacterEditorPage() {
                                 <button
                                   type="button"
                                   className={styles.regexUnbindBtn}
-                                  title="Unbind from character (make global)"
+                                  title={t('characterEditor.unbindRegex')}
                                   onClick={() => handleUnbindRegex(s.id)}
                                 >
                                   <X size={12} />
@@ -1361,7 +1367,7 @@ export default function CharacterEditorPage() {
                           if (unboundGlobals.length === 0 && boundRegexScripts.length === 0) {
                             return (
                               <span className={styles.fieldHelper}>
-                                No regex scripts found. Create one in the Regex panel first.
+                                {t('characterEditor.noRegexScripts')}
                               </span>
                             )
                           }
@@ -1375,18 +1381,18 @@ export default function CharacterEditorPage() {
                                 label: s.name,
                                 sublabel: s.target,
                               }))}
-                              placeholder="Bind a global regex to this character…"
-                              searchPlaceholder="Search regex scripts…"
-                              emptyMessage="No unbound global regex scripts"
+                              placeholder={t('characterEditor.bindRegexPlaceholder')}
+                              searchPlaceholder={t('characterEditor.searchRegex')}
+                              emptyMessage={t('characterEditor.noUnboundRegex')}
                             />
                           )
                         })()}
                       </div>
 
                       <div className={styles.fieldGroup}>
-                        <span className={styles.fieldLabel}>Extensions (JSON)</span>
+                        <span className={styles.fieldLabel}>{t('characterEditor.extensionsJson')}</span>
                         <span className={styles.fieldHelper}>
-                          Raw JSON data for character extensions and custom fields.
+                          {t('characterEditor.extensionsJsonHelper')}
                         </span>
                         <textarea
                           className={styles.jsonTextarea}
@@ -1417,10 +1423,10 @@ export default function CharacterEditorPage() {
     {showDeleteConfirm && (
       <ConfirmationModal
         isOpen={true}
-        title="Delete Character"
-        message={`Delete "${character?.name || 'this character'}" permanently? This cannot be undone.`}
+        title={t('characterEditor.deleteTitle')}
+        message={t('characterEditor.deleteMessage', { name: character?.name || t('characterEditor.thisCharacter') })}
         variant="danger"
-        confirmText="Delete"
+        confirmText={t('characterEditor.delete')}
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}
       />
@@ -1500,6 +1506,7 @@ function CharacterVoiceTab({
   value: VoiceRef | null
   onChange: (next: VoiceRef | null) => void
 }) {
+  const { t } = useTranslation('panels')
   const ttsProfiles = useStore((s) => s.ttsProfiles)
   const setTtsProfiles = useStore((s) => s.setTtsProfiles)
   const setTtsProviders = useStore((s) => s.setTtsProviders)
@@ -1514,21 +1521,20 @@ function CharacterVoiceTab({
 
   return (
     <div className={styles.fieldGroup}>
-      <span className={styles.fieldLabel}>Character Voice</span>
+      <span className={styles.fieldLabel}>{t('characterEditor.characterVoice')}</span>
       <span className={styles.fieldHelper}>
-        Default voice used when this character speaks. Falls back to the global voice when unset.
-        Group chats can override this per chat.
+        {t('characterEditor.characterVoiceHelper')}
       </span>
 
       {ttsProfiles.length === 0 ? (
         <div className={styles.fieldHelper} style={{ marginTop: 8 }}>
-          No TTS connections configured.{' '}
+          {t('characterEditor.noTtsConnections')}{' '}
           <button
             type="button"
             onClick={() => openDrawer?.('connections')}
             style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent, #6aa3ff)', cursor: 'pointer', textDecoration: 'underline' }}
           >
-            Add one in Connections
+            {t('characterEditor.addTtsInConnections')}
           </button>
           .
         </div>
@@ -1537,8 +1543,8 @@ function CharacterVoiceTab({
           <VoicePicker
             value={value}
             onChange={onChange}
-            ariaLabel="Character voice"
-            clearLabel="Use global default"
+            ariaLabel={t('characterEditor.characterVoiceAria')}
+            clearLabel={t('characterEditor.useGlobalVoice')}
             portal
           />
         </div>

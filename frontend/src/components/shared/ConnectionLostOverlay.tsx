@@ -1,33 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'motion/react'
+import { useTranslation } from 'react-i18next'
 import { WifiOff, Download } from 'lucide-react'
 import { useStore } from '@/store'
 import { Spinner } from './Spinner'
 import styles from './ConnectionLostOverlay.module.css'
 
-/**
- * Grace window after a hidden→visible transition where we suppress the
- * overlay so iOS PWAs (and any other browser that silently kills the WS during
- * suspension) can finish their recovery dance without flashing the screen at
- * the user. Tuned to comfortably cover: fast-watchdog timeout (3s) + scheduled
- * reconnect delay (3s) + handshake (~200ms) = ~6.2s worst case.
- */
 const RESUME_GRACE_MS = 7_000
 
-/**
- * Full-screen, non-dismissable overlay shown when the WebSocket connection to
- * the backend has dropped after the user was already authenticated and using
- * the app. Auto-dismisses once all three healthy signals coincide:
- *   1. Socket OPEN (wsConnected)
- *   2. Backend CONNECTED event with role received (wsAuthSynced)
- *   3. Pong received since the last open (wsRoundTripVerified)
- *
- * The overlay is suppressed until the user has had at least one fully healthy
- * connection in this session (wsHasEverConnected) — that prevents a flash
- * during cold start, login, or page refresh.
- */
 export default function ConnectionLostOverlay() {
+  const { t } = useTranslation('shared')
   const isAuthenticated = useStore((s) => s.isAuthenticated)
   const wsConnected = useStore((s) => s.wsConnected)
   const wsAuthSynced = useStore((s) => s.wsAuthSynced)
@@ -35,11 +18,7 @@ export default function ConnectionLostOverlay() {
   const wsHasEverConnected = useStore((s) => s.wsHasEverConnected)
   const wsUpdatePending = useStore((s) => s.wsUpdatePending)
 
-  // Grace state used only for hidden→visible recoveries — see RESUME_GRACE_MS.
   const [inResumeGrace, setInResumeGrace] = useState(false)
-  // Snapshot whether the overlay was visible right before the page went hidden.
-  // If it was, we DON'T grant grace on resume — hiding an already-shown overlay
-  // for 7s only to re-show it would be more jarring than the current behavior.
   const overlayWasShowingAtHideRef = useRef(false)
 
   useEffect(() => {
@@ -69,27 +48,25 @@ export default function ConnectionLostOverlay() {
   }, [])
 
   const healthy = wsConnected && wsAuthSynced && wsRoundTripVerified
-  // wsUpdatePending forces the overlay to stay up through the bundle swap, so
-  // the user never sees a flash of normal UI before the page reloads.
-  // wsUpdatePending also bypasses the resume grace — an actual update needs to
-  // be communicated even if we just resumed from the background.
   const visible =
     isAuthenticated &&
     (wsUpdatePending || (wsHasEverConnected && !healthy && !inResumeGrace))
 
-  const title = wsUpdatePending ? 'Updating Lumiverse' : 'Server connection lost'
+  const title = wsUpdatePending
+    ? t('connectionLost.updatingTitle')
+    : t('connectionLost.lostTitle')
   const message = wsUpdatePending
-    ? 'A new version is available. Applying the update — the page will refresh in a moment.'
+    ? t('connectionLost.updatingMessage')
     : wsConnected
       ? wsAuthSynced
-        ? 'Verifying connection…'
-        : 'Re-syncing your session…'
-      : 'The server has become unreachable. We’ll automatically restore your session as soon as it’s back.'
+        ? t('connectionLost.verifyingConnection')
+        : t('connectionLost.resyncingSession')
+      : t('connectionLost.unreachable')
   const statusText = wsUpdatePending
-    ? 'Installing latest bundle…'
+    ? t('connectionLost.installingBundle')
     : wsConnected
-      ? 'Verifying…'
-      : 'Attempting to reconnect…'
+      ? t('connectionLost.verifying')
+      : t('connectionLost.reconnecting')
 
   return createPortal(
     <AnimatePresence>

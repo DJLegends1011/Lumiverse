@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import useSwipeAction from '@/hooks/useSwipeAction'
 import type { Message } from '@/types/api'
@@ -11,6 +12,7 @@ interface SwipeControlsProps {
 }
 
 export default function SwipeControls({ message, chatId, variant = 'default' }: SwipeControlsProps) {
+  const { t } = useTranslation('chat')
   const { handleSwipe, disableLeft, disableRight } = useSwipeAction(message, chatId)
 
   const current = message.swipe_id + 1
@@ -23,7 +25,7 @@ export default function SwipeControls({ message, chatId, variant = 'default' }: 
         className={styles.btn}
         onClick={() => handleSwipe('left')}
         disabled={disableLeft}
-        aria-label="Previous swipe"
+        aria-label={t('swipe.previous')}
       >
         <ChevronLeft size={14} />
       </button>
@@ -35,7 +37,7 @@ export default function SwipeControls({ message, chatId, variant = 'default' }: 
         className={styles.btn}
         onClick={() => handleSwipe('right')}
         disabled={disableRight}
-        aria-label="Next swipe"
+        aria-label={t('swipe.next')}
       >
         <ChevronRight size={14} />
       </button>

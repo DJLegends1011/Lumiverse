@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router'
 import { UserRound, ListChecks } from 'lucide-react'
 import { useStore } from '@/store'
@@ -60,40 +61,44 @@ interface CortexRebuildStatus {
   source?: string
 }
 
-function formatIngestionDetail(status: CortexIngestionStatus): string {
-  const phaseDetail: Record<CortexIngestionStatus['phase'], string> = {
-    queued: 'Queued for processing',
-    font: 'Extracting font and style cues',
-    heuristics: 'Scoring salience and relationships',
-    sidecar: 'Running sidecar analysis',
-    persisting: 'Saving memory updates',
-    complete: 'Complete',
-    error: status.error || 'Processing failed',
-  }
-
-  return phaseDetail[status.phase] + (status.pendingJobs > 1 ? `, ${status.pendingJobs} jobs pending` : '')
-}
-
-function formatChunkProgress(payload: CortexRebuildStatus): string {
+function formatChunkProgress(payload: CortexRebuildStatus, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const current = payload.current ?? 0
   const total = payload.total ?? 0
-  return total > 0 ? `, ${current}/${total} chunks` : ''
+  return total > 0 ? t('chatView.cortexChunks', { current, total }) : ''
 }
 
-function formatRebuildDetail(payload: CortexRebuildStatus): string {
+function formatIngestionDetail(status: CortexIngestionStatus, t: (key: string, opts?: Record<string, unknown>) => string): string {
+  const phaseDetail: Record<CortexIngestionStatus['phase'], string> = {
+    queued: t('chatView.cortexQueued'),
+    font: t('chatView.cortexFont'),
+    heuristics: t('chatView.cortexHeuristics'),
+    sidecar: t('chatView.cortexSidecar'),
+    persisting: t('chatView.cortexPersisting'),
+    complete: t('chatView.cortexComplete'),
+    error: status.error || t('chatView.cortexProcessingFailed'),
+  }
+
+  return phaseDetail[status.phase] + (status.pendingJobs > 1 ? t('chatView.cortexJobsPending', { count: status.pendingJobs }) : '')
+}
+
+function formatRebuildDetail(payload: CortexRebuildStatus, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const action = payload.source === 'warmup'
-    ? 'Preparing Long-Term Chat Memory'
-    : 'Rebuilding Long-Term Chat Memory'
+    ? t('chatView.cortexPreparingMemory')
+    : t('chatView.cortexRebuildingMemory')
 
-  return action + formatChunkProgress(payload)
+  return action + formatChunkProgress(payload, t)
 }
 
-function buildCortexNotice(ingestionStatus: CortexIngestionStatus | null, rebuildStatus: CortexRebuildStatus | null): CortexNotice | null {
+function buildCortexNotice(
+  ingestionStatus: CortexIngestionStatus | null,
+  rebuildStatus: CortexRebuildStatus | null,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): CortexNotice | null {
   if (rebuildStatus?.status === 'error') {
     return {
       variant: 'error',
-      title: 'Memory',
-      detail: rebuildStatus.error || 'Chat memory rebuild failed.',
+      title: t('chatView.memory'),
+      detail: rebuildStatus.error || t('chatView.memoryRebuildFailed'),
       percent: rebuildStatus.percent,
     }
   }
@@ -101,8 +106,8 @@ function buildCortexNotice(ingestionStatus: CortexIngestionStatus | null, rebuil
   if (ingestionStatus?.status === 'error') {
     return {
       variant: 'error',
-      title: 'Memory',
-      detail: ingestionStatus.error || 'Background memory processing failed.',
+      title: t('chatView.memory'),
+      detail: ingestionStatus.error || t('chatView.backgroundMemoryFailed'),
     }
   }
 
@@ -112,8 +117,8 @@ function buildCortexNotice(ingestionStatus: CortexIngestionStatus | null, rebuil
   if (rebuildProcessing && ingestionProcessing) {
     return {
       variant: 'processing',
-      title: 'Memory',
-      detail: `Preparing Long-Term Chat Memory + Cortex${formatChunkProgress(rebuildStatus)}`,
+      title: t('chatView.memory'),
+      detail: t('chatView.cortexCombined', { chunks: formatChunkProgress(rebuildStatus, t) }),
       percent: rebuildStatus.percent,
     }
   }
@@ -121,8 +126,8 @@ function buildCortexNotice(ingestionStatus: CortexIngestionStatus | null, rebuil
   if (rebuildProcessing) {
     return {
       variant: 'processing',
-      title: 'Memory',
-      detail: formatRebuildDetail(rebuildStatus),
+      title: t('chatView.memory'),
+      detail: formatRebuildDetail(rebuildStatus, t),
       percent: rebuildStatus.percent,
     }
   }
@@ -130,8 +135,8 @@ function buildCortexNotice(ingestionStatus: CortexIngestionStatus | null, rebuil
   if (ingestionProcessing) {
     return {
       variant: 'processing',
-      title: 'Memory',
-      detail: formatIngestionDetail(ingestionStatus),
+      title: t('chatView.memory'),
+      detail: formatIngestionDetail(ingestionStatus, t),
     }
   }
 
@@ -143,29 +148,30 @@ function normalizeRebuildStatus(payload: CortexRebuildStatus | null): CortexRebu
   return payload.status === 'idle' || payload.status === 'complete' ? null : payload
 }
 
-function buildSpindleNotice(payload: SpindlePreGenerationActivityPayload): SpindleNotice {
+function buildSpindleNotice(payload: SpindlePreGenerationActivityPayload, t: (key: string, opts?: Record<string, unknown>) => string): SpindleNotice {
   const phaseLabel: Record<SpindlePreGenerationActivityPayload['phase'], string> = {
-    message_content_processor: 'processing your message',
-    context_handler: 'preparing generation context',
-    interceptor: 'running a prompt interceptor',
+    message_content_processor: t('chatView.spindleProcessingMessage'),
+    context_handler: t('chatView.spindleProcessingContext'),
+    interceptor: t('chatView.spindleProcessingInterceptor'),
   }
 
   if (payload.status === 'error') {
     return {
       variant: 'error',
-      title: 'Extension',
-      detail: payload.error || `${payload.extensionName} failed while ${phaseLabel[payload.phase]}.`,
+      title: t('extension'),
+      detail: payload.error || t('chatView.spindleFailed', { name: payload.extensionName, phase: phaseLabel[payload.phase] }),
     }
   }
 
   return {
     variant: 'processing',
-    title: 'Extension',
-    detail: `${payload.extensionName} is ${phaseLabel[payload.phase]}`,
+    title: t('extension'),
+    detail: t('chatView.spindleActive', { name: payload.extensionName, phase: phaseLabel[payload.phase] }),
   }
 }
 
 export default function ChatView() {
+  const { t } = useTranslation('chat')
   const { chatId } = useParams<{ chatId: string }>()
   const autoSwitchedPersonaIdRef = useRef<string | null>(null)
   const spindleActiveRef = useRef(new Map<string, SpindlePreGenerationActivityPayload>())
@@ -201,7 +207,7 @@ export default function ChatView() {
   useSwipeKeyboard()
   useEditKeyboard()
 
-  const cortexNotice = useMemo(() => buildCortexNotice(ingestionStatus, rebuildStatus), [ingestionStatus, rebuildStatus])
+  const cortexNotice = useMemo(() => buildCortexNotice(ingestionStatus, rebuildStatus, t), [ingestionStatus, rebuildStatus, t])
 
   useEffect(() => {
     if (!spindleNotice || spindleNotice.variant !== 'error') return
@@ -242,7 +248,7 @@ export default function ChatView() {
       clearSpindleShowTimer()
       clearSpindleHideTimer()
       spindleVisibleAtRef.current = Date.now()
-      setSpindleNotice(buildSpindleNotice(payload))
+      setSpindleNotice(buildSpindleNotice(payload, t))
     }
 
     const scheduleSpindleHide = () => {
@@ -302,7 +308,7 @@ export default function ChatView() {
         spindleLatestRef.current = payload
         clearSpindleHideTimer()
         if (spindleVisibleAtRef.current !== null) {
-          setSpindleNotice(buildSpindleNotice(payload))
+          setSpindleNotice(buildSpindleNotice(payload, t))
         } else if (spindleShowTimerRef.current === null) {
           spindleShowTimerRef.current = window.setTimeout(() => {
             spindleShowTimerRef.current = null
@@ -325,7 +331,7 @@ export default function ChatView() {
       spindleLatestRef.current = nextPayload
       if (nextPayload) {
         if (spindleVisibleAtRef.current !== null) {
-          setSpindleNotice(buildSpindleNotice(nextPayload))
+          setSpindleNotice(buildSpindleNotice(nextPayload, t))
         }
         return
       }
@@ -446,7 +452,7 @@ export default function ChatView() {
           if (resolvedBinding.personaId && boundPersona) {
             if (activePersonaId !== resolvedBinding.personaId) {
               setActivePersona(resolvedBinding.personaId)
-              toast.info(`Switched to persona: ${boundPersona.name}`)
+              toast.info(t('chatView.switchedPersona', { name: boundPersona.name }))
             }
             autoSwitchedPersonaIdRef.current = resolvedBinding.personaId
 
@@ -471,7 +477,7 @@ export default function ChatView() {
           if (resolved.loadout && !cancelled) {
             const { applyLoadout } = useStore.getState()
             await applyLoadout(resolved.loadout.id)
-            toast.info(`Applied loadout: ${resolved.loadout.name}`)
+            toast.info(t('chatView.appliedLoadout', { name: resolved.loadout.name }))
           }
         } catch { /* no loadout binding — that's fine */ }
 
@@ -701,7 +707,7 @@ export default function ChatView() {
               type="button"
               className={clsx(styles.portraitTab, styles.portraitTabLeft, portraitPanelOpen && styles.portraitTabActive)}
               onClick={togglePortraitPanel}
-              aria-label="Toggle portrait panel"
+              aria-label={t('chatView.togglePortraitPanel')}
             >
               <UserRound size={14} />
             </button>
@@ -745,7 +751,7 @@ export default function ChatView() {
                 type="button"
                 className={clsx(styles.toolbarBtn, messageSelectMode && styles.toolbarBtnActive)}
                 onClick={toggleSelectMode}
-                title={messageSelectMode ? 'Exit selection mode' : 'Select messages'}
+                title={messageSelectMode ? t('chatView.exitSelectionMode') : t('chatView.selectMessages')}
               >
                 <ListChecks size={14} />
               </button>
@@ -764,7 +770,7 @@ export default function ChatView() {
               type="button"
               className={clsx(styles.portraitTab, styles.portraitTabRight, portraitPanelOpen && styles.portraitTabActive)}
               onClick={togglePortraitPanel}
-              aria-label="Toggle portrait panel"
+              aria-label={t('chatView.togglePortraitPanel')}
             >
               <UserRound size={14} />
             </button>

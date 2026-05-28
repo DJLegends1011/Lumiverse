@@ -1,8 +1,10 @@
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { Users, Trash2, MessageSquarePlus } from 'lucide-react'
 import { chatsApi } from '@/api/chats'
 import { getCharacterAvatarThumbUrlById } from '@/lib/avatarUrls'
+import { formatRelativeTime } from '@/lib/formatRelativeTime'
 import { useStore } from '@/store'
 import LazyImage from '@/components/shared/LazyImage'
 import ConfirmationModal from '@/components/shared/ConfirmationModal'
@@ -13,19 +15,6 @@ import { Spinner } from '@/components/shared/Spinner'
 import type { CharacterViewMode } from '@/types/store'
 import styles from './GroupChatsPanel.module.css'
 import clsx from 'clsx'
-
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now()
-  const diff = now - timestamp * 1000
-  const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return 'Just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days}d ago`
-  return new Date(timestamp * 1000).toLocaleDateString()
-}
 
 function MosaicThumb({ charIds, size = 'small' }: { charIds: string[]; size?: 'small' | 'large' }) {
   const characters = useStore((s) => s.characters)
@@ -69,6 +58,7 @@ interface GroupChatsPanelProps {
 }
 
 export default function GroupChatsPanel({ viewMode }: GroupChatsPanelProps) {
+  const { t } = useTranslation('panels')
   const navigate = useNavigate()
   const openModal = useStore((s) => s.openModal)
   const searchQuery = useStore((s) => s.searchQuery)
@@ -91,7 +81,7 @@ export default function GroupChatsPanel({ viewMode }: GroupChatsPanelProps) {
     return (
       <div className={styles.empty}>
         <Spinner size={20} />
-        <span>Loading group chats...</span>
+        <span>{t('groupChatsPanel.loading')}</span>
       </div>
     )
   }
@@ -101,21 +91,21 @@ export default function GroupChatsPanel({ viewMode }: GroupChatsPanelProps) {
       return (
         <div className={styles.empty}>
           <Users size={32} strokeWidth={1} className={styles.emptyIcon} />
-          <p>No group chats match your search</p>
+          <p>{t('groupChatsPanel.noSearchResults')}</p>
         </div>
       )
     }
     return (
       <div className={styles.empty}>
         <Users size={32} strokeWidth={1} className={styles.emptyIcon} />
-        <p>No group chats yet</p>
+        <p>{t('groupChatsPanel.noGroupChatsYet')}</p>
         <button
           type="button"
           className={styles.createBtn}
           onClick={() => openModal('groupChatCreator')}
         >
           <MessageSquarePlus size={14} />
-          Create Group Chat
+          {t('groupChatsPanel.createGroupChat')}
         </button>
       </div>
     )
@@ -133,7 +123,7 @@ export default function GroupChatsPanel({ viewMode }: GroupChatsPanelProps) {
         {groupChats.map((chat) => {
           const charIds: string[] = chat.group_character_ids ?? []
           const count = charIds.length
-          const displayName = chat.group_name || chat.latest_chat_name || 'Group Chat'
+          const displayName = chat.group_name || chat.latest_chat_name || t('groupChatsPanel.defaultName')
 
           if (isGrid) {
             return (
@@ -164,7 +154,7 @@ export default function GroupChatsPanel({ viewMode }: GroupChatsPanelProps) {
                     e.stopPropagation()
                     setDeleteTarget(chat)
                   }}
-                  aria-label="Delete group chat"
+                  aria-label={t('groupChatsPanel.deleteAria')}
                 >
                   <Trash2 size={12} />
                 </button>
@@ -183,7 +173,7 @@ export default function GroupChatsPanel({ viewMode }: GroupChatsPanelProps) {
               <div className={styles.listCardInfo}>
                 <span className={styles.listCardName}>{displayName}</span>
                 <span className={styles.listCardMeta}>
-                  {count} members &middot; {formatRelativeTime(chat.updated_at)}
+                  {t('groupChatsPanel.memberCount', { count })} &middot; {formatRelativeTime(chat.updated_at)}
                 </span>
               </div>
               <button
@@ -193,7 +183,7 @@ export default function GroupChatsPanel({ viewMode }: GroupChatsPanelProps) {
                   e.stopPropagation()
                   setDeleteTarget(chat)
                 }}
-                aria-label="Delete group chat"
+                aria-label={t('groupChatsPanel.deleteAria')}
               >
                 <Trash2 size={12} />
               </button>
@@ -206,14 +196,16 @@ export default function GroupChatsPanel({ viewMode }: GroupChatsPanelProps) {
         isOpen={!!deleteTarget}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
-        title="Delete Group Chat"
+        title={t('groupChatsPanel.deleteTitle')}
         message={
           deleteTarget
-            ? <>Are you sure you want to delete <strong>&quot;{deleteTarget.group_name || deleteTarget.latest_chat_name || 'Group Chat'}&quot;</strong>?</>
-            : 'Are you sure?'
+            ? t('groupChatsPanel.deleteMessage', {
+                name: deleteTarget.group_name || deleteTarget.latest_chat_name || t('groupChatsPanel.defaultName'),
+              })
+            : t('groupChatsPanel.deleteConfirmFallback')
         }
         variant="danger"
-        confirmText="Delete"
+        confirmText={t('groupChatsPanel.delete')}
         />
       </div>
     </PanelFadeIn>

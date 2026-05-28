@@ -11,6 +11,7 @@ import {
 import { createPortal } from 'react-dom'
 import { ChevronDown, Search } from 'lucide-react'
 import clsx from 'clsx'
+import { useTranslation } from 'react-i18next'
 import styles from './SearchableSelect.module.css'
 
 export interface SearchableSelectOption {
@@ -25,7 +26,6 @@ export interface SearchableSelectOption {
 }
 
 const UNCATEGORIZED_KEY = '__uncategorized__'
-const UNCATEGORIZED_LABEL = 'Uncategorized'
 
 function getGroupKey(opt: SearchableSelectOption): string {
   const trimmed = (opt.group ?? '').trim()
@@ -75,13 +75,15 @@ type CommonProps = {
 type SearchableSelectProps = CommonProps & (SingleModeProps | MultiModeProps)
 
 export default function SearchableSelect(props: SearchableSelectProps) {
+  const { t } = useTranslation('shared', { keyPrefix: 'searchableSelect' })
+
   const {
     options,
-    placeholder = 'Select…',
-    searchPlaceholder = 'Search…',
+    placeholder = t('placeholder'),
+    searchPlaceholder = t('searchPlaceholder'),
     searchThreshold = 8,
-    emptyMessage = 'No options available',
-    noResultsMessage = 'No matches',
+    emptyMessage = t('emptyMessage'),
+    noResultsMessage = t('noResultsMessage'),
     disabled,
     className,
     triggerClassName,
@@ -396,7 +398,7 @@ export default function SearchableSelect(props: SearchableSelectProps) {
             onClick={clearValue}
           >
             <span className={styles.optionCheck}>{props.value === '' ? '✓' : ''}</span>
-            <span className={styles.optionLabel}>{props.clearLabel ?? 'None'}</span>
+            <span className={styles.optionLabel}>{props.clearLabel ?? t('clear')}</span>
           </button>
         )}
         {filtered.length === 0 ? (
@@ -412,7 +414,7 @@ export default function SearchableSelect(props: SearchableSelectProps) {
                 const key = getGroupKey(opt)
                 if (key !== lastGroupKey) {
                   const headerLabel = key === UNCATEGORIZED_KEY
-                    ? UNCATEGORIZED_LABEL
+                    ? t('uncategorized')
                     : (opt.group ?? '').trim()
                   nodes.push(
                     <div

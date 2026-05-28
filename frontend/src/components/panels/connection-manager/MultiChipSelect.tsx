@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { X, ChevronDown } from 'lucide-react'
 import styles from './MultiChipSelect.module.css'
 
@@ -16,6 +17,8 @@ interface MultiChipSelectProps {
 }
 
 export default function MultiChipSelect({ options, selected, onChange, placeholder, loading }: MultiChipSelectProps) {
+  const { t } = useTranslation('panels', { keyPrefix: 'multiChipSelect' })
+  const { t: tc } = useTranslation('common')
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const ref = useRef<HTMLDivElement>(null)
@@ -64,16 +67,16 @@ export default function MultiChipSelect({ options, selected, onChange, placehold
           value={search}
           onChange={(e) => { setSearch(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
-          placeholder={selected.length === 0 ? (placeholder || 'Select...') : ''}
+          placeholder={selected.length === 0 ? (placeholder || t('select')) : ''}
         />
         <ChevronDown size={12} className={styles.chevron} />
       </div>
       {open && (
         <div className={styles.dropdown}>
-          {loading && <div className={styles.dropdownEmpty}>Loading...</div>}
+          {loading && <div className={styles.dropdownEmpty}>{tc('actions.loading')}</div>}
           {!loading && filtered.length === 0 && (
             <div className={styles.dropdownEmpty}>
-              {available.length === 0 ? 'All selected' : 'No matches'}
+              {available.length === 0 ? t('allSelected') : t('noMatches')}
             </div>
           )}
           {!loading && filtered.map((o) => (

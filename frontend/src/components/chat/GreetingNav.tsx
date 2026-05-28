@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MessageCircle } from 'lucide-react'
 import { useStore } from '@/store'
 import { charactersApi } from '@/api/characters'
@@ -15,6 +16,7 @@ interface GreetingNavProps {
 }
 
 export default function GreetingNav({ message, chatId, variant = 'minimal' }: GreetingNavProps) {
+  const { t } = useTranslation('chat')
   const activeCharacterId = useStore((s) => s.activeCharacterId)
   const isGroupChat = useStore((s) => s.isGroupChat)
   const characters = useStore((s) => s.characters)
@@ -23,14 +25,12 @@ export default function GreetingNav({ message, chatId, variant = 'minimal' }: Gr
   const [character, setCharacter] = useState<Character | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
 
-  // In group chats, use the character_id from the message's extra field
   const greetingCharId = isGroupChat
     ? (typeof message.extra?.character_id === 'string' ? message.extra.character_id : activeCharacterId)
     : activeCharacterId
 
   useEffect(() => {
     if (!greetingCharId) return
-    // Try store first, then fetch
     const cached = characters.find((c) => c.id === greetingCharId)
     if (cached) {
       setCharacter(cached)
@@ -62,7 +62,6 @@ export default function GreetingNav({ message, chatId, variant = 'minimal' }: Gr
       }
       setPickerOpen(false)
 
-      // Let the modal unmount before scrolling so the greeting isn't obscured.
       requestAnimationFrame(() => {
         const el = document.querySelector(`[data-message-id="${message.id}"]`)
         if (el) {
@@ -70,8 +69,6 @@ export default function GreetingNav({ message, chatId, variant = 'minimal' }: Gr
         }
         setHighlightedMessageId(message.id)
         window.setTimeout(() => {
-          // Only clear if we're still the highlighted one — avoid stomping
-          // a newer highlight target.
           const current = useStore.getState().highlightedMessageId
           if (current === message.id) setHighlightedMessageId(null)
         }, 1700)
@@ -88,10 +85,10 @@ export default function GreetingNav({ message, chatId, variant = 'minimal' }: Gr
         type="button"
         className={clsx(styles.indicator, variant === 'bubble' && styles.indicatorBubble)}
         onClick={() => setPickerOpen(true)}
-        title="Browse alternate greetings"
+        title={t('greetingNav.browseGreetings')}
       >
         <MessageCircle size={13} />
-        <span>Greetings</span>
+        <span>{t('greetingNav.label')}</span>
         <span className={styles.badge}>{greetingCount}</span>
       </button>
 

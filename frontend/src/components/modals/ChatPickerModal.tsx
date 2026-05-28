@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'motion/react'
+import { formatRelativeTime } from '@/lib/formatRelativeTime'
 import { Check, MessageSquare, Plus, MoreHorizontal, Pencil, Download, Trash2, Sparkles } from 'lucide-react'
 import ConfirmationModal from '@/components/shared/ConfirmationModal'
 import { CloseButton } from '@/components/shared/CloseButton'
@@ -26,30 +28,22 @@ interface ChatPickerModalProps {
   onDismiss: () => void
 }
 
-function formatChatName(chat: ChatSummary): string {
-  if (chat.name) return chat.name
-  return `Chat ${new Date(chat.created_at * 1000).toLocaleString()}`
-}
-
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now()
-  const diff = now - timestamp * 1000
-  const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return 'Just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days}d ago`
-  return new Date(timestamp * 1000).toLocaleDateString()
-}
-
 export default function ChatPickerModal({
   characterId,
   characterName,
   onSelect,
   onDismiss,
 }: ChatPickerModalProps) {
+  const { t } = useTranslation('modals')
+  const { t: tc } = useTranslation('common')
+
+  const formatChatName = useCallback((chat: ChatSummary) => {
+    if (chat.name) return chat.name
+    return t('chatPicker.unnamedChat', {
+      date: new Date(chat.created_at * 1000).toLocaleString(),
+    })
+  }, [t])
+
   const [items, setItems] = useState<ChatSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null)
@@ -187,7 +181,7 @@ export default function ChatPickerModal({
   const activeMenuItems: ContextMenuEntry[] = activeMenuId ? [
     {
       key: 'rename',
-      label: 'Rename',
+      label: t('chatPicker.menuRename'),
       icon: <Pencil size={14} />,
       onClick: () => {
         const item = items.find((chat) => chat.id === activeMenuId)
@@ -199,7 +193,7 @@ export default function ChatPickerModal({
     },
     {
       key: 'export',
-      label: 'Export',
+      label: t('chatPicker.menuExport'),
       icon: <Download size={14} />,
       onClick: () => {
         const item = items.find((chat) => chat.id === activeMenuId)
@@ -210,7 +204,7 @@ export default function ChatPickerModal({
     },
     {
       key: 'delete',
-      label: 'Delete',
+      label: t('chatPicker.menuDelete'),
       icon: <Trash2 size={14} />,
       danger: true,
       onClick: () => {
@@ -228,14 +222,14 @@ export default function ChatPickerModal({
         <CloseButton onClick={onDismiss} variant="solid" position="absolute" className={styles.closeBtnPos} />
 
         <div className={styles.header}>
-          <h3 className={styles.title}>Resume Chat &middot; {characterName}</h3>
+          <h3 className={styles.title}>{t('chatPicker.title', { name: characterName })}</h3>
           <span className={styles.count}>
             {loading ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <Spinner size={10} /> Loading...
+                <Spinner size={10} /> {t('chatPicker.loading')}
               </span>
             ) : (
-              `${items.length} chats`
+              t('chatPicker.chatCount', { count: items.length })
             )}
           </span>
         </div>
@@ -252,7 +246,7 @@ export default function ChatPickerModal({
               <Plus size={16} strokeWidth={2.5} />
             </div>
             <div className={styles.cardHeader}>
-              <span className={styles.cardLabel}>Start New Chat</span>
+              <span className={styles.cardLabel}>{t('chatPicker.startNewChat')}</span>
             </div>
           </button>
 
@@ -262,14 +256,14 @@ export default function ChatPickerModal({
             className={clsx(styles.card, styles.freshChatCard)}
             onClick={() => handleNewChat({ memoryIsolation: true })}
             disabled={loading}
-            title="Starts a new chat that does not pull in documents or memory from this character's other chats. World books and personality still apply."
+            title={t('freshChatTitle')}
           >
             <div className={styles.freshChatIcon}>
               <Sparkles size={14} strokeWidth={2.5} />
             </div>
             <div className={clsx(styles.cardHeader, styles.freshChatHeader)}>
-              <span className={styles.cardLabel}>Start Fresh Chat</span>
-              <span className={styles.freshChatSubtitle}>No long-term memories from prior chats</span>
+              <span className={styles.cardLabel}>{t('startFreshChat')}</span>
+              <span className={styles.freshChatSubtitle}>{t('freshChatSubtitle')}</span>
             </div>
           </button>
 
@@ -328,7 +322,7 @@ export default function ChatPickerModal({
                     {isActive && !isRenaming && (
                       <span className={styles.activeBadge}>
                         <Check size={10} />
-                        Most Recent
+                        {t('mostRecent')}
                       </span>
                     )}
                   </div>
@@ -345,7 +339,7 @@ export default function ChatPickerModal({
                       }
                       openActiveMenu(item.id, e.currentTarget)
                     }}
-                    title="More options"
+                    title={t('moreOptions')}
                   >
                     <MoreHorizontal size={14} />
                   </button>
@@ -355,10 +349,10 @@ export default function ChatPickerModal({
                   <div className={styles.metaRow}>
                     <span className={styles.metaItem}>
                       <MessageSquare size={12} />
-                      {item.message_count} messages
+                      {t('messageCount', { count: item.message_count })}
                     </span>
                     <span className={styles.metaItem}>
-                      Updated {formatRelativeTime(item.updated_at)}
+                      {t('updated', { time: formatRelativeTime(item.updated_at) })}
                     </span>
                   </div>
                 </div>
@@ -375,11 +369,11 @@ export default function ChatPickerModal({
         isOpen={deleteTarget !== null}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
-        title="Delete Chat"
-        message={`Are you sure you want to delete "${deleteTarget ? formatChatName(deleteTarget) : ''}"? This action cannot be undone.`}
+        title={t('deleteTitle')}
+        message={t('deleteMessage', { name: deleteTarget ? formatChatName(deleteTarget) : '' })}
         variant="danger"
-        confirmText="Delete"
-        cancelText="Cancel"
+        confirmText={tc('actions.delete')}
+        cancelText={tc('actions.cancel')}
       />
     </>
   )

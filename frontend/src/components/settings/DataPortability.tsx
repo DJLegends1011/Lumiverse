@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Download, Upload, X, KeyRound, ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/shared/FormComponents'
 import { wsClient } from '@/ws/client'
@@ -30,6 +31,8 @@ type ImportSummary = ImportJobStatus['summary']
 type FileSummary = ImportJobStatus['fileSummary']
 
 export default function DataPortability() {
+  const { t } = useTranslation('settings')
+  const { t: tc } = useTranslation('common')
   // ── Export state ──────────────────────────────────────────────────────
   const [includeVectors, setIncludeVectors] = useState(true)
   const [includeSecrets, setIncludeSecrets] = useState(false)
@@ -94,7 +97,7 @@ export default function DataPortability() {
           setImportFileSummary(payload.fileSummary)
           setImporting(false)
           setImportProgress(null)
-          setImportSuccess('Import complete')
+          setImportSuccess(t('dataPortability.importComplete'))
         },
       ),
     )
@@ -105,9 +108,9 @@ export default function DataPortability() {
           setImporting(false)
           setImportProgress(null)
           if (payload.cancelled) {
-            setImportError('Import cancelled')
+            setImportError(t('dataPortability.importCancelled'))
           } else {
-            setImportError(payload.error || 'Import failed')
+            setImportError(payload.error || t('dataPortability.importFailed'))
           }
         },
       ),
@@ -115,7 +118,7 @@ export default function DataPortability() {
     return () => {
       for (const u of unsubs) u()
     }
-  }, [])
+  }, [t])
 
   // ── Export action ─────────────────────────────────────────────────────
   const handleExport = async () => {
@@ -125,7 +128,7 @@ export default function DataPortability() {
     setExportProgress({ phase: 'start' })
     const a = downloadAnchorRef.current
     if (!a) {
-      setExportError('Internal: download anchor missing')
+      setExportError(t('dataPortability.exportAnchorMissing'))
       setExporting(false)
       return
     }
@@ -162,7 +165,7 @@ export default function DataPortability() {
       a.href = resp.archiveUrl
       a.click()
     } catch (err: any) {
-      setExportError(err?.body?.error || err?.message || 'Export prepare failed')
+      setExportError(err?.body?.error || err?.message || t('dataPortability.exportPrepareFailed'))
       setExporting(false)
     }
   }
@@ -200,7 +203,7 @@ export default function DataPortability() {
               setImportSummary(status.summary)
               setImportFileSummary(status.fileSummary)
               setImporting(false)
-              setImportSuccess('Import complete')
+              setImportSuccess(t('dataPortability.importComplete'))
             }
           })
           .catch(() => {/* ignore */})
@@ -208,7 +211,7 @@ export default function DataPortability() {
     } catch (err: any) {
       setImporting(false)
       setImportUploadPct(null)
-      setImportError(err?.message || 'Upload failed')
+      setImportError(err?.message || t('dataPortability.uploadFailed'))
     }
   }
 
@@ -223,7 +226,7 @@ export default function DataPortability() {
       try {
         parsed = JSON.parse(text)
       } catch {
-        throw new Error('Ticket file is not valid JSON')
+        throw new Error(t('dataPortability.ticketInvalidJson'))
       }
       const result = await userDataApi.submitTicket(
         awaitingTicket.jobId,
@@ -235,7 +238,7 @@ export default function DataPortability() {
       // Server resolves the gate and emits ticket_accepted via WS, which
       // clears `awaitingTicket` from our progress handler above.
     } catch (err: any) {
-      setImportError(err?.body?.error || err?.message || 'Ticket submission failed')
+      setImportError(err?.body?.error || err?.message || t('dataPortability.ticketSubmitFailed'))
     } finally {
       setTicketSubmitting(false)
     }
@@ -247,7 +250,7 @@ export default function DataPortability() {
     try {
       await userDataApi.skipTicket(awaitingTicket.jobId)
     } catch (err: any) {
-      setImportError(err?.body?.error || err?.message || 'Skip failed')
+      setImportError(err?.body?.error || err?.message || t('dataPortability.skipFailed'))
     } finally {
       setTicketSubmitting(false)
     }
@@ -258,7 +261,7 @@ export default function DataPortability() {
     try {
       await userDataApi.cancelImport(importJobId)
     } catch (err: any) {
-      setImportError(err?.message || 'Cancel failed')
+      setImportError(err?.message || t('dataPortability.cancelFailed'))
     }
   }
 
@@ -266,56 +269,57 @@ export default function DataPortability() {
     if (!exporting || !exportProgress) return ''
     const phase = exportProgress.phase
     if ((phase === 'table' || phase === 'table_start' || phase === 'table_done') && exportProgress.table) {
-      const suffix = typeof exportProgress.processed === 'number' ? ` (${exportProgress.processed})` : ''
-      return `Exporting ${exportProgress.table}${suffix}…`
+      const suffix = typeof exportProgress.processed === 'number'
+        ? t('dataPortability.exportTableSuffix', { processed: exportProgress.processed })
+        : ''
+      return t('dataPortability.exportTable', { table: exportProgress.table, suffix })
     }
     if (phase === 'files' || phase === 'files_done') {
       return exportProgress.total
-        ? `Bundling files… ${exportProgress.processed ?? 0}/${exportProgress.total}`
-        : 'Bundling files…'
+        ? t('dataPortability.exportFilesCount', { done: exportProgress.processed ?? 0, total: exportProgress.total })
+        : t('dataPortability.exportFiles')
     }
     if (phase === 'lancedb_start' || phase === 'lancedb' || phase === 'lancedb_done') {
       return exportProgress.table
-        ? `Bundling vectors (${exportProgress.table})…`
-        : 'Bundling vectors…'
+        ? t('dataPortability.exportVectors', { table: exportProgress.table })
+        : t('dataPortability.exportVectorsGeneric')
     }
-    if (phase === 'complete') return 'Done'
-    return 'Preparing archive…'
-  }, [exporting, exportProgress])
+    if (phase === 'complete') return t('dataPortability.exportDone')
+    return t('dataPortability.exportPreparing')
+  }, [exporting, exportProgress, t])
 
   const importLabel = useMemo(() => {
-    if (importUploadPct !== null && importUploadPct < 100) return `Uploading… ${importUploadPct}%`
+    if (importUploadPct !== null && importUploadPct < 100) return t('dataPortability.uploading', { pct: importUploadPct })
     if (!importing || !importProgress) {
-      // Upload-complete but no progress event has landed yet — verify is in flight.
-      return importUploadPct === 100 ? 'Verifying archive…' : ''
+      return importUploadPct === 100 ? t('dataPortability.verifying') : ''
     }
     const phase = importProgress.phase
-    if (phase === 'verifying') return 'Verifying archive…'
-    if (phase === 'start') return 'Queued — starting import…'
-    if (phase === 'awaiting_ticket') return 'Waiting for decryption ticket…'
-    if (phase === 'ticket_accepted') return 'Ticket accepted — applying secrets…'
-    if (phase === 'ticket_skipped') return 'Skipping API keys — applying rest of archive…'
-    if (phase === 'secrets_apply_start') return 'Restoring API keys…'
-    if (phase === 'secrets_apply_done') return 'API keys restored'
-    if (phase === 'extracted') return 'Archive extracted, applying rows…'
+    if (phase === 'verifying') return t('dataPortability.verifying')
+    if (phase === 'start') return t('dataPortability.importQueued')
+    if (phase === 'awaiting_ticket') return t('dataPortability.awaitingTicket')
+    if (phase === 'ticket_accepted') return t('dataPortability.ticketAccepted')
+    if (phase === 'ticket_skipped') return t('dataPortability.ticketSkipped')
+    if (phase === 'secrets_apply_start') return t('dataPortability.secretsStart')
+    if (phase === 'secrets_apply_done') return t('dataPortability.secretsDone')
+    if (phase === 'extracted') return t('dataPortability.extracted')
     if (phase === 'table' && importProgress.table) {
-      return `Applying ${importProgress.table}…`
+      return t('dataPortability.applyingTable', { table: importProgress.table })
     }
     if (phase === 'table_done' && importProgress.table) {
-      return `Applied ${importProgress.table}`
+      return t('dataPortability.appliedTable', { table: importProgress.table })
     }
     if (phase === 'files') {
       return importProgress.total
-        ? `Restoring files… ${importProgress.processed ?? 0}/${importProgress.total}`
-        : 'Restoring files…'
+        ? t('dataPortability.restoringFilesCount', { done: importProgress.processed ?? 0, total: importProgress.total })
+        : t('dataPortability.restoringFiles')
     }
-    if (phase === 'files_done') return 'Files restored'
+    if (phase === 'files_done') return t('dataPortability.filesRestored')
     if (phase === 'lancedb_table_done' && importProgress.table) {
-      return `Vectors restored for ${importProgress.table}`
+      return t('dataPortability.vectorsRestored', { table: importProgress.table })
     }
-    if (phase === 'lancedb_skipped') return 'Skipping vectors (config mismatch)'
-    return 'Importing…'
-  }, [importing, importProgress, importUploadPct])
+    if (phase === 'lancedb_skipped') return t('dataPortability.vectorsSkipped')
+    return t('dataPortability.importGeneric')
+  }, [importing, importProgress, importUploadPct, t])
 
   // ── Render ────────────────────────────────────────────────────────────
   return (
@@ -324,11 +328,9 @@ export default function DataPortability() {
 
       {/* ── Export ──────────────────────────────────────────────────── */}
       <section className={styles.section}>
-        <h3 className={styles.title}>Export your data</h3>
+        <h3 className={styles.title}>{t('dataPortability.exportTitle')}</h3>
         <p className={styles.description}>
-          Bundle everything you own — characters, chats, world books, personas, presets, memory cortex,
-          databanks, themes, settings, and extension preferences — into a single portable archive (.lvbak).
-          API keys and other secrets are <strong>never</strong> included.
+          {t('dataPortability.exportDesc')}
         </p>
         <label className={styles.checkboxRow}>
           <input
@@ -337,9 +339,7 @@ export default function DataPortability() {
             onChange={(e) => setIncludeVectors(e.target.checked)}
             disabled={exporting}
           />
-          <span>
-            Include vector embeddings (faster import on a matching embedding provider; larger file)
-          </span>
+          <span>{t('dataPortability.includeVectors')}</span>
         </label>
         <label className={styles.checkboxRow}>
           <input
@@ -350,15 +350,12 @@ export default function DataPortability() {
           />
           <span>
             <KeyRound size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-            Include API keys & secrets (downloads a separate decryption ticket)
+            {t('dataPortability.includeSecrets')}
           </span>
         </label>
         {includeSecrets && (
           <div className={styles.warning}>
-            Two files will download: the archive (<code>.lvbak</code>) and a small ticket
-            (<code>.ticket.json</code>). <strong>Keep the ticket separate from the archive</strong>
-             — a password manager is ideal. Without the ticket, the keys cannot be restored. With
-            both files together, anyone who obtains them can read your API keys.
+            {t('dataPortability.secretsWarning')}
           </div>
         )}
         <div className={styles.actions}>
@@ -368,7 +365,7 @@ export default function DataPortability() {
             onClick={handleExport}
             disabled={exporting}
           >
-            {exporting ? 'Preparing…' : 'Download archive'}
+            {exporting ? t('dataPortability.preparing') : t('dataPortability.downloadArchive')}
           </Button>
         </div>
         {exporting && (
@@ -384,25 +381,19 @@ export default function DataPortability() {
         {exportError && <div className={styles.error}>{exportError}</div>}
         {exportWarnings.length > 0 && (
           <div className={styles.warning}>
-            {exportWarnings.length} secret{exportWarnings.length === 1 ? '' : 's'} could not be
-            decrypted on this server and were excluded from the archive. This usually means the
-            row was written by an older identity key or was inserted manually. Affected key
-            {exportWarnings.length === 1 ? '' : 's'}:{' '}
-            <code>{exportWarnings.join(', ')}</code>
+            {t('dataPortability.exportSecretsWarn', { count: exportWarnings.length, keys: exportWarnings.join(', ') })}
           </div>
         )}
       </section>
 
       {/* ── Import ──────────────────────────────────────────────────── */}
       <section className={styles.section}>
-        <h3 className={styles.title}>Import an archive</h3>
+        <h3 className={styles.title}>{t('dataPortability.importTitle')}</h3>
         <p className={styles.description}>
-          Restore a .lvbak archive into this account. Imports merge by ID — your existing data is preserved.
-          You'll need to re-enter API keys after the import, since secrets are never carried in archives.
+          {t('dataPortability.importDesc')}
         </p>
         <div className={styles.warning}>
-          The archive is processed in the background after upload. Don't close this tab until you see the
-          completion summary — but it's safe to keep using Lumiverse while it runs.
+          {t('dataPortability.importWarn')}
         </div>
         <div className={styles.actions}>
           <input
@@ -425,7 +416,7 @@ export default function DataPortability() {
             onClick={handleImport}
             disabled={!file || importing}
           >
-            {importing ? 'Importing…' : 'Upload & import'}
+            {importing ? t('dataPortability.importing') : t('dataPortability.uploadImport')}
           </Button>
           {importing && importJobId && (
             <Button
@@ -433,7 +424,7 @@ export default function DataPortability() {
               icon={<X size={14} />}
               onClick={handleCancelImport}
             >
-              Cancel
+              {tc('actions.cancel')}
             </Button>
           )}
         </div>
@@ -442,8 +433,7 @@ export default function DataPortability() {
             <div className={styles.progressLabel}>
               <span>
                 <ShieldAlert size={13} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-                This archive carries {awaitingTicket.secretsCount} encrypted secret
-                {awaitingTicket.secretsCount === 1 ? '' : 's'}. Upload your ticket file to restore them.
+                {t('dataPortability.ticketPrompt', { count: awaitingTicket.secretsCount })}
               </span>
             </div>
             <div className={styles.actions} style={{ marginTop: 8 }}>
@@ -462,17 +452,19 @@ export default function DataPortability() {
                 onClick={handleSkipTicket}
                 disabled={ticketSubmitting}
               >
-                Skip API keys
+                {t('dataPortability.skipApiKeys')}
               </Button>
             </div>
             {ticketReuseWarning?.wasReused && (
               <div className={styles.warning} style={{ marginTop: 8 }}>
-                Heads up: this ticket has been used {ticketReuseWarning.uses} time
-                {ticketReuseWarning.uses === 1 ? '' : 's'}
-                {ticketReuseWarning.previouslyConsumedAt
-                  ? ` (last used ${new Date(ticketReuseWarning.previouslyConsumedAt * 1000).toLocaleString()})`
-                  : ''}
-                . Proceeding will overwrite any matching API keys on this account.
+                {t('dataPortability.ticketReuse', {
+                  count: ticketReuseWarning.uses,
+                  lastUsed: ticketReuseWarning.previouslyConsumedAt
+                    ? t('dataPortability.ticketLastUsed', {
+                        date: new Date(ticketReuseWarning.previouslyConsumedAt * 1000).toLocaleString(),
+                      })
+                    : '',
+                })}
               </div>
             )}
           </div>
@@ -498,9 +490,9 @@ export default function DataPortability() {
         {importSuccess && <div className={styles.success}>{importSuccess}</div>}
         {importSummary && (
           <div className={styles.summaryTable}>
-            <div className={styles.summaryHead}>Table</div>
-            <div className={styles.summaryHead}>Imported</div>
-            <div className={styles.summaryHead}>Skipped</div>
+            <div className={styles.summaryHead}>{t('dataPortability.summaryTable')}</div>
+            <div className={styles.summaryHead}>{t('dataPortability.summaryImported')}</div>
+            <div className={styles.summaryHead}>{t('dataPortability.summarySkipped')}</div>
             {Object.entries(importSummary)
               .sort(([a], [b]) => a.localeCompare(b))
               .map(([table, counts]) => (
@@ -508,7 +500,7 @@ export default function DataPortability() {
               ))}
             {importFileSummary && Object.keys(importFileSummary).length > 0 && (
               <>
-                <div className={styles.summaryHead} style={{ gridColumn: 'span 3', marginTop: 6 }}>Files</div>
+                <div className={styles.summaryHead} style={{ gridColumn: 'span 3', marginTop: 6 }}>{t('dataPortability.summaryFiles')}</div>
                 {Object.entries(importFileSummary).map(([bucket, count]) => (
                   <FragmentRow key={`file-${bucket}`} table={bucket} imported={count} skipped={0} />
                 ))}

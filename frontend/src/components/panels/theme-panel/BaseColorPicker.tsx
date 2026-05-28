@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { RotateCcw } from 'lucide-react'
 import type { BaseColorKey, BaseColors } from '@/types/theme'
 import { useStore } from '@/store'
@@ -60,16 +61,16 @@ interface ColorDef {
   defaultColor: string
 }
 
-const COLOR_KEYS: ColorDef[] = [
-  { key: 'primary',    label: 'Primary',    defaultColor: '#9370db' },
-  { key: 'secondary',  label: 'Secondary',  defaultColor: '#808080' },
-  { key: 'background', label: 'Background', defaultColor: '#1a1520' },
-  { key: 'text',       label: 'Text',       defaultColor: '#e6e6e6' },
-  { key: 'danger',     label: 'Danger',     defaultColor: '#ef4444' },
-  { key: 'success',    label: 'Success',    defaultColor: '#22c55e' },
-  { key: 'warning',    label: 'Warning',    defaultColor: '#f59e0b' },
-  { key: 'speech',     label: 'Speech',     defaultColor: '#e6e6e6' },
-  { key: 'thoughts',   label: 'Thoughts',   defaultColor: '#c8c8d4' },
+const COLOR_KEY_META: Array<{ key: BaseColorKey; defaultColor: string }> = [
+  { key: 'primary',    defaultColor: '#9370db' },
+  { key: 'secondary',  defaultColor: '#808080' },
+  { key: 'background', defaultColor: '#1a1520' },
+  { key: 'text',       defaultColor: '#e6e6e6' },
+  { key: 'danger',     defaultColor: '#ef4444' },
+  { key: 'success',    defaultColor: '#22c55e' },
+  { key: 'warning',    defaultColor: '#f59e0b' },
+  { key: 'speech',     defaultColor: '#e6e6e6' },
+  { key: 'thoughts',   defaultColor: '#c8c8d4' },
 ]
 
 // Each base color key maps to the CSS variable the theme engine actually
@@ -138,6 +139,14 @@ interface BaseColorPickerProps {
 }
 
 export default function BaseColorPicker({ baseColors, onChange }: BaseColorPickerProps) {
+  const { t } = useTranslation('panels', { keyPrefix: 'themePanel' })
+  const COLOR_KEYS: ColorDef[] = useMemo(
+    () => COLOR_KEY_META.map((meta) => ({
+      ...meta,
+      label: t(`baseColorKeys.${meta.key}`),
+    })),
+    [t],
+  )
   const [activeKey, setActiveKey] = useState<BaseColorKey>('primary')
   const [hexDraft, setHexDraft] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -394,7 +403,7 @@ export default function BaseColorPicker({ baseColors, onChange }: BaseColorPicke
       {/* HEX / RGB inputs */}
       <div className={styles.inputRow}>
         <div className={styles.inputGroup}>
-          <span className={styles.inputLabel}>Hex</span>
+          <span className={styles.inputLabel}>{t('inputHex')}</span>
           <input
             className={styles.inputField}
             value={hexDraft !== null ? hexDraft.toUpperCase() : currentHex.toUpperCase()}
@@ -441,7 +450,7 @@ export default function BaseColorPicker({ baseColors, onChange }: BaseColorPicke
       {/* Action buttons */}
       <div className={styles.actions}>
         <button type="button" className={styles.actionBtn} onClick={handleReset}>
-          <RotateCcw size={12} /> Reset
+          <RotateCcw size={12} /> {t('reset')}
         </button>
       </div>
     </div>

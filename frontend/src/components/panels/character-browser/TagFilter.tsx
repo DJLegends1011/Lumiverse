@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, X } from 'lucide-react'
 import { getTagColor } from '@/lib/tagColors'
 import styles from './TagFilter.module.css'
@@ -22,6 +23,7 @@ export default function TagFilter({
   onToggleTag,
   onClearTags,
 }: TagFilterProps) {
+  const { t } = useTranslation('panels')
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const ref = useRef<HTMLDivElement>(null)
@@ -39,7 +41,7 @@ export default function TagFilter({
   }, [open])
 
   const filtered = search
-    ? allTags.filter((t) => t.tag.toLowerCase().includes(search.toLowerCase()))
+    ? allTags.filter((tagInfo) => tagInfo.tag.toLowerCase().includes(search.toLowerCase()))
     : allTags
 
   if (allTags.length === 0) return <div className={styles.placeholder} />
@@ -51,11 +53,20 @@ export default function TagFilter({
         className={clsx(styles.trigger, selectedTags.length > 0 && styles.triggerActive)}
         onClick={() => setOpen(!open)}
       >
-        <span>Tags{selectedTags.length > 0 ? ` (${selectedTags.length})` : ''}</span>
+        <span>
+          {selectedTags.length > 0
+            ? t('characterBrowser.tagFilter.labelWithCount', { count: selectedTags.length })
+            : t('characterBrowser.tagFilter.label')}
+        </span>
         <ChevronDown size={12} />
       </button>
       {selectedTags.length > 0 && (
-        <button type="button" className={styles.clearBtn} onClick={onClearTags} title="Clear tags">
+        <button
+          type="button"
+          className={styles.clearBtn}
+          onClick={onClearTags}
+          title={t('characterBrowser.tagFilter.clearTags')}
+        >
           <X size={12} />
         </button>
       )}
@@ -64,7 +75,7 @@ export default function TagFilter({
           <input
             type="text"
             className={styles.search}
-            placeholder="Search tags..."
+            placeholder={t('characterBrowser.tagFilter.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoFocus
@@ -91,7 +102,7 @@ export default function TagFilter({
               )
             })}
             {filtered.length === 0 && (
-              <div className={styles.empty}>No tags found</div>
+              <div className={styles.empty}>{t('characterBrowser.tagFilter.noTagsFound')}</div>
             )}
           </div>
         </div>

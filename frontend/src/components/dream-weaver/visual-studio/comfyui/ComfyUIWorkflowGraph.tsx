@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import styles from './ComfyUIWorkflowGraph.module.css'
 import { detectComfyWorkflowJsonFormat } from './workflow-state'
 import {
@@ -132,6 +133,7 @@ export const ComfyUIWorkflowGraph = forwardRef<ComfyUIWorkflowGraphHandle, Comfy
     highlightNodeId,
     onNodeClick,
   }, ref) {
+    const { t } = useTranslation('dreamWeaver')
     const containerRef = useRef<HTMLDivElement>(null)
     const dragStateRef = useRef<{ pointerId: number; x: number; y: number } | null>(null)
     const [viewport, setViewport] = useState<GraphViewport>({ x: GRAPH_PADDING, y: GRAPH_PADDING, scale: 1 })
@@ -234,7 +236,7 @@ export const ComfyUIWorkflowGraph = forwardRef<ComfyUIWorkflowGraphHandle, Comfy
     if (!workflow) {
       return (
         <div className={styles.graphEmpty}>
-          <p>No workflow loaded yet.</p>
+          <p>{t('comfyui.graph.empty')}</p>
         </div>
       )
     }
@@ -365,7 +367,7 @@ export const ComfyUIWorkflowGraph = forwardRef<ComfyUIWorkflowGraphHandle, Comfy
                   <span className={styles.graphNodeType}>{node.nodeType}</span>
                   <strong className={styles.graphNodeTitle}>{node.title}</strong>
                   <span className={styles.graphNodeMeta}>
-                    {isMapped ? 'Mapped' : 'Workflow node'}
+                    {isMapped ? t('comfyui.graph.mapped') : t('comfyui.graph.workflowNode')}
                   </span>
                 </button>
               )

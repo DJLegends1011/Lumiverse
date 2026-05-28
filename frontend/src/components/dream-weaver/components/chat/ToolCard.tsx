@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { ChevronDown, Clock3, Hash, Loader2, Wrench } from "lucide-react";
 import type { DreamWeaverMessage, DreamWeaverToolTokenUsage } from "@/api/dream-weaver-tooling";
 import { ToolCardActions } from "./ToolCardActions";
@@ -15,6 +17,7 @@ interface Props {
 }
 
 export function ToolCard({ message, isLatestInChain, onAccept, onReject, onCancel, onRetry }: Props) {
+  const { t } = useTranslation('dreamWeaver')
   const payload = message.payload as {
     tool: string;
     output: any;
@@ -36,13 +39,13 @@ export function ToolCard({ message, isLatestInChain, onAccept, onReject, onCance
             </span>
             <div>
               <div className={styles.name}>{formatToolName(payload.tool)}</div>
-              <div className={styles.intent}>{getToolIntent(payload.tool)}</div>
+              <div className={styles.intent}>{getToolIntent(t, payload.tool)}</div>
             </div>
           </div>
           <div className={styles.metaGroup}>
-            <span className={styles.status} data-s={status}>{formatStatus(status)}</span>
+            <span className={styles.status} data-s={status}>{formatStatus(t, status)}</span>
             <TokenUsage usage={payload.token_usage} />
-            <span className={styles.metaItem} title="Run time">
+            <span className={styles.metaItem} title={t('chat.toolCard.runTime')}>
               <Clock3 size={12} />
               {payload.duration_ms ? `${(payload.duration_ms / 1000).toFixed(1)}s` : "…"}
             </span>
@@ -57,8 +60,8 @@ export function ToolCard({ message, isLatestInChain, onAccept, onReject, onCance
           </div>
         ) : payload.error ? (
           <div className={styles.errorBox}>
-            <span className={styles.errorLabel}>Tool Error</span>
-            <p>{getToolErrorMessage(payload.error.message)}</p>
+            <span className={styles.errorLabel}>{t('chat.toolCard.toolError')}</span>
+            <p>{getToolErrorMessage(t, payload.error.message)}</p>
           </div>
         ) : (
           <ToolOutput output={payload.output} />
@@ -75,7 +78,7 @@ export function ToolCard({ message, isLatestInChain, onAccept, onReject, onCance
         )}
         {isLatestInChain && status === "running" && (
           <div className={styles.cancelRow}>
-            <button onClick={() => onCancel(message.id)} className={styles.cancelBtn}>Cancel run</button>
+            <button onClick={() => onCancel(message.id)} className={styles.cancelBtn}>{t('chat.toolCard.cancelRun')}</button>
           </div>
         )}
         {nudgeOpen && (
@@ -88,7 +91,7 @@ export function ToolCard({ message, isLatestInChain, onAccept, onReject, onCance
           <details className={styles.runDetails}>
             <summary>
               <ChevronDown size={13} />
-              Run details
+              {t('chat.toolCard.runDetails')}
             </summary>
             <pre className={styles.rawOutput}>{JSON.stringify(payload.output, null, 2)}</pre>
           </details>
@@ -98,8 +101,8 @@ export function ToolCard({ message, isLatestInChain, onAccept, onReject, onCance
   );
 }
 
-function getToolErrorMessage(message: string | undefined): string {
-  if (!message) return "Tool execution failed. Check the connection and try again.";
+function getToolErrorMessage(t: TFunction<'dreamWeaver'>, message: string | undefined): string {
+  if (!message) return t('chat.toolCard.errors.generic');
   if (
     message.startsWith("Choose a ") ||
     message.startsWith("Add source material") ||
@@ -109,47 +112,34 @@ function getToolErrorMessage(message: string | undefined): string {
   ) {
     return message;
   }
-  return "Tool execution failed. Check the connection and try again.";
+  return t('chat.toolCard.errors.generic');
 }
 
 function formatToolName(tool: string): string {
   return tool.replace(/^set_/, "").replace(/^add_/, "add ").replace(/_/g, " ");
 }
 
-function getToolIntent(tool: string): string {
-  switch (tool) {
-    case "set_name": return "Identity";
-    case "set_appearance": return "Visual profile";
-    case "set_personality": return "Behavior";
-    case "set_scenario": return "Situation";
-    case "set_voice_guidance": return "Voice";
-    case "set_first_message": return "Opening message";
-    case "set_greeting": return "Alternate start";
-    case "add_lorebook_entry": return "World memory";
-    case "add_npc": return "World cast";
-    default: return "Tool result";
-  }
+function getToolIntent(t: TFunction<'dreamWeaver'>, tool: string): string {
+  const key = `chat.toolCard.intent.${tool}`
+  const translated = t(key, { defaultValue: '' })
+  return translated || t('chat.toolCard.intent.default')
 }
 
-function formatStatus(status: string): string {
-  switch (status) {
-    case "accepted": return "Applied";
-    case "pending": return "Ready to Review";
-    case "running": return "Running";
-    case "rejected": return "Discarded";
-    case "superseded": return "Replaced";
-    default: return status;
-  }
+function formatStatus(t: TFunction<'dreamWeaver'>, status: string): string {
+  const key = `chat.toolCard.status.${status}`
+  const translated = t(key, { defaultValue: '' })
+  return translated || status;
 }
 
 function TokenUsage({ usage }: { usage?: DreamWeaverToolTokenUsage | null }) {
+  const { t } = useTranslation('dreamWeaver')
   if (!usage) return null;
   return (
     <span className={styles.metaItem} title={`${usage.tokenizer_name} · ${usage.model}`}>
       <Hash size={12} />
-      {formatCount(usage.input_tokens)} in
+      {formatCount(usage.input_tokens)} {t('chat.toolCard.tokens.in')}
       <span className={styles.metaDot} />
-      {formatCount(usage.output_tokens)} out
+      {formatCount(usage.output_tokens)} {t('chat.toolCard.tokens.out')}
       <span className={styles.metaTotal}>{formatCount(usage.total_tokens)}</span>
     </span>
   );
@@ -161,36 +151,38 @@ function formatCount(value: number): string {
 }
 
 function ToolOutput({ output }: { output: any }) {
-  const entries = buildOutputEntries(output);
+  const { t } = useTranslation('dreamWeaver')
+  const entries = buildOutputEntries(t, output);
   return (
     <div className={styles.outputPanel}>
       {entries.map((entry) => (
         <OutputField key={entry.label} label={entry.label} value={entry.value} />
       ))}
-      {renderAppearanceData(output?.appearance_data)}
-      {renderVoiceRules(output?.voice_guidance)}
+      <AppearanceDataSection value={output?.appearance_data} />
+      <VoiceRulesSection value={output?.voice_guidance} />
     </div>
   );
 }
 
-function buildOutputEntries(output: any): Array<{ label: string; value: unknown }> {
+function buildOutputEntries(t: TFunction<'dreamWeaver'>, output: any): Array<{ label: string; value: unknown }> {
   if (!output || typeof output !== "object" || Array.isArray(output)) {
-    return [{ label: "Result", value: output }];
+    return [{ label: t('chat.toolCard.output.result'), value: output }];
   }
 
   const skip = new Set(["appearance_data", "voice_guidance"]);
   return Object.entries(output)
     .filter(([key]) => !skip.has(key))
-    .map(([key, value]) => ({ label: humanizeKey(key), value }));
+    .map(([key, value]) => ({ label: humanizeKey(t, key), value }));
 }
 
-function humanizeKey(key: string): string {
-  if (key === "first_mes") return "First Message";
+function humanizeKey(t: TFunction<'dreamWeaver'>, key: string): string {
+  if (key === "first_mes") return t('chat.toolCard.output.firstMes');
   return key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
 function OutputField({ label, value }: { label: string; value: unknown }) {
-  const text = stringifyValue(value);
+  const { t } = useTranslation('dreamWeaver')
+  const text = stringifyValue(t, value);
   const long = text.length > 360;
 
   return (
@@ -201,7 +193,7 @@ function OutputField({ label, value }: { label: string; value: unknown }) {
       </div>
       {long && (
         <details className={styles.moreDetails}>
-          <summary>Show full {label.toLowerCase()}</summary>
+          <summary>{t('chat.toolCard.output.showFull', { label: label.toLowerCase() })}</summary>
           <div className={styles.fullText}>{text}</div>
         </details>
       )}
@@ -209,24 +201,25 @@ function OutputField({ label, value }: { label: string; value: unknown }) {
   );
 }
 
-function stringifyValue(value: unknown): string {
-  if (value == null) return "Not provided";
-  if (Array.isArray(value)) return value.map((item) => stringifyValue(item)).join(", ");
+function stringifyValue(t: TFunction<'dreamWeaver'>, value: unknown): string {
+  if (value == null) return t('chat.toolCard.output.notProvided');
+  if (Array.isArray(value)) return value.map((item) => stringifyValue(t, item)).join(", ");
   if (typeof value === "object") return JSON.stringify(value, null, 2);
   return String(value);
 }
 
-function renderAppearanceData(value: unknown) {
+function AppearanceDataSection({ value }: { value: unknown }) {
+  const { t } = useTranslation('dreamWeaver')
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const entries = Object.entries(value).filter(([, v]) => v != null && String(v).trim());
   if (entries.length === 0) return null;
   return (
     <section className={styles.field}>
-      <div className={styles.fieldLabel}>Appearance Data</div>
+      <div className={styles.fieldLabel}>{t('chat.toolCard.output.appearanceData')}</div>
       <div className={styles.chipGrid}>
         {entries.slice(0, 16).map(([key, v]) => (
           <span key={key} className={styles.dataChip}>
-            <span>{humanizeKey(key)}</span>
+            <span>{humanizeKey(t, key)}</span>
             {String(v)}
           </span>
         ))}
@@ -235,19 +228,20 @@ function renderAppearanceData(value: unknown) {
   );
 }
 
-function renderVoiceRules(value: unknown) {
+function VoiceRulesSection({ value }: { value: unknown }) {
+  const { t } = useTranslation('dreamWeaver')
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const voice = value as any;
   const rules = voice.rules && typeof voice.rules === "object" ? voice.rules : null;
   if (!rules) return null;
   return (
     <section className={styles.field}>
-      <div className={styles.fieldLabel}>Voice Rules</div>
+      <div className={styles.fieldLabel}>{t('chat.toolCard.output.voiceRules')}</div>
       <div className={styles.ruleGrid}>
         {Object.entries(rules).map(([key, items]) => (
           <div key={key} className={styles.ruleGroup}>
-            <span>{humanizeKey(key)}</span>
-            <p>{Array.isArray(items) && items.length > 0 ? items.join("; ") : "None"}</p>
+            <span>{humanizeKey(t, key)}</span>
+            <p>{Array.isArray(items) && items.length > 0 ? items.join("; ") : t('chat.toolCard.output.none')}</p>
           </div>
         ))}
       </div>

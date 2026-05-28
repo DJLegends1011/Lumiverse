@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, FolderOpen, Plus, Check, X } from 'lucide-react'
 import clsx from 'clsx'
 import styles from './FolderDropdown.module.css'
@@ -17,9 +18,11 @@ export default function FolderDropdown({
   selectedFolder,
   onSelect,
   onCreateFolder,
-  placeholder = 'No folder',
+  placeholder,
   className,
 }: FolderDropdownProps) {
+  const { t } = useTranslation('shared', { keyPrefix: 'folderDropdown' })
+  const resolvedPlaceholder = placeholder ?? t('noFolder')
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
@@ -68,7 +71,7 @@ export default function FolderDropdown({
       >
         <FolderOpen size={12} />
         <span className={clsx(styles.triggerLabel, !selectedFolder && styles.triggerPlaceholder)}>
-          {selectedFolder || placeholder}
+          {selectedFolder || resolvedPlaceholder}
         </span>
         <span className={clsx(styles.triggerChevron, open && styles.triggerChevronOpen)}>
           <ChevronDown size={12} />
@@ -80,7 +83,7 @@ export default function FolderDropdown({
           {folders.length > 5 && (
             <input
               className={styles.searchInput}
-              placeholder="Search folders..."
+              placeholder={t('searchFolders')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               autoFocus
@@ -96,7 +99,7 @@ export default function FolderDropdown({
               setSearch('')
             }}
           >
-            None
+            {t('none')}
           </button>
 
           {filtered.map((folder) => (
@@ -128,7 +131,7 @@ export default function FolderDropdown({
                     setNewName('')
                   }
                 }}
-                placeholder="Folder name..."
+                placeholder={t('folderNamePlaceholder')}
                 maxLength={64}
               />
               <button
@@ -156,7 +159,7 @@ export default function FolderDropdown({
               className={clsx(styles.option, styles.createOption)}
               onClick={() => setCreating(true)}
             >
-              <Plus size={12} /> Create new folder...
+              <Plus size={12} /> {t('createNew')}
             </button>
           )}
         </div>

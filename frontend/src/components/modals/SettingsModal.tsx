@@ -21,6 +21,9 @@ import {
 } from '@dnd-kit/sortable'
 import { uiScaledTransform } from '@/lib/dndUiScale'
 import { CloseButton } from '@/components/shared/CloseButton'
+import LanguageSwitcher from '@/components/shared/LanguageSwitcher'
+import { useTranslation } from 'react-i18next'
+import { translateSettingsField } from '@/lib/i18n/resolveLabel'
 import { Button } from '@/components/shared/FormComponents'
 import NumericInput from '@/components/shared/NumericInput'
 import { Toggle } from '@/components/shared/Toggle'
@@ -59,6 +62,7 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({ onClose }: SettingsModalProps) {
+  const { t: ts } = useTranslation('settings')
   const settingsActiveView = useStore((s) => s.settingsActiveView)
   const user = useStore((s) => s.user)
   const [activeView, setActiveView] = useState(settingsActiveView || 'display')
@@ -82,7 +86,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
         transition={{ duration: 0.15 }}
       >
         <div className={styles.header}>
-          <h2 className={styles.title}>Settings</h2>
+          <h2 className={styles.title}>{ts('title')}</h2>
           <CloseButton onClick={onClose} />
         </div>
 
@@ -98,7 +102,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   onClick={() => setActiveView(tab.id)}
                 >
                   <Icon size={14} />
-                  <span>{tab.shortName}</span>
+                  <span>{translateSettingsField(tab.id, 'shortName', tab.shortName)}</span>
                 </button>
               )
             })}
@@ -123,6 +127,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
 }
 
 function SettingsView({ view }: { view: string }) {
+  const { t } = useTranslation('shared')
   switch (view) {
     case 'account':
       return <AccountSettings />
@@ -167,7 +172,7 @@ function SettingsView({ view }: { view: string }) {
     case 'operator':
       return <OperatorPanel />
     default:
-      return <div className={styles.placeholder}>Select a settings category</div>
+      return <div className={styles.placeholder}>{t('selectCategory')}</div>
   }
 }
 
@@ -176,6 +181,8 @@ function createId(prefix: string) {
 }
 
 function DisplaySettings() {
+  const { t } = useTranslation('settings')
+  const { t: tc } = useTranslation('common')
   const drawerSettings = useStore((s) => s.drawerSettings)
   const modalWidthMode = useStore((s) => s.modalWidthMode)
   const modalMaxWidth = useStore((s) => s.modalMaxWidth)
@@ -197,13 +204,15 @@ function DisplaySettings() {
 
   return (
     <div className={styles.settingsSection}>
-      <h3 className={styles.sectionTitle}>Modal Width</h3>
+      <LanguageSwitcher />
+
+      <h3 className={styles.sectionTitle} style={{ marginTop: 16 }}>{t('display.modalWidth.title')}</h3>
       <p className={styles.helperText}>
-        Constrain the maximum width of all modal dialogs. Affects settings, editors, and other popover panels.
+        {t('display.modalWidth.helper')}
       </p>
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>MODAL WIDTH</label>
+        <label className={styles.fieldLabel}>{t('display.modalWidth.maxWidth')}</label>
         <div className={styles.segmented}>
           {(['full', 'comfortable', 'compact', 'custom'] as const).map((preset) => (
             <button
@@ -212,7 +221,7 @@ function DisplaySettings() {
               className={clsx(styles.segmentedBtn, modalWidthMode === preset && styles.segmentedBtnActive)}
               onClick={() => setSetting('modalWidthMode', preset)}
             >
-              {preset === 'full' ? 'Full' : preset === 'comfortable' ? 'Comfortable' : preset === 'compact' ? 'Compact' : 'Custom'}
+              {t(`display.modalWidth.${preset}`)}
             </button>
           ))}
         </div>
@@ -220,7 +229,7 @@ function DisplaySettings() {
 
       {modalWidthMode === 'custom' && (
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>MAX WIDTH (px)</label>
+          <label className={styles.fieldLabel}>{t('display.modalWidth.maxWidth')}</label>
           <div className={styles.rangeRow}>
             <input
               type="range"
@@ -236,31 +245,31 @@ function DisplaySettings() {
         </div>
       )}
 
-      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>Drawer</h3>
+      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>{t('display.drawer.title')}</h3>
 
       <div className={styles.drawerRow}>
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>DRAWER SIDE</label>
+          <label className={styles.fieldLabel}>{t('display.drawer.side')}</label>
           <div className={styles.segmented}>
             <button
               type="button"
               className={clsx(styles.segmentedBtn, drawerSettings.side === 'left' && styles.segmentedBtnActive)}
               onClick={() => updateDrawer({ side: 'left' })}
             >
-              Left
+              {t('display.drawer.left')}
             </button>
             <button
               type="button"
               className={clsx(styles.segmentedBtn, drawerSettings.side === 'right' && styles.segmentedBtnActive)}
               onClick={() => updateDrawer({ side: 'right' })}
             >
-              Right
+              {t('display.drawer.right')}
             </button>
           </div>
         </div>
 
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>TAB POSITION</label>
+          <label className={styles.fieldLabel}>{t('display.drawer.tabPosition')}</label>
           <div className={styles.rangeRow}>
             <input
               type="range"
@@ -276,21 +285,21 @@ function DisplaySettings() {
       </div>
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>TAB SIZE</label>
+        <label className={styles.fieldLabel}>{t('display.drawer.tabSize')}</label>
         <div className={styles.segmented}>
           <button
             type="button"
             className={clsx(styles.segmentedBtn, drawerSettings.tabSize === 'large' && styles.segmentedBtnActive)}
             onClick={() => updateDrawer({ tabSize: 'large' })}
           >
-            Large
+            {t('display.drawer.tabSizeLarge')}
           </button>
           <button
             type="button"
             className={clsx(styles.segmentedBtn, drawerSettings.tabSize === 'compact' && styles.segmentedBtnActive)}
             onClick={() => updateDrawer({ tabSize: 'compact' })}
           >
-            Compact
+            {t('display.drawer.tabSizeCompact')}
           </button>
         </div>
       </div>
@@ -298,40 +307,40 @@ function DisplaySettings() {
       <Toggle.Checkbox
         checked={drawerSettings.showTabLabels ?? false}
         onChange={(checked) => updateDrawer({ showTabLabels: checked })}
-        label="Show tab labels"
-        hint="Display short names below each tab icon in the sidebar"
+        label={t('display.drawer.showTabLabels')}
+        hint={t('display.drawer.showTabLabelsHint')}
       />
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>PANEL WIDTH</label>
+        <label className={styles.fieldLabel}>{t('display.drawer.panelWidth')}</label>
         <div className={styles.segmented}>
           <button
             type="button"
             className={clsx(styles.segmentedBtn, drawerSettings.panelWidthMode === 'default' && styles.segmentedBtnActive)}
             onClick={() => updateDrawer({ panelWidthMode: 'default' })}
           >
-            Default
+            {t('display.drawer.panelDefault')}
           </button>
           <button
             type="button"
             className={clsx(styles.segmentedBtn, drawerSettings.panelWidthMode === 'stChat' && styles.segmentedBtnActive)}
             onClick={() => updateDrawer({ panelWidthMode: 'stChat' })}
           >
-            ST Chat
+            {t('display.drawer.panelStChat')}
           </button>
           <button
             type="button"
             className={clsx(styles.segmentedBtn, drawerSettings.panelWidthMode === 'custom' && styles.segmentedBtnActive)}
             onClick={() => updateDrawer({ panelWidthMode: 'custom' })}
           >
-            Custom
+            {t('display.drawer.panelCustom')}
           </button>
         </div>
       </div>
 
       {drawerSettings.panelWidthMode === 'custom' && (
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>CUSTOM WIDTH (vw)</label>
+          <label className={styles.fieldLabel}>{t('display.drawer.customWidthVw')}</label>
           <NumericInput
             className={styles.numberInput}
             min={20}
@@ -343,45 +352,45 @@ function DisplaySettings() {
         </div>
       )}
 
-      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>Notifications</h3>
+      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>{t('display.toast.title')}</h3>
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>TOAST POSITION</label>
+        <label className={styles.fieldLabel}>{t('display.toast.position')}</label>
         <div className={styles.segmented}>
           {([
-            ['top-left', 'TL'],
-            ['top', 'Top'],
-            ['top-right', 'TR'],
-            ['bottom-left', 'BL'],
-            ['bottom', 'Bottom'],
-            ['bottom-right', 'BR'],
-          ] as const).map(([value, label]) => (
+            ['top-left', 'tl'],
+            ['top', 'top'],
+            ['top-right', 'tr'],
+            ['bottom-left', 'bl'],
+            ['bottom', 'bottom'],
+            ['bottom-right', 'br'],
+          ] as const).map(([value, key]) => (
             <button
               key={value}
               type="button"
               className={clsx(styles.segmentedBtn, toastPosition === value && styles.segmentedBtnActive)}
               onClick={() => setSetting('toastPosition', value)}
             >
-              {label}
+              {t(`display.toast.${key}`)}
             </button>
           ))}
         </div>
       </div>
 
-      <h3 className={styles.sectionTitle} style={{ marginTop: 8 }}>Chat Heads</h3>
+      <h3 className={styles.sectionTitle} style={{ marginTop: 8 }}>{t('display.chatHeads.title')}</h3>
 
       <Toggle.Checkbox
         checked={chatHeadsEnabled}
         onChange={(checked) => setSetting('chatHeadsEnabled', checked)}
-        label="Show chat heads"
-        hint="Display floating indicators for background generations"
+        label={t('display.chatHeads.show')}
+        hint={t('display.chatHeads.showHint')}
       />
 
       <Toggle.Checkbox
         checked={chatHeadsCompletionSoundEnabled}
         onChange={(checked) => setSetting('chatHeadsCompletionSoundEnabled', checked)}
-        label="Completion sound"
-        hint="Play a ding when a background chat head finishes generating"
+        label={t('display.chatHeads.completionSound')}
+        hint={t('display.chatHeads.completionSoundHint')}
       />
 
       <CompletionSoundUploader
@@ -395,7 +404,7 @@ function DisplaySettings() {
       {chatHeadsEnabled && (
         <>
           <div className={styles.field}>
-            <label className={styles.fieldLabel}>SIZE ({chatHeadsSize}px)</label>
+            <label className={styles.fieldLabel}>{t('display.chatHeads.size', { px: chatHeadsSize })}</label>
             <div className={styles.rangeRow}>
               <input
                 type="range"
@@ -410,7 +419,7 @@ function DisplaySettings() {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.fieldLabel}>LAYOUT</label>
+            <label className={styles.fieldLabel}>{t('display.chatHeads.layout')}</label>
             <div className={styles.segmented}>
               {(['column', 'row'] as const).map((dir) => (
                 <button
@@ -419,14 +428,14 @@ function DisplaySettings() {
                   className={`${styles.segmentedBtn} ${chatHeadsDirection === dir ? styles.segmentedBtnActive : ''}`}
                   onClick={() => setSetting('chatHeadsDirection', dir)}
                 >
-                  {dir === 'column' ? 'Vertical' : 'Horizontal'}
+                  {dir === 'column' ? t('display.chatHeads.vertical') : t('display.chatHeads.horizontal')}
                 </button>
               ))}
             </div>
           </div>
 
           <div className={styles.field}>
-            <label className={styles.fieldLabel}>OPACITY ({Math.round(chatHeadsOpacity * 100)}%)</label>
+            <label className={styles.fieldLabel}>{t('display.chatHeads.opacity', { pct: Math.round(chatHeadsOpacity * 100) })}</label>
             <div className={styles.rangeRow}>
               <input
                 type="range"
@@ -443,33 +452,33 @@ function DisplaySettings() {
         </>
       )}
 
-      <h3 className={styles.sectionTitle} style={{ marginTop: 8 }}>Pagination</h3>
+      <h3 className={styles.sectionTitle} style={{ marginTop: 8 }}>{t('display.landing.title')}</h3>
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>LANDING PAGE LAYOUT</label>
+        <label className={styles.fieldLabel}>{t('display.landing.layout')}</label>
         <div className={styles.segmented}>
           <button
             type="button"
             className={clsx(styles.segmentedBtn, landingPageLayoutMode === 'cards' && styles.segmentedBtnActive)}
             onClick={() => setSetting('landingPageLayoutMode', 'cards')}
           >
-            Cards
+            {t('display.landing.cards')}
           </button>
           <button
             type="button"
             className={clsx(styles.segmentedBtn, landingPageLayoutMode === 'compact' && styles.segmentedBtnActive)}
             onClick={() => setSetting('landingPageLayoutMode', 'compact')}
           >
-            Compact List
+            {t('display.landing.compactList')}
           </button>
         </div>
         <p className={styles.helperText} style={{ marginTop: 8 }}>
-          Switch the landing page between the current card gallery and a denser adaptive list of recent chats.
+          {t('display.landing.layoutHelper')}
         </p>
       </div>
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>LANDING PAGE CHATS PER BATCH</label>
+        <label className={styles.fieldLabel}>{t('display.landing.batchSize')}</label>
         <NumericInput
           className={styles.numberInput}
           min={4}
@@ -500,6 +509,7 @@ interface CompletionSoundUploaderProps {
 const MAX_COMPLETION_SOUND_BYTES = 2 * 1024 * 1024
 
 function CompletionSoundUploader({ disabled, current, onChange, onError, onSuccess }: CompletionSoundUploaderProps) {
+  const { t } = useTranslation('settings')
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [removing, setRemoving] = useState(false)
@@ -507,7 +517,7 @@ function CompletionSoundUploader({ disabled, current, onChange, onError, onSucce
 
   const handleFile = async (file: File) => {
     if (file.size > MAX_COMPLETION_SOUND_BYTES) {
-      onError('Audio file must be 2MB or smaller')
+      onError(t('display.completionSound.fileTooLarge'))
       return
     }
     setUploading(true)
@@ -519,9 +529,9 @@ function CompletionSoundUploader({ disabled, current, onChange, onError, onSucce
         byteSize: meta.byteSize,
         uploadedAt: meta.uploadedAt,
       })
-      onSuccess('Custom completion sound saved')
+      onSuccess(t('display.completionSound.saved'))
     } catch (err: any) {
-      onError(err?.body?.error || err?.message || 'Failed to upload sound')
+      onError(err?.body?.error || err?.message || t('display.completionSound.uploadFailed'))
     } finally {
       setUploading(false)
       if (inputRef.current) inputRef.current.value = ''
@@ -538,13 +548,13 @@ function CompletionSoundUploader({ disabled, current, onChange, onError, onSucce
       if (err?.status === 404) {
         onChange(null)
       } else {
-        onError(err?.body?.error || err?.message || 'Failed to remove sound')
+        onError(err?.body?.error || err?.message || t('display.completionSound.removeFailed'))
         return
       }
     } finally {
       setRemoving(false)
     }
-    onSuccess('Reverted to default sound')
+    onSuccess(t('display.completionSound.reverted'))
   }
 
   const handlePreview = async () => {
@@ -553,14 +563,14 @@ function CompletionSoundUploader({ disabled, current, onChange, onError, onSucce
     try {
       const unlocked = await unlockNotificationAudio()
       if (!unlocked) {
-        onError('Browser blocked audio playback — interact with the page first')
+        onError(t('display.completionSound.blocked'))
         return
       }
       const url = notificationSoundsApi.completionUrl(current.uploadedAt)
       const audio = new Audio(url)
       audio.volume = 0.5
       await audio.play().catch((err) => {
-        onError(err?.message || 'Failed to play sound')
+        onError(err?.message || t('display.completionSound.playFailed'))
       })
     } finally {
       setPreviewing(false)
@@ -587,7 +597,7 @@ function CompletionSoundUploader({ disabled, current, onChange, onError, onSucce
           loading={uploading}
           onClick={() => inputRef.current?.click()}
         >
-          {current ? 'Replace custom sound' : 'Upload custom sound'}
+          {current ? t('display.completionSound.replace') : t('display.completionSound.upload')}
         </Button>
         {current && (
           <>
@@ -597,7 +607,7 @@ function CompletionSoundUploader({ disabled, current, onChange, onError, onSucce
               disabled={disabled || previewing}
               onClick={handlePreview}
             >
-              Preview
+              {t('display.completionSound.preview')}
             </Button>
             <Button
               size="sm"
@@ -606,21 +616,27 @@ function CompletionSoundUploader({ disabled, current, onChange, onError, onSucce
               loading={removing}
               onClick={handleRemove}
             >
-              Use default
+              {t('display.completionSound.useDefault')}
             </Button>
           </>
         )}
       </div>
       <p className={styles.helperText} style={{ marginTop: 6 }}>
         {current
-          ? `Using ${current.filename} (${(current.byteSize / 1024).toFixed(1)} KB, ${current.mimeType})`
-          : 'Upload an MP3, WAV, OGG, AAC or M4A file (max 2MB) to replace the default ding.'}
+          ? t('display.completionSound.usingFile', {
+              filename: current.filename,
+              size: (current.byteSize / 1024).toFixed(1),
+              mime: current.mimeType,
+            })
+          : t('display.completionSound.uploadHint')}
       </p>
     </div>
   )
 }
 
 function ChatSettings() {
+  const { t } = useTranslation('settings')
+  const { t: tc } = useTranslation('common')
   const displayMode = useStore((s) => s.chatSheldDisplayMode)
   const bubbleUserAlign = useStore((s) => s.bubbleUserAlign)
   const bubbleHideAvatarBg = useStore((s) => s.bubbleHideAvatarBg)
@@ -636,10 +652,10 @@ function ChatSettings() {
 
   return (
     <div className={styles.settingsSection}>
-      <h3 className={styles.sectionTitle}>Chat</h3>
+      <h3 className={styles.sectionTitle}>{t('chat.title')}</h3>
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>Display mode</label>
+        <label className={styles.fieldLabel}>{t('chat.displayMode')}</label>
         <div className={styles.displayModeGrid}>
           {/* ── Minimal card ── */}
           <button
@@ -675,7 +691,7 @@ function ChatSettings() {
               </div>
             </div>
             <span className={clsx(styles.displayModeLabel, displayMode === 'minimal' && styles.displayModeLabelActive)}>
-              Minimal
+              {t('chat.minimal')}
             </span>
           </button>
 
@@ -712,7 +728,7 @@ function ChatSettings() {
               </div>
             </div>
             <span className={clsx(styles.displayModeLabel, displayMode === 'bubble' && styles.displayModeLabelActive)}>
-              Bubble
+              {t('chat.bubble')}
             </span>
           </button>
         </div>
@@ -721,7 +737,7 @@ function ChatSettings() {
       {displayMode === 'bubble' && (
         <>
           <div className={styles.field}>
-            <label className={styles.fieldLabel}>User message alignment</label>
+            <label className={styles.fieldLabel}>{t('chat.userAlign')}</label>
             <div className={styles.segmented}>
               {(['left', 'right'] as const).map((align) => (
                 <button
@@ -730,7 +746,7 @@ function ChatSettings() {
                   className={clsx(styles.segmentedBtn, (bubbleUserAlign ?? 'right') === align && styles.segmentedBtnActive)}
                   onClick={() => setSetting('bubbleUserAlign', align)}
                 >
-                  {align === 'left' ? 'Left' : 'Right'}
+                  {align === 'left' ? t('chat.left') : t('chat.right')}
                 </button>
               ))}
             </div>
@@ -739,19 +755,19 @@ function ChatSettings() {
           <Toggle.Checkbox
             checked={!bubbleHideAvatarBg}
             onChange={(checked) => setSetting('bubbleHideAvatarBg', !checked)}
-            label="Show character art in bubble backgrounds"
-            hint="Uses the message avatar as a subtle dissolving background in Bubble mode"
+            label={t('chat.bubbleAvatarBg')}
+            hint={t('chat.bubbleAvatarBgHint')}
           />
         </>
       )}
 
-      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>Chat Width</h3>
+      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>{t('chat.widthTitle')}</h3>
       <p className={styles.helperText}>
-        Constrain the chat message area width. Useful for ultrawide monitors where full-width messages stretch too far.
+        {t('chat.widthHelper')}
       </p>
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>CONTENT WIDTH</label>
+        <label className={styles.fieldLabel}>{t('chat.contentWidth')}</label>
         <div className={styles.segmented}>
           {(['full', 'comfortable', 'compact', 'custom'] as const).map((preset) => (
             <button
@@ -760,7 +776,7 @@ function ChatSettings() {
               className={clsx(styles.segmentedBtn, chatWidthMode === preset && styles.segmentedBtnActive)}
               onClick={() => setSetting('chatWidthMode', preset)}
             >
-              {preset === 'full' ? 'Full' : preset === 'comfortable' ? 'Comfortable' : preset === 'compact' ? 'Compact' : 'Custom'}
+              {t(`display.modalWidth.${preset}`)}
             </button>
           ))}
         </div>
@@ -768,7 +784,7 @@ function ChatSettings() {
 
       {chatWidthMode === 'custom' && (
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>MAX WIDTH (px)</label>
+          <label className={styles.fieldLabel}>{t('chat.maxWidthPx')}</label>
           <div className={styles.rangeRow}>
             <input
               type="range"
@@ -784,13 +800,13 @@ function ChatSettings() {
         </div>
       )}
 
-      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>Messages Per Page</h3>
+      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>{t('chat.messagesPerPageTitle')}</h3>
       <p className={styles.helperText}>
-        How many messages to load at a time. Lower values improve loading speed on slow connections.
+        {t('chat.messagesPerPageHelper')}
       </p>
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>MESSAGES PER PAGE</label>
+        <label className={styles.fieldLabel}>{t('chat.messagesPerPage')}</label>
         <div className={styles.segmented}>
           {[25, 50, 100, 200].map((value) => (
             <button
@@ -807,14 +823,14 @@ function ChatSettings() {
             className={clsx(styles.segmentedBtn, ![25, 50, 100, 200].includes(messagesPerPage ?? 50) && styles.segmentedBtnActive)}
             onClick={() => { if ([25, 50, 100, 200].includes(messagesPerPage ?? 50)) setSetting('messagesPerPage', 75) }}
           >
-            Custom
+            {t('display.modalWidth.custom')}
           </button>
         </div>
       </div>
 
       {![25, 50, 100, 200].includes(messagesPerPage ?? 50) && (
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>CUSTOM VALUE</label>
+          <label className={styles.fieldLabel}>{t('chat.customValue')}</label>
           <div className={styles.rangeRow}>
             <input
               type="range"
@@ -830,55 +846,55 @@ function ChatSettings() {
         </div>
       )}
 
-      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>Input</h3>
+      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>{t('chat.inputTitle')}</h3>
 
       <Toggle.Checkbox
         checked={enterToSend}
         onChange={(checked) => setSetting('chatSheldEnterToSend', checked)}
-        label="Press Enter to send"
+        label={t('chat.enterToSend')}
         hint={enterToSend
-          ? 'Use Shift+Enter for new line'
-          : `Use ${isMac ? 'Cmd' : 'Ctrl'}+Enter to send`}
+          ? t('chat.enterToSendHintOn')
+          : isMac ? t('chat.enterToSendHintOffMac') : t('chat.enterToSendHintOffWin')}
       />
 
       <Toggle.Checkbox
         checked={saveDraftInput}
         onChange={(checked) => setSetting('saveDraftInput', checked)}
-        label="Save draft input"
-        hint="Automatically saves your unsent message so it persists across page refreshes and chat switches"
+        label={t('chat.saveDraft')}
+        hint={t('chat.saveDraftHint')}
       />
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>Portrait panel side</label>
+        <label className={styles.fieldLabel}>{t('chat.portraitSide')}</label>
         <select
           className={styles.select}
           value={portraitPanelSide}
           onChange={(e) => setSetting('portraitPanelSide', e.target.value as 'left' | 'right' | 'none')}
         >
-          <option value="none">None</option>
-          <option value="left">Left</option>
-          <option value="right">Right</option>
+          <option value="none">{t('chat.none')}</option>
+          <option value="left">{t('chat.left')}</option>
+          <option value="right">{t('chat.right')}</option>
         </select>
       </div>
 
-      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>Regeneration Feedback</h3>
+      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>{t('chat.regenTitle')}</h3>
       <p className={styles.helperText}>
-        When enabled, a feedback prompt appears before each regeneration or swipe, letting you guide the next response.
+        {t('chat.regenHelper')}
       </p>
 
       <Toggle.Checkbox
         checked={regenFeedback.enabled}
         onChange={(checked) => setSetting('regenFeedback', { ...regenFeedback, enabled: checked })}
-        label="Prompt for feedback on regenerate"
+        label={t('chat.regenPrompt')}
       />
 
       {regenFeedback.enabled && (
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>Injection position</label>
+          <label className={styles.fieldLabel}>{t('chat.regenPosition')}</label>
           <div className={styles.segmented}>
             {([
-              { value: 'user', label: 'User Message' },
-              { value: 'system', label: 'System Prompt' },
+              { value: 'user', label: t('chat.regenUserMessage') },
+              { value: 'system', label: t('chat.regenSystemPrompt') },
             ] as const).map((opt) => (
               <button
                 key={opt.value}
@@ -892,54 +908,55 @@ function ChatSettings() {
           </div>
           <p className={styles.helperText}>
             {regenFeedback.position === 'user'
-              ? 'Feedback is appended to the last user message as [OOC: ...]'
-              : 'Feedback is appended to the end of the system prompt as [OOC: ...]'}
+              ? t('chat.regenHintUser')
+              : t('chat.regenHintSystem')}
           </p>
         </div>
       )}
 
-      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>Message Info</h3>
+      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>{t('chat.messageInfoTitle')}</h3>
 
       <Toggle.Checkbox
         checked={useStore((s) => s.showMessageTokenCount ?? true)}
         onChange={(checked) => setSetting('showMessageTokenCount', checked)}
-        label="Show token count in message pill"
-        hint="Displays the token count for assistant messages in the timestamp badge below each message"
+        label={t('chat.showTokenCount')}
+        hint={t('chat.showTokenCountHint')}
       />
 
       <Toggle.Checkbox
         checked={useStore((s) => s.messageContextMenuEnabled ?? true)}
         onChange={(checked) => setSetting('messageContextMenuEnabled', checked)}
-        label="Enable right-click / long-press menu on messages"
-        hint="When off, the in-app context menu won't appear — useful on mobile if you'd rather use the OS's native long-press to select and copy text without competing with the in-app menu."
+        label={t('chat.contextMenu')}
+        hint={t('chat.contextMenuHint')}
       />
 
-      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>Swipe Navigation</h3>
+      <h3 className={styles.sectionTitle} style={{ marginTop: 12 }}>{t('chat.swipeTitle')}</h3>
       <p className={styles.helperText}>
-        Navigate message swipes using touch gestures (mobile) or arrow keys (desktop). Hold Shift and hover to target a specific message.
+        {t('chat.swipeHelper')}
       </p>
 
       <Toggle.Checkbox
         checked={useStore((s) => s.swipeGesturesEnabled)}
         onChange={(checked) => setSetting('swipeGesturesEnabled', checked)}
-        label="Enable swipe gestures & keyboard shortcuts"
+        label={t('chat.swipeGestures')}
       />
     </div>
   )
 }
 
 function ExtensionSettingsView() {
+  const { t } = useTranslation('settings')
   const extensions = useStore((s) => s.extensions)
   const frontendCount = extensions.filter((ext) => ext.has_frontend).length
 
   return (
     <div className={styles.settingsSection}>
-      <h3 className={styles.sectionTitle}>Extension Settings</h3>
+      <h3 className={styles.sectionTitle}>{t('extensions.title')}</h3>
       <p className={styles.placeholder}>
-        Installed extensions can expose configuration controls here.
+        {t('extensions.placeholder')}
         {frontendCount > 0
-          ? ` ${frontendCount} extension${frontendCount === 1 ? '' : 's'} can render frontend settings.`
-          : ' No frontend-capable extensions are currently installed.'}
+          ? ` ${t('extensions.frontendCount', { count: frontendCount })}`
+          : ` ${t('extensions.noFrontend')}`}
       </p>
     </div>
   )
@@ -955,10 +972,16 @@ interface SortableGuideRowProps {
 }
 
 function SortableGuideRow({ guide, editing, onToggleEnabled, onToggleEdit, onUpdate, onRemove }: SortableGuideRowProps) {
+  const { t } = useTranslation('settings')
+  const { t: tc } = useTranslation('common')
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: guide.id })
   const style = { transform: uiScaledTransform(transform), transition }
-  const positionLabel = { system: 'System', user_prefix: 'Before message', user_suffix: 'After message' }[guide.position] ?? guide.position
-  const modeLabel = guide.mode === 'oneshot' ? 'One-shot' : 'Persistent'
+  const positionLabel = {
+    system: t('guided.positionSystem'),
+    user_prefix: t('guided.positionBefore'),
+    user_suffix: t('guided.positionAfter'),
+  }[guide.position] ?? guide.position
+  const modeLabel = guide.mode === 'oneshot' ? t('guided.oneshot') : t('guided.persistent')
   return (
     <div
       ref={setNodeRef}
@@ -970,18 +993,18 @@ function SortableGuideRow({ guide, editing, onToggleEnabled, onToggleEdit, onUpd
           {...attributes}
           {...listeners}
           className={styles.dragHandle}
-          title="Drag to reorder"
-          aria-label="Drag to reorder guide"
+          title={t('guided.dragReorder')}
+          aria-label={t('guided.dragAria')}
         >
           <GripVertical size={14} />
         </span>
         <Toggle.Switch checked={guide.enabled} onChange={(v) => onToggleEnabled(guide.id, v)} size="sm" />
         <div className={styles.cardTitleWrap}>
-          <div className={styles.cardTitle}>{guide.name || 'Untitled Guide'}</div>
+          <div className={styles.cardTitle}>{guide.name || t('guided.untitled')}</div>
           <div className={styles.cardMeta}>{modeLabel} · {positionLabel}</div>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => onToggleEdit(guide.id)}>{editing ? 'Done' : 'Edit'}</Button>
-        <Button variant="danger-ghost" size="sm" onClick={() => onRemove(guide.id)}>Delete</Button>
+        <Button variant="ghost" size="sm" onClick={() => onToggleEdit(guide.id)}>{editing ? tc('actions.done') : tc('actions.edit')}</Button>
+        <Button variant="danger-ghost" size="sm" onClick={() => onRemove(guide.id)}>{tc('actions.delete')}</Button>
       </div>
 
       {editing && (
@@ -990,24 +1013,24 @@ function SortableGuideRow({ guide, editing, onToggleEnabled, onToggleEdit, onUpd
             className={styles.select}
             value={guide.name}
             onChange={(e) => onUpdate(guide.id, { name: e.target.value })}
-            placeholder="Guide name"
+            placeholder={t('guided.guideName')}
           />
           <div className={styles.drawerRow}>
             <select className={styles.select} value={guide.position} onChange={(e) => onUpdate(guide.id, { position: e.target.value as GuidedGeneration['position'] })}>
-              <option value="system">System</option>
-              <option value="user_prefix">Before message</option>
-              <option value="user_suffix">After message</option>
+              <option value="system">{t('guided.positionSystem')}</option>
+              <option value="user_prefix">{t('guided.positionBefore')}</option>
+              <option value="user_suffix">{t('guided.positionAfter')}</option>
             </select>
             <select className={styles.select} value={guide.mode} onChange={(e) => onUpdate(guide.id, { mode: e.target.value as GuidedGeneration['mode'] })}>
-              <option value="persistent">Persistent</option>
-              <option value="oneshot">One-shot</option>
+              <option value="persistent">{t('guided.persistent')}</option>
+              <option value="oneshot">{t('guided.oneshot')}</option>
             </select>
           </div>
           <textarea
             className={styles.textarea}
             value={guide.content}
             onChange={(e) => onUpdate(guide.id, { content: e.target.value })}
-            placeholder="Guide prompt content"
+            placeholder={t('guided.guideContent')}
             rows={4}
           />
         </div>
@@ -1017,6 +1040,7 @@ function SortableGuideRow({ guide, editing, onToggleEnabled, onToggleEdit, onUpd
 }
 
 function GuidedGenerationSettings() {
+  const { t } = useTranslation('settings')
   const guides = useStore((s) => s.guidedGenerations)
   const setSetting = useStore((s) => s.setSetting)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -1030,7 +1054,7 @@ function GuidedGenerationSettings() {
   const addGuide = () => {
     const next: GuidedGeneration = {
       id: createId('guide'),
-      name: 'New Guide',
+      name: t('guided.newGuideDefault'),
       content: '',
       position: 'system',
       mode: 'persistent',
@@ -1062,12 +1086,12 @@ function GuidedGenerationSettings() {
   return (
     <div className={styles.settingsSection}>
       <div className={styles.inlineHeader}>
-        <h3 className={styles.sectionTitle}>Guided Generations</h3>
-        <Button size="sm" onClick={addGuide}>New Guide</Button>
+        <h3 className={styles.sectionTitle}>{t('guided.title')}</h3>
+        <Button size="sm" onClick={addGuide}>{t('guided.newGuide')}</Button>
       </div>
-      <p className={styles.placeholder}>Attach reusable prompts as system content or user prefixes/suffixes. Drag the handle to reorder.</p>
+      <p className={styles.placeholder}>{t('guided.helper')}</p>
 
-      {guides.length === 0 && <p className={styles.placeholder}>No guides configured yet.</p>}
+      {guides.length === 0 && <p className={styles.placeholder}>{t('guided.empty')}</p>}
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={guides.map((g) => g.id)} strategy={verticalListSortingStrategy}>
@@ -1089,6 +1113,8 @@ function GuidedGenerationSettings() {
 }
 
 function QuickRepliesSettings() {
+  const { t } = useTranslation('settings')
+  const { t: tc } = useTranslation('common')
   const sets = useStore((s) => s.quickReplySets)
   const setSetting = useStore((s) => s.setSetting)
   const [editingSetId, setEditingSetId] = useState<string | null>(null)
@@ -1096,7 +1122,7 @@ function QuickRepliesSettings() {
   const addSet = () => {
     const next: QuickReplySet = {
       id: createId('qrs'),
-      name: 'New Set',
+      name: t('quickReplies.newSetDefault'),
       color: null,
       enabled: true,
       replies: [],
@@ -1119,7 +1145,7 @@ function QuickRepliesSettings() {
       if (s.id !== setId) return s
       return {
         ...s,
-        replies: [...s.replies, { id: createId('qr'), label: 'New Reply', message: '' }],
+        replies: [...s.replies, { id: createId('qr'), label: t('quickReplies.newReplyDefault'), message: '' }],
       }
     }))
   }
@@ -1147,12 +1173,12 @@ function QuickRepliesSettings() {
   return (
     <div className={styles.settingsSection}>
       <div className={styles.inlineHeader}>
-        <h3 className={styles.sectionTitle}>Quick Replies</h3>
-        <Button size="sm" onClick={addSet}>New Set</Button>
+        <h3 className={styles.sectionTitle}>{t('quickReplies.title')}</h3>
+        <Button size="sm" onClick={addSet}>{t('quickReplies.newSet')}</Button>
       </div>
-      <p className={styles.placeholder}>Build your own quick-reply sets for the input bar popover.</p>
+      <p className={styles.placeholder}>{t('quickReplies.helper')}</p>
 
-      {sets.length === 0 && <p className={styles.placeholder}>No quick reply sets configured yet.</p>}
+      {sets.length === 0 && <p className={styles.placeholder}>{t('quickReplies.empty')}</p>}
 
       {sets.map((set) => {
         const editing = editingSetId === set.id
@@ -1161,11 +1187,11 @@ function QuickRepliesSettings() {
             <div className={styles.cardRow}>
               <Toggle.Switch checked={set.enabled} onChange={(v) => updateSet(set.id, { enabled: v })} size="sm" />
               <div className={styles.cardTitleWrap}>
-                <div className={styles.cardTitle}>{set.name || 'Untitled Set'}</div>
-                <div className={styles.cardMeta}>{set.replies.length} {set.replies.length === 1 ? 'reply' : 'replies'}</div>
+                <div className={styles.cardTitle}>{set.name || t('quickReplies.untitled')}</div>
+                <div className={styles.cardMeta}>{t('quickReplies.reply', { count: set.replies.length })}</div>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setEditingSetId(editing ? null : set.id)}>{editing ? 'Done' : 'Edit'}</Button>
-              <Button variant="danger-ghost" size="sm" onClick={() => removeSet(set.id)}>Delete</Button>
+              <Button variant="ghost" size="sm" onClick={() => setEditingSetId(editing ? null : set.id)}>{editing ? tc('actions.done') : tc('actions.edit')}</Button>
+              <Button variant="danger-ghost" size="sm" onClick={() => removeSet(set.id)}>{tc('actions.delete')}</Button>
             </div>
 
             {editing && (
@@ -1174,7 +1200,7 @@ function QuickRepliesSettings() {
                   className={styles.select}
                   value={set.name}
                   onChange={(e) => updateSet(set.id, { name: e.target.value })}
-                  placeholder="Set name"
+                  placeholder={t('quickReplies.setName')}
                 />
 
                 {set.replies.map((reply) => (
@@ -1183,20 +1209,20 @@ function QuickRepliesSettings() {
                       className={styles.select}
                       value={reply.label}
                       onChange={(e) => updateReply(set.id, reply.id, { label: e.target.value })}
-                      placeholder="Label"
+                      placeholder={t('quickReplies.label')}
                     />
                     <textarea
                       className={styles.textarea}
                       value={reply.message}
                       onChange={(e) => updateReply(set.id, reply.id, { message: e.target.value })}
-                      placeholder="Message"
+                      placeholder={t('quickReplies.message')}
                       rows={2}
                     />
-                    <Button variant="danger-ghost" size="sm" onClick={() => removeReply(set.id, reply.id)}>Remove</Button>
+                    <Button variant="danger-ghost" size="sm" onClick={() => removeReply(set.id, reply.id)}>{t('quickReplies.remove')}</Button>
                   </div>
                 ))}
 
-                <Button size="sm" onClick={() => addReply(set.id)}>Add Reply</Button>
+                <Button size="sm" onClick={() => addReply(set.id)}>{t('quickReplies.addReply')}</Button>
               </div>
             )}
           </div>
@@ -1293,6 +1319,7 @@ function parseOverrides(text: string, unit: PoolEditUnit): Record<string, number
 }
 
 function ExtensionPoolSettings() {
+  const { t } = useTranslation('settings')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -1339,7 +1366,7 @@ function ExtensionPoolSettings() {
         setOverviewAdmin(null)
       }
     } catch (err: any) {
-      const msg = err?.body?.error || err?.message || 'Failed to load pool settings'
+      const msg = err?.body?.error || err?.message || t('extensionPools.loadFailed')
       setError(msg)
     } finally {
       if (isRefresh) setRefreshing(false)
@@ -1381,20 +1408,20 @@ function ExtensionPoolSettings() {
     const ttl = Number(reservationTtlMs)
 
     if (!Number.isFinite(global) || global <= 0) {
-      setError('Global max bytes must be a positive number')
+      setError(t('extensionPools.errGlobalMax'))
       return
     }
     if (!Number.isFinite(extDefault) || extDefault <= 0) {
-      setError('Per-extension default max bytes must be a positive number')
+      setError(t('extensionPools.errExtDefault'))
       return
     }
     if (!Number.isFinite(ttl) || ttl <= 0) {
-      setError('Reservation TTL must be a positive number')
+      setError(t('extensionPools.errTtl'))
       return
     }
 
     if (!password.trim()) {
-      setError('Owner password is required to save pool changes')
+      setError(t('extensionPools.errPassword'))
       return
     }
 
@@ -1407,11 +1434,11 @@ function ExtensionPoolSettings() {
         reservationTtlMs: Math.floor(ttl),
         extensionMaxOverrides: parseOverrides(overrideText, poolUnit),
       })
-      setSaveMessage('Pool configuration updated')
+      setSaveMessage(t('extensionPools.saveSuccess'))
       setPassword('')
       await load(true)
     } catch (err: any) {
-      const msg = err?.body?.error || err?.message || 'Failed to save pool settings'
+      const msg = err?.body?.error || err?.message || t('extensionPools.saveFailed')
       setError(msg)
     } finally {
       setSaving(false)
@@ -1458,19 +1485,19 @@ function ExtensionPoolSettings() {
   return (
     <div className={styles.settingsSection}>
       <div className={styles.inlineHeader}>
-        <h3 className={styles.sectionTitle}>Extension Ephemeral Pools</h3>
+        <h3 className={styles.sectionTitle}>{t('extensionPools.title')}</h3>
         <Button
           size="icon"
           onClick={() => load(true)}
           disabled={refreshing || loading}
-          title="Refresh pool data"
-          aria-label="Refresh pool data"
+          title={t('extensionPools.refresh')}
+          aria-label={t('extensionPools.refresh')}
           icon={<RefreshCw size={13} className={refreshing ? spinClass : undefined} />}
         />
       </div>
 
       {loading ? (
-        <p className={styles.placeholder}>Loading extension pool metrics...</p>
+        <p className={styles.placeholder}>{t('extensionPools.loading')}</p>
       ) : (
         <>
           {error && <p className={styles.errorText}>{error}</p>}
@@ -1479,15 +1506,15 @@ function ExtensionPoolSettings() {
           {global && (
             <div className={styles.poolSummaryGrid}>
               <div className={styles.poolSummaryCard}>
-                <span className={styles.fieldLabel}>GLOBAL USED</span>
+                <span className={styles.fieldLabel}>{t('extensionPools.globalUsed')}</span>
                 <strong>{formatBytes(global.usedBytes)}</strong>
               </div>
               <div className={styles.poolSummaryCard}>
-                <span className={styles.fieldLabel}>GLOBAL RESERVED</span>
+                <span className={styles.fieldLabel}>{t('extensionPools.globalReserved')}</span>
                 <strong>{formatBytes(global.reservedBytes)}</strong>
               </div>
               <div className={styles.poolSummaryCard}>
-                <span className={styles.fieldLabel}>GLOBAL AVAILABLE</span>
+                <span className={styles.fieldLabel}>{t('extensionPools.globalAvailable')}</span>
                 <strong>{formatBytes(global.availableBytes)}</strong>
               </div>
             </div>
@@ -1505,17 +1532,21 @@ function ExtensionPoolSettings() {
                     <div>
                       <div className={styles.cardTitle}>{row.name} <span className={styles.poolIdentifier}>({row.identifier})</span></div>
                       <div className={styles.cardMeta}>
-                        {row.enabled ? 'Enabled' : 'Disabled'} • {row.hasEphemeralPermission ? 'ephemeral permission granted' : 'no ephemeral permission'}
+                        {row.enabled ? t('extensionPools.enabled') : t('extensionPools.disabled')} • {row.hasEphemeralPermission ? t('extensionPools.ephemeralGranted') : t('extensionPools.noEphemeral')}
                       </div>
                     </div>
                     <div className={styles.poolNumbers}>
-                      {formatBytes(row.usedBytes)} used + {formatBytes(row.reservedBytes)} reserved / {formatBytes(row.extensionMaxBytes)}
+                      {t('extensionPools.poolUsage', {
+                        used: formatBytes(row.usedBytes),
+                        reserved: formatBytes(row.reservedBytes),
+                        max: formatBytes(row.extensionMaxBytes),
+                      })}
                     </div>
                   </div>
                   <div className={styles.poolBar}>
                     <div className={styles.poolBarFill} style={{ width: `${usedPct}%` }} />
                   </div>
-                  <div className={styles.cardMeta}>Files: {row.fileCount} • Available: {formatBytes(row.availableBytes)}</div>
+                  <div className={styles.cardMeta}>{t('extensionPools.filesAvailable', { count: row.fileCount, available: formatBytes(row.availableBytes) })}</div>
                 </div>
               )
             })}
@@ -1523,54 +1554,54 @@ function ExtensionPoolSettings() {
 
           {canEditPools && (
             <div className={styles.adminPoolSection}>
-              <h4 className={styles.subsectionTitle}>Pool Configuration</h4>
+              <h4 className={styles.subsectionTitle}>{t('extensionPools.poolConfig')}</h4>
               <div className={styles.field}>
-                <label className={styles.fieldLabel}>EDIT SIZE UNIT</label>
+                <label className={styles.fieldLabel}>{t('extensionPools.editUnit')}</label>
                 <div className={styles.segmented}>
-                  <button type="button" className={clsx(styles.segmentedBtn, poolUnit === 'bytes' && styles.segmentedBtnActive)} onClick={() => changePoolUnit('bytes')}>Bytes</button>
-                  <button type="button" className={clsx(styles.segmentedBtn, poolUnit === 'mb' && styles.segmentedBtnActive)} onClick={() => changePoolUnit('mb')}>MB</button>
-                  <button type="button" className={clsx(styles.segmentedBtn, poolUnit === 'gb' && styles.segmentedBtnActive)} onClick={() => changePoolUnit('gb')}>GB</button>
+                  <button type="button" className={clsx(styles.segmentedBtn, poolUnit === 'bytes' && styles.segmentedBtnActive)} onClick={() => changePoolUnit('bytes')}>{t('extensionPools.unitBytes')}</button>
+                  <button type="button" className={clsx(styles.segmentedBtn, poolUnit === 'mb' && styles.segmentedBtnActive)} onClick={() => changePoolUnit('mb')}>{t('extensionPools.unitMb')}</button>
+                  <button type="button" className={clsx(styles.segmentedBtn, poolUnit === 'gb' && styles.segmentedBtnActive)} onClick={() => changePoolUnit('gb')}>{t('extensionPools.unitGb')}</button>
                 </div>
               </div>
               <div className={styles.field}>
-                <label className={styles.fieldLabel}>GLOBAL MAX ({poolUnit.toUpperCase()})</label>
+                <label className={styles.fieldLabel}>{t('extensionPools.globalMax', { unit: poolUnit.toUpperCase() })}</label>
                 <input className={styles.numberInput} type="number" min={1} value={globalMaxBytes} onChange={(e) => setGlobalMaxBytes(e.target.value)} />
                 <div className={styles.helperText}>
                   {Number.isFinite(globalBytesValue)
-                    ? `${globalBytesValue.toLocaleString()} bytes`
-                    : 'Enter a positive number'}
+                    ? t('extensionPools.bytesHint', { count: globalBytesValue.toLocaleString() })
+                    : t('extensionPools.enterPositive')}
                 </div>
                 {Number.isFinite(globalBytesValue) && Number.isFinite(extensionDefaultBytesValue) && extensionDefaultBytesValue > 0 && (
                   <div className={styles.helperText}>
-                    Fits roughly {approxFullDefaultExtensions} extension(s) at the default cap.
+                    {t('extensionPools.fitsExtensions', { count: approxFullDefaultExtensions })}
                   </div>
                 )}
               </div>
               <div className={styles.field}>
-                <label className={styles.fieldLabel}>PER-EXTENSION DEFAULT MAX ({poolUnit.toUpperCase()})</label>
+                <label className={styles.fieldLabel}>{t('extensionPools.perExtDefault', { unit: poolUnit.toUpperCase() })}</label>
                 <input className={styles.numberInput} type="number" min={1} value={extensionDefaultMaxBytes} onChange={(e) => setExtensionDefaultMaxBytes(e.target.value)} />
                 <div className={styles.helperText}>
                   {Number.isFinite(extensionDefaultBytesValue)
-                    ? `${extensionDefaultBytesValue.toLocaleString()} bytes`
-                    : 'Enter a positive number'}
+                    ? t('extensionPools.bytesHint', { count: extensionDefaultBytesValue.toLocaleString() })
+                    : t('extensionPools.enterPositive')}
                 </div>
                 {hasPoolThresholdWarning && (
                   <div className={styles.warningText}>
-                    Warning: per-extension default exceeds global cap.
+                    {t('extensionPools.warnExceedsGlobal')}
                   </div>
                 )}
               </div>
               <div className={styles.field}>
-                <label className={styles.fieldLabel}>RESERVATION TTL (MS)</label>
+                <label className={styles.fieldLabel}>{t('extensionPools.reservationTtl')}</label>
                 <input className={styles.numberInput} type="number" min={1} value={reservationTtlMs} onChange={(e) => setReservationTtlMs(e.target.value)} />
                 <div className={styles.helperText}>
                   {Number.isFinite(Number(reservationTtlMs)) && Number(reservationTtlMs) > 0
-                    ? `${Math.round(Number(reservationTtlMs) / 1000)} seconds`
-                    : 'Enter a positive number'}
+                    ? t('extensionPools.secondsHint', { count: Math.round(Number(reservationTtlMs) / 1000) })
+                    : t('extensionPools.enterPositive')}
                 </div>
               </div>
               <div className={styles.field}>
-                <label className={styles.fieldLabel}>PER-EXTENSION OVERRIDES (identifier=value per line, optional suffix b/mb/gb)</label>
+                <label className={styles.fieldLabel}>{t('extensionPools.overrides')}</label>
                 <textarea
                   ref={overridesRef}
                   className={styles.textarea}
@@ -1581,7 +1612,7 @@ function ExtensionPoolSettings() {
                 />
                 {overrideValidation.invalidLines.length > 0 && (
                   <div className={styles.warningText}>
-                    Invalid override lines:{' '}
+                    {t('extensionPools.invalidOverrides')}{' '}
                     {overrideValidation.invalidLines.map((x, idx) => (
                       <span key={`${x.line}-${x.reason}`}>
                         {idx > 0 ? ', ' : ''}
@@ -1598,21 +1629,21 @@ function ExtensionPoolSettings() {
                   </div>
                 )}
                 {focusedInvalidLine !== null && (
-                  <div className={styles.helperText}>Focused line {focusedInvalidLine} in overrides editor.</div>
+                  <div className={styles.helperText}>{t('extensionPools.focusedLine', { line: focusedInvalidLine })}</div>
                 )}
               </div>
               <div className={styles.field}>
-                <label className={styles.fieldLabel}>OWNER PASSWORD (required to save)</label>
+                <label className={styles.fieldLabel}>{t('extensionPools.ownerPassword')}</label>
                 <input
                   className={styles.select}
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter owner password"
+                  placeholder={t('extensionPools.ownerPasswordPlaceholder')}
                 />
               </div>
               <Button size="sm" onClick={handleSave} disabled={saving} loading={saving}>
-                {saving ? 'Saving...' : 'Save Pool Config'}
+                {saving ? t('extensionPools.saving') : t('extensionPools.saveConfig')}
               </Button>
             </div>
           )}
@@ -1623,6 +1654,7 @@ function ExtensionPoolSettings() {
 }
 
 function EmbeddingsSettings() {
+  const { t } = useTranslation('settings')
   const WORLD_BOOK_VECTOR_PRESETS: Record<Exclude<WorldBookVectorPresetMode, 'custom'>, Omit<WorldBookVectorSettings, 'presetMode'>> = {
     lean: {
       chunkTargetTokens: 220,
@@ -1701,7 +1733,7 @@ function EmbeddingsSettings() {
       setCfg(next)
       setApiKey('')
     } catch (err: any) {
-      setError(err?.body?.error || err?.message || 'Failed to load embedding settings')
+      setError(err?.body?.error || err?.message || t('embeddings.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -1738,20 +1770,20 @@ function EmbeddingsSettings() {
   useEffect(() => {
     if (!worldBookSettingsLoadedRef.current || !worldBookSettingsDirtyRef.current) return
     if (worldBookSettingsSaveTimerRef.current) clearTimeout(worldBookSettingsSaveTimerRef.current)
-    setWorldBookSettingsStatus('Saving world-book settings...')
+    setWorldBookSettingsStatus(t('embeddings.worldBookSaving'))
     worldBookSettingsSaveTimerRef.current = setTimeout(async () => {
       try {
         await settingsApi.put('worldBookVectorSettings', worldBookSettings)
         worldBookSettingsDirtyRef.current = false
-        setWorldBookSettingsStatus('World-book settings saved')
+        setWorldBookSettingsStatus(t('embeddings.worldBookSaved'))
       } catch (err: any) {
-        setWorldBookSettingsStatus(err?.body?.error || err?.message || 'Failed to save world-book settings')
+        setWorldBookSettingsStatus(err?.body?.error || err?.message || t('embeddings.worldBookSaveFailed'))
       }
     }, 400)
     return () => {
       if (worldBookSettingsSaveTimerRef.current) clearTimeout(worldBookSettingsSaveTimerRef.current)
     }
-  }, [worldBookSettings])
+  }, [worldBookSettings, t])
 
   useEffect(() => {
     setModels([])
@@ -1832,9 +1864,9 @@ function EmbeddingsSettings() {
       })
       setCfg(saved)
       setApiKey('')
-      setSuccess('Embedding settings saved')
+      setSuccess(t('embeddings.saveSuccess'))
     } catch (err: any) {
-      setError(err?.body?.error || err?.message || 'Failed to save embedding settings')
+      setError(err?.body?.error || err?.message || t('embeddings.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -1854,9 +1886,9 @@ function EmbeddingsSettings() {
             inherited: result.config.inherited,
           }
         : result.config)
-      setSuccess(`Embedding test passed. Dimensions set to ${result.applied_dimensions}.`)
+      setSuccess(t('embeddings.testSuccess', { dims: result.applied_dimensions }))
     } catch (err: any) {
-      setError(err?.body?.error || err?.message || 'Embedding test failed')
+      setError(err?.body?.error || err?.message || t('embeddings.testFailed'))
     } finally {
       setTesting(false)
     }
@@ -1884,31 +1916,31 @@ function EmbeddingsSettings() {
   if (loading || !cfg) {
     return (
       <div className={styles.settingsSection}>
-        <h3 className={styles.sectionTitle}>Embeddings</h3>
-        <p className={styles.placeholder}>Loading embedding settings...</p>
+        <h3 className={styles.sectionTitle}>{t('embeddings.title')}</h3>
+        <p className={styles.placeholder}>{t('embeddings.loading')}</p>
       </div>
     )
   }
 
   const setupChecklist = [
     {
-      label: 'Embeddings enabled',
-      description: 'Turns on vector features across Lumiverse.',
+      label: t('embeddings.checkEnabled'),
+      description: t('embeddings.checkEnabledDesc'),
       complete: cfg.enabled,
     },
     {
-      label: 'API key configured',
-      description: 'Lets the app reach your embedding provider.',
+      label: t('embeddings.checkApiKey'),
+      description: t('embeddings.checkApiKeyDesc'),
       complete: cfg.has_api_key,
     },
     {
-      label: 'Embedding dimensions detected',
-      description: 'Run a test once so Lumiverse knows the vector size.',
+      label: t('embeddings.checkDimensions'),
+      description: t('embeddings.checkDimensionsDesc'),
       complete: !!cfg.dimensions,
     },
     {
-      label: 'World-book vectorization enabled',
-      description: 'Allows lorebook entries to be indexed and searched with vectors.',
+      label: t('embeddings.checkWorldBook'),
+      description: t('embeddings.checkWorldBookDesc'),
       complete: cfg.vectorize_world_books,
     },
   ]
@@ -1920,20 +1952,26 @@ function EmbeddingsSettings() {
   const canEditApiUrl = providerAllowsCustomApiUrl(cfg.provider)
   const defaultApiUrl = PROVIDER_DEFAULTS[cfg.provider]?.api_url || cfg.api_url
   const worldBookPresetDescriptions: Record<WorldBookVectorPresetMode, string> = {
-    lean: 'Smaller chunks and lighter storage for compact lorebooks.',
-    balanced: 'Recommended. Better coverage without blowing up index size.',
-    deep: 'More chunks and broader recall for dense reference books.',
-    custom: 'Tune chunking, recall, and storage manually.',
+    lean: t('embeddings.presetLeanDesc'),
+    balanced: t('embeddings.presetBalancedDesc'),
+    deep: t('embeddings.presetDeepDesc'),
+    custom: t('embeddings.presetCustomDesc'),
+  }
+  const worldBookPresetLabels: Record<WorldBookVectorPresetMode, string> = {
+    lean: t('embeddings.presetLean'),
+    balanced: t('embeddings.presetBalanced'),
+    deep: t('embeddings.presetDeep'),
+    custom: t('embeddings.presetCustom'),
   }
 
   return (
     <div className={styles.settingsSection}>
-      <h3 className={styles.sectionTitle}>Embeddings</h3>
-      <p className={styles.placeholder}>Configure vector embeddings for long-term memory retrieval. Vectorizes world books, chat messages, and documents for vector search during generation.</p>
+      <h3 className={styles.sectionTitle}>{t('embeddings.title')}</h3>
+      <p className={styles.placeholder}>{t('embeddings.helper')}</p>
 
       {inherited && (
         <p className={styles.placeholder} style={{ fontStyle: 'normal', padding: '8px 12px', border: '1px solid var(--lumiverse-border-subtle)', borderRadius: 6, background: 'var(--lumiverse-surface-raised)' }}>
-          These embedding settings are managed by the server owner. Your account inherits the shared configuration and uses the owner's API key — you cannot change the provider, model, or key here. Test verifies the inherited connection works for your account.
+          {t('embeddings.inheritedNotice')}
         </p>
       )}
 
@@ -1943,12 +1981,12 @@ function EmbeddingsSettings() {
       <div className={styles.embeddingChecklist}>
         <div className={styles.embeddingChecklistHeader}>
           <div className={styles.embeddingChecklistHeaderCopy}>
-            <div className={styles.embeddingChecklistEyebrow}>Readiness</div>
-            <div className={styles.embeddingChecklistTitle}>Embedding setup</div>
+            <div className={styles.embeddingChecklistEyebrow}>{t('embeddings.readiness')}</div>
+            <div className={styles.embeddingChecklistTitle}>{t('embeddings.setupTitle')}</div>
             <div className={styles.embeddingChecklistSubtitle}>
               {checklistReady
-                ? 'Vector search is ready for world books.'
-                : `${completedChecklistCount} of ${setupChecklist.length} setup steps complete.`}
+                ? t('embeddings.setupReady')
+                : t('embeddings.setupProgress', { done: completedChecklistCount, total: setupChecklist.length })}
             </div>
           </div>
           <div className={styles.embeddingChecklistScore}>
@@ -1956,7 +1994,7 @@ function EmbeddingsSettings() {
               {completedChecklistCount}/{setupChecklist.length}
             </span>
             <span className={styles.embeddingChecklistScoreLabel}>
-              {checklistReady ? 'Ready' : 'In progress'}
+              {checklistReady ? t('embeddings.ready') : t('embeddings.inProgress')}
             </span>
           </div>
         </div>
@@ -1982,7 +2020,7 @@ function EmbeddingsSettings() {
                 <div className={styles.embeddingChecklistItemTop}>
                   <span className={styles.embeddingChecklistItemLabel}>{item.label}</span>
                   <span className={item.complete ? styles.embeddingChecklistDone : styles.embeddingChecklistTodo}>
-                    {item.complete ? 'Ready' : 'Needs attention'}
+                    {item.complete ? t('embeddings.ready') : t('embeddings.needsAttention')}
                   </span>
                 </div>
                 <span className={styles.embeddingChecklistItemDescription}>
@@ -1997,20 +2035,20 @@ function EmbeddingsSettings() {
       <div className={styles.settingsCard}>
         <div className={styles.settingsCardHeader}>
           <div>
-            <div className={styles.subsectionTitle}>Connection</div>
-            <div className={styles.settingsCardTitle}>Provider and model</div>
+            <div className={styles.subsectionTitle}>{t('embeddings.connection')}</div>
+            <div className={styles.settingsCardTitle}>{t('embeddings.providerModel')}</div>
           </div>
         </div>
         <div className={styles.settingsCardBody}>
           <Toggle.Checkbox
             checked={cfg.enabled}
             onChange={(checked) => update({ enabled: checked })}
-            label="Enable embeddings"
+            label={t('embeddings.enable')}
           />
 
           <div className={styles.settingsGridTwo}>
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Provider</label>
+              <label className={styles.fieldLabel}>{t('embeddings.provider')}</label>
               <select className={styles.select} value={cfg.provider} onChange={(e) => update({ provider: e.target.value as EmbeddingConfig['provider'] })} disabled={inherited}>
                 <option value="openai-compatible">OpenAI Compatible</option>
                 <option value="openai">OpenAI</option>
@@ -2022,7 +2060,7 @@ function EmbeddingsSettings() {
             </div>
 
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Embedding Model</label>
+              <label className={styles.fieldLabel}>{t('embeddings.model')}</label>
               <ModelCombobox
                 value={cfg.model}
                 onChange={(value) => update({ model: value })}
@@ -2032,9 +2070,9 @@ function EmbeddingsSettings() {
                 onRefresh={fetchModels}
                 autoRefreshOnFocus
                 refreshKey={`${cfg.provider}:${cfg.api_url}`}
-                placeholder='Search or enter a model'
-                emptyMessage="No models returned for this provider. Enter one manually."
-                browseHint="Click into the field to browse embedding-capable models for this provider, or type one manually."
+                placeholder={t('embeddings.modelPlaceholder')}
+                emptyMessage={t('embeddings.noModels')}
+                browseHint={t('embeddings.browseHint')}
                 disabled={inherited}
               />
             </div>
@@ -2042,27 +2080,27 @@ function EmbeddingsSettings() {
 
           {canEditApiUrl ? (
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>API URL</label>
+              <label className={styles.fieldLabel}>{t('embeddings.apiUrl')}</label>
               <input className={styles.select} value={cfg.api_url} onChange={(e) => update({ api_url: e.target.value })} disabled={inherited} />
               <span className={styles.helperText}>
-                Auto-appends /v1/embeddings to base domains and /embeddings to partial paths. Full paths ending in /embeddings are used as-is.
+                {t('embeddings.apiUrlPathHint')}
               </span>
               {cfg.provider === 'bananabread' && (
                 <span className={styles.helperText}>
-                  BananaBread defaults to `http://localhost:8008/v1/embeddings` and uses its loaded model list from `/v1/models`.
+                  {t('embeddings.bananabreadHint')}
                 </span>
               )}
             </div>
           ) : (
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>API Endpoint</label>
-              <span className={styles.helperText}>Uses the provider default: `{defaultApiUrl}`</span>
+              <label className={styles.fieldLabel}>{t('embeddings.apiEndpoint')}</label>
+              <span className={styles.helperText}>{t('embeddings.apiEndpointDefault', { url: defaultApiUrl })}</span>
             </div>
           )}
 
           <div className={styles.settingsGridTwo}>
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Dimensions (optional)</label>
+              <label className={styles.fieldLabel}>{t('embeddings.dimensionsOptional')}</label>
               <NumericInput
                 className={styles.numberInput}
                 min={1}
@@ -2075,12 +2113,14 @@ function EmbeddingsSettings() {
 
             {!inherited && (
               <div className={styles.field}>
-                <label className={styles.fieldLabel}>API Key {cfg.has_api_key ? '(configured)' : '(not configured)'}</label>
+                <label className={styles.fieldLabel}>
+                  {cfg.has_api_key ? t('embeddings.apiKeyConfigured') : t('embeddings.apiKeyNotConfigured')}
+                </label>
                 <input
                   className={styles.select}
                   type="password"
                   value={apiKey}
-                  placeholder="Paste a new key to replace"
+                  placeholder={t('embeddings.apiKeyPlaceholder')}
                   onChange={(e) => setApiKey(e.target.value)}
                 />
               </div>
@@ -2090,8 +2130,8 @@ function EmbeddingsSettings() {
           <Toggle.Checkbox
             checked={cfg.send_dimensions ?? false}
             onChange={(checked) => update({ send_dimensions: checked })}
-            label="Send dimensions to provider"
-            hint="When enabled, the dimensions value above is included in the embedding API request. Some providers set this automatically from the model and may reject an explicit value."
+            label={t('embeddings.sendDimensions')}
+            hint={t('embeddings.sendDimensionsHint')}
           />
         </div>
       </div>
@@ -2099,19 +2139,19 @@ function EmbeddingsSettings() {
       <div className={styles.settingsCard}>
         <div className={styles.settingsCardHeader}>
           <div>
-            <div className={styles.subsectionTitle}>World Books</div>
-            <div className={styles.settingsCardTitle}>Lorebook indexing and retrieval</div>
-            <div className={styles.settingsCardMeta}>Chunking and storage save automatically for your account.</div>
+            <div className={styles.subsectionTitle}>{t('embeddings.worldBooksEyebrow')}</div>
+            <div className={styles.settingsCardTitle}>{t('embeddings.worldBooksCardTitle')}</div>
+            <div className={styles.settingsCardMeta}>{t('embeddings.worldBooksCardMeta')}</div>
           </div>
           <span className={styles.settingsCardStatus}>
-            {worldBookSettingsLoading ? 'Loading...' : worldBookSettingsStatus ?? 'Ready'}
+            {worldBookSettingsLoading ? t('embeddings.loadingShort') : worldBookSettingsStatus ?? t('embeddings.ready')}
           </span>
         </div>
         <div className={styles.settingsCardBody}>
           <Toggle.Checkbox
             checked={cfg.vectorize_world_books}
             onChange={(checked) => update({ vectorize_world_books: checked })}
-            label="Vectorize world book entries"
+            label={t('embeddings.vectorizeWorldBooks')}
           />
 
           <div className={styles.presetRow}>
@@ -2122,18 +2162,18 @@ function EmbeddingsSettings() {
                 className={clsx(styles.presetBtn, worldBookSettings.presetMode === preset && styles.presetBtnActive)}
                 onClick={() => applyWorldBookPreset(preset)}
               >
-                {preset === 'lean' ? 'Lean' : preset === 'balanced' ? 'Balanced' : preset === 'deep' ? 'Deep' : 'Custom'}
+                {worldBookPresetLabels[preset]}
               </button>
             ))}
           </div>
           <span className={styles.helperText}>
             {worldBookPresetDescriptions[worldBookSettings.presetMode]}
-            {worldBookSettings.presetMode !== 'custom' ? ' Editing any value below switches to Custom.' : ''}
+            {worldBookSettings.presetMode !== 'custom' ? t('embeddings.presetEditSwitch') : ''}
           </span>
 
           <div className={styles.settingsGridCompact}>
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Retrieved Entries</label>
+              <label className={styles.fieldLabel}>{t('embeddings.retrievedEntries')}</label>
               <NumericInput
                 className={styles.numberInput}
                 min={1}
@@ -2144,7 +2184,7 @@ function EmbeddingsSettings() {
               />
             </div>
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Chunk Target Tokens</label>
+              <label className={styles.fieldLabel}>{t('embeddings.chunkTargetTokens')}</label>
               <NumericInput
                 className={styles.numberInput}
                 min={120}
@@ -2156,7 +2196,7 @@ function EmbeddingsSettings() {
               />
             </div>
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Chunk Max Tokens</label>
+              <label className={styles.fieldLabel}>{t('embeddings.chunkMaxTokens')}</label>
               <NumericInput
                 className={styles.numberInput}
                 min={120}
@@ -2168,7 +2208,7 @@ function EmbeddingsSettings() {
               />
             </div>
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Chunk Overlap Tokens</label>
+              <label className={styles.fieldLabel}>{t('embeddings.chunkOverlapTokens')}</label>
               <NumericInput
                 className={styles.numberInput}
                 min={0}
@@ -2180,7 +2220,7 @@ function EmbeddingsSettings() {
               />
             </div>
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Stored Chunks Per Entry</label>
+              <label className={styles.fieldLabel}>{t('embeddings.storedChunksPerEntry')}</label>
               <NumericInput
                 className={styles.numberInput}
                 min={1}
@@ -2195,20 +2235,20 @@ function EmbeddingsSettings() {
 
           <div className={styles.settingsGridTwo}>
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Hybrid Weight Mode</label>
+              <label className={styles.fieldLabel}>{t('embeddings.hybridWeightMode')}</label>
               <select
                 className={styles.select}
                 value={cfg.hybrid_weight_mode}
                 onChange={(e) => update({ hybrid_weight_mode: e.target.value as EmbeddingConfig['hybrid_weight_mode'] })}
               >
-                <option value="keyword_first">Keyword First</option>
-                <option value="balanced">Balanced</option>
-                <option value="vector_first">Vector First</option>
+                <option value="keyword_first">{t('embeddings.keywordFirst')}</option>
+                <option value="balanced">{t('embeddings.hybridBalanced')}</option>
+                <option value="vector_first">{t('embeddings.vectorFirst')}</option>
               </select>
             </div>
 
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Similarity Threshold</label>
+              <label className={styles.fieldLabel}>{t('embeddings.similarityThreshold')}</label>
               <NumericInput
                 className={styles.numberInput}
                 min={0}
@@ -2217,12 +2257,12 @@ function EmbeddingsSettings() {
                 value={cfg.similarity_threshold}
                 onChange={(value) => update({ similarity_threshold: Math.max(0, Math.min(2, value ?? 0)) })}
               />
-              <span className={styles.helperText}>0 disables raw-distance filtering.</span>
+              <span className={styles.helperText}>{t('embeddings.similarityThresholdHint')}</span>
             </div>
           </div>
 
           <div className={styles.field}>
-            <label className={styles.fieldLabel}>World Book Rerank Cutoff</label>
+            <label className={styles.fieldLabel}>{t('embeddings.worldBookRerankCutoff')}</label>
             <NumericInput
               className={styles.numberInput}
               min={0}
@@ -2231,7 +2271,7 @@ function EmbeddingsSettings() {
               value={cfg.rerank_cutoff}
               onChange={(value) => update({ rerank_cutoff: Math.max(0, Math.min(2, value ?? 0)) })}
             />
-            <span className={styles.helperText}>0 disables post-rerank filtering after boosts and penalties are applied.</span>
+            <span className={styles.helperText}>{t('embeddings.rerankCutoffHint')}</span>
           </div>
         </div>
       </div>
@@ -2239,14 +2279,14 @@ function EmbeddingsSettings() {
       <div className={styles.settingsCard}>
         <div className={styles.settingsCardHeader}>
           <div>
-            <div className={styles.subsectionTitle}>Runtime</div>
-            <div className={styles.settingsCardTitle}>Embedding request behavior</div>
+            <div className={styles.subsectionTitle}>{t('embeddings.runtimeEyebrow')}</div>
+            <div className={styles.settingsCardTitle}>{t('embeddings.runtimeTitle')}</div>
           </div>
         </div>
         <div className={styles.settingsCardBody}>
           <div className={styles.settingsGridTwo}>
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Embedding Batch Size</label>
+              <label className={styles.fieldLabel}>{t('embeddings.embeddingBatchSize')}</label>
               <NumericInput
                 className={styles.numberInput}
                 min={1}
@@ -2255,11 +2295,11 @@ function EmbeddingsSettings() {
                 integer
                 onChange={(value) => update({ batch_size: Math.max(1, Math.min(200, value ?? 50)) })}
               />
-              <span className={styles.helperText}>Entries or chunks embedded per request during indexing.</span>
+              <span className={styles.helperText}>{t('embeddings.batchSizeHint')}</span>
             </div>
 
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Request Timeout (seconds)</label>
+              <label className={styles.fieldLabel}>{t('embeddings.requestTimeoutSec')}</label>
               <NumericInput
                 className={styles.numberInput}
                 min={0}
@@ -2269,26 +2309,26 @@ function EmbeddingsSettings() {
                 integer
                 onChange={(value) => update({ request_timeout: Math.max(0, Math.min(300, value ?? 60)) })}
               />
-              <span className={styles.helperText}>0 disables the timeout.</span>
+              <span className={styles.helperText}>{t('embeddings.requestTimeoutHint')}</span>
             </div>
           </div>
 
           <Toggle.Checkbox
             checked={cfg.vectorize_chat_documents}
             onChange={(checked) => update({ vectorize_chat_documents: checked })}
-            label="Vectorize attached chat documents (scaffold)"
+            label={t('embeddings.vectorizeChatDocuments')}
           />
 
           <Toggle.Checkbox
             checked={cfg.vectorize_chat_messages}
             onChange={(checked) => update({ vectorize_chat_messages: checked })}
-            label="Vectorize chat messages (long-term memory)"
+            label={t('embeddings.vectorizeChatMessages')}
           />
 
           {cfg.vectorize_chat_messages && (
             <div className={styles.settingsGridTwo}>
               <div className={styles.field}>
-                <label className={styles.fieldLabel}>Preferred Context Size (messages)</label>
+                <label className={styles.fieldLabel}>{t('embeddings.preferredContextSize')}</label>
                 <NumericInput
                   className={styles.numberInput}
                   min={1}
@@ -2299,15 +2339,15 @@ function EmbeddingsSettings() {
                 />
               </div>
               <div className={styles.field}>
-                <label className={styles.fieldLabel}>Memory Retrieval Mode</label>
+                <label className={styles.fieldLabel}>{t('embeddings.memoryRetrievalMode')}</label>
                 <select
                   className={styles.select}
                   value={cfg.chat_memory_mode}
                   onChange={(e) => update({ chat_memory_mode: e.target.value as EmbeddingConfig['chat_memory_mode'] })}
                 >
-                  <option value="conservative">Conservative - Fewer, high-quality memories</option>
-                  <option value="balanced">Balanced - Standard retrieval (recommended)</option>
-                  <option value="aggressive">Aggressive - More memories, lower threshold</option>
+                  <option value="conservative">{t('embeddings.memoryModeConservative')}</option>
+                  <option value="balanced">{t('embeddings.memoryModeBalanced')}</option>
+                  <option value="aggressive">{t('embeddings.memoryModeAggressive')}</option>
                 </select>
               </div>
             </div>
@@ -2317,16 +2357,14 @@ function EmbeddingsSettings() {
 
       <div className={styles.drawerRow}>
         <Button size="sm" onClick={save} disabled={saving || inherited} loading={saving}>
-          {saving ? 'Saving...' : 'Save Embedding Settings'}
+          {saving ? t('embeddings.saving') : t('embeddings.saveSettings')}
         </Button>
         <Button size="sm" onClick={test} disabled={testing || saving} loading={testing}>
-          {testing ? 'Testing...' : 'Test Embedding API'}
+          {testing ? t('embeddings.testing') : t('embeddings.testApi')}
         </Button>
       </div>
       <p className={styles.placeholder}>
-        {inherited
-          ? 'Testing verifies the inherited embedding connection without changing shared provider settings. World-book chunking and retrieval tuning still save automatically.'
-          : 'Testing auto-detects native model dimensions and applies them to this configuration. World-book chunking and retrieval tuning save automatically.'}
+        {inherited ? t('embeddings.testInheritedHint') : t('embeddings.testHint')}
       </p>
     </div>
   )
@@ -2363,6 +2401,7 @@ const WEB_SEARCH_DEFAULTS: WebSearchSettingsState = {
 }
 
 function WebSearchSettings() {
+  const { t } = useTranslation('settings')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -2418,9 +2457,9 @@ function WebSearchSettings() {
       setCfg(next)
       setEnginesInput(next.engines.join(', '))
       setApiKey('')
-      setSuccess('Web search settings saved')
+      setSuccess(t('webSearch.saveSuccess'))
     } catch (err: any) {
-      setError(err?.body?.error || err?.message || 'Failed to save web search settings')
+      setError(err?.body?.error || err?.message || t('webSearch.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -2434,9 +2473,9 @@ function WebSearchSettings() {
     try {
       const result = await webSearchApi.test(testQuery, buildPayload(), apiKey.trim() || undefined)
       setTestResult(result)
-      setSuccess(`Web search test passed. Retrieved ${result.results.length} results and ${result.documents.length} extracted pages.`)
+      setSuccess(t('webSearch.testSuccess', { results: result.results.length, pages: result.documents.length }))
     } catch (err: any) {
-      setError(err?.body?.error || err?.message || 'Web search test failed')
+      setError(err?.body?.error || err?.message || t('webSearch.testFailed'))
     } finally {
       setTesting(false)
     }
@@ -2445,16 +2484,16 @@ function WebSearchSettings() {
   if (loading) {
     return (
       <div className={styles.settingsSection}>
-        <h3 className={styles.sectionTitle}>Web Search</h3>
-        <p className={styles.placeholder}>Loading web search settings...</p>
+        <h3 className={styles.sectionTitle}>{t('webSearch.title')}</h3>
+        <p className={styles.placeholder}>{t('webSearch.loading')}</p>
       </div>
     )
   }
 
   return (
     <div className={styles.settingsSection}>
-      <h3 className={styles.sectionTitle}>Web Search</h3>
-      <p className={styles.placeholder}>Configure a SearXNG instance for the host-backed council web-search tool. The tool will appear in Council once search is enabled and an API URL is configured.</p>
+      <h3 className={styles.sectionTitle}>{t('webSearch.title')}</h3>
+      <p className={styles.placeholder}>{t('webSearch.helper')}</p>
 
       {error && <p className={styles.errorText}>{error}</p>}
       {success && <p className={styles.successText}>{success}</p>}
@@ -2462,100 +2501,100 @@ function WebSearchSettings() {
       <Toggle.Checkbox
         checked={cfg.enabled}
         onChange={(checked) => update({ enabled: checked })}
-        label="Enable web search"
+        label={t('webSearch.enable')}
       />
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>Provider</label>
+        <label className={styles.fieldLabel}>{t('webSearch.provider')}</label>
         <select className={styles.select} value={cfg.provider} onChange={() => update({ provider: 'searxng' })}>
-          <option value="searxng">SearXNG</option>
+          <option value="searxng">{t('webSearch.providerSearxng')}</option>
         </select>
       </div>
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>API URL</label>
-        <input className={styles.select} value={cfg.apiUrl} onChange={(e) => update({ apiUrl: e.target.value })} placeholder="https://your-searxng.example.com/search" />
+        <label className={styles.fieldLabel}>{t('webSearch.apiUrl')}</label>
+        <input className={styles.select} value={cfg.apiUrl} onChange={(e) => update({ apiUrl: e.target.value })} placeholder={t('webSearch.apiUrlPlaceholder')} />
       </div>
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>API Key {cfg.hasApiKey ? '(configured)' : '(optional)'}</label>
+        <label className={styles.fieldLabel}>{t('webSearch.apiKey')} {cfg.hasApiKey ? t('webSearch.apiKeyConfigured') : t('webSearch.apiKeyOptional')}</label>
         <input
           className={styles.select}
           type="password"
           value={apiKey}
-          placeholder="Paste a new key to replace"
+          placeholder={t('webSearch.apiKeyPlaceholder')}
           onChange={(e) => setApiKey(e.target.value)}
         />
       </div>
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>Engines</label>
-        <input className={styles.select} value={enginesInput} onChange={(e) => setEnginesInput(e.target.value)} placeholder="google, brave, duckduckgo" />
+        <label className={styles.fieldLabel}>{t('webSearch.engines')}</label>
+        <input className={styles.select} value={enginesInput} onChange={(e) => setEnginesInput(e.target.value)} placeholder={t('webSearch.enginesPlaceholder')} />
         <span className={styles.placeholder} style={{ marginTop: '2px', fontSize: 'calc(11px * var(--lumiverse-font-scale, 1))' }}>
-          Optional comma-separated engine allowlist passed through to SearXNG.
+          {t('webSearch.enginesHint')}
         </span>
       </div>
 
       <div className={styles.drawerRow}>
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>Language</label>
-          <input className={styles.select} value={cfg.language} onChange={(e) => update({ language: e.target.value })} placeholder="all or en-US" />
+          <label className={styles.fieldLabel}>{t('webSearch.language')}</label>
+          <input className={styles.select} value={cfg.language} onChange={(e) => update({ language: e.target.value })} placeholder={t('webSearch.languagePlaceholder')} />
         </div>
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>Safe Search</label>
+          <label className={styles.fieldLabel}>{t('webSearch.safeSearch')}</label>
           <select className={styles.select} value={cfg.safeSearch} onChange={(e) => update({ safeSearch: Number(e.target.value) as 0 | 1 | 2 })}>
-            <option value={0}>Off</option>
-            <option value={1}>Moderate</option>
-            <option value={2}>Strict</option>
+            <option value={0}>{t('webSearch.safeOff')}</option>
+            <option value={1}>{t('webSearch.safeModerate')}</option>
+            <option value={2}>{t('webSearch.safeStrict')}</option>
           </select>
         </div>
       </div>
 
       <div className={styles.drawerRow}>
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>Timeout (ms)</label>
+          <label className={styles.fieldLabel}>{t('webSearch.timeout')}</label>
           <NumericInput className={styles.numberInput} min={5000} max={120000} step={1000} value={cfg.requestTimeoutMs} integer onChange={(value) => update({ requestTimeoutMs: Math.max(5000, Math.min(120000, value ?? 15000)) })} />
         </div>
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>Default Results</label>
+          <label className={styles.fieldLabel}>{t('webSearch.defaultResults')}</label>
           <NumericInput className={styles.numberInput} min={1} max={10} value={cfg.defaultResultCount} integer onChange={(value) => update({ defaultResultCount: Math.max(1, Math.min(10, value ?? 3)) })} />
         </div>
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>Max Results</label>
+          <label className={styles.fieldLabel}>{t('webSearch.maxResults')}</label>
           <NumericInput className={styles.numberInput} min={1} max={20} value={cfg.maxResultCount} integer onChange={(value) => update({ maxResultCount: Math.max(1, Math.min(20, value ?? 5)) })} />
         </div>
       </div>
 
       <div className={styles.drawerRow}>
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>Pages to Scrape</label>
+          <label className={styles.fieldLabel}>{t('webSearch.pagesToScrape')}</label>
           <NumericInput className={styles.numberInput} min={1} max={10} value={cfg.maxPagesToScrape} integer onChange={(value) => update({ maxPagesToScrape: Math.max(1, Math.min(10, value ?? 3)) })} />
         </div>
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>Chars per Page</label>
+          <label className={styles.fieldLabel}>{t('webSearch.charsPerPage')}</label>
           <NumericInput className={styles.numberInput} min={500} max={20000} step={250} value={cfg.maxCharsPerPage} integer onChange={(value) => update({ maxCharsPerPage: Math.max(500, Math.min(20000, value ?? 3000)) })} />
         </div>
       </div>
 
       <div className={styles.field}>
-        <label className={styles.fieldLabel}>Test Query</label>
-        <input className={styles.select} value={testQuery} onChange={(e) => setTestQuery(e.target.value)} placeholder="Enter a query to validate this setup" />
+        <label className={styles.fieldLabel}>{t('webSearch.testQuery')}</label>
+        <input className={styles.select} value={testQuery} onChange={(e) => setTestQuery(e.target.value)} placeholder={t('webSearch.testQueryPlaceholder')} />
       </div>
 
       <div className={styles.drawerRow}>
         <Button size="sm" onClick={save} disabled={saving} loading={saving}>
-          {saving ? 'Saving...' : 'Save Web Search Settings'}
+          {saving ? t('webSearch.saving') : t('webSearch.save')}
         </Button>
         <Button size="sm" onClick={test} disabled={testing || saving} loading={testing}>
-          {testing ? 'Testing...' : 'Test Web Search'}
+          {testing ? t('webSearch.testing') : t('webSearch.test')}
         </Button>
       </div>
 
-      <p className={styles.placeholder}>Testing uses the current form values, including any unsaved API key override, so you can validate the instance before saving.</p>
+      <p className={styles.placeholder}>{t('webSearch.testFormHint')}</p>
 
       {testResult && (
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>Preview</label>
+          <label className={styles.fieldLabel}>{t('webSearch.preview')}</label>
           <div className={styles.placeholder} style={{ whiteSpace: 'pre-wrap', padding: '10px 12px', border: '1px solid var(--lumiverse-border-subtle)', borderRadius: 8, background: 'var(--lumiverse-surface-raised)', maxHeight: 280, overflowY: 'auto' }}>
             {testResult.context}
           </div>
@@ -2566,6 +2605,7 @@ function WebSearchSettings() {
 }
 
 function ImageOptimizationSettings() {
+  const { t } = useTranslation('settings')
   const thumbnailSettings = useStore((s) => (s as any).thumbnailSettings as { smallSize?: number, largeSize?: number } | undefined)
   const setSetting = useStore((s) => s.setSetting)
 
@@ -2580,28 +2620,37 @@ function ImageOptimizationSettings() {
     setSetting('thumbnailSettings', { smallSize, largeSize, ...patch })
   }
 
+  const formatRebuildParts = (generated: number, skipped: number, failed: number) => {
+    const parts: string[] = []
+    if (generated > 0) parts.push(t('advanced.rebuildGenerated', { count: generated }))
+    if (skipped > 0) parts.push(t('advanced.rebuildSkipped', { count: skipped }))
+    if (failed > 0) parts.push(t('advanced.rebuildFailedCount', { count: failed }))
+    return parts.join(', ')
+  }
+
   const handleRebuild = async () => {
     if (rebuilding) return
     setRebuilding(true)
-    setRebuildStatus('Starting...')
+    setRebuildStatus(t('advanced.rebuildStarting'))
     setRebuildProgress(null)
     try {
       const result = await imagesApi.rebuildThumbnails({
         onProgress: (p) => {
           setRebuildProgress({ current: p.current, total: p.total })
           const parts = [`${p.current}/${p.total}`]
-          if (p.generated > 0) parts.push(`${p.generated} generated`)
-          if (p.skipped > 0) parts.push(`${p.skipped} skipped`)
-          if (p.failed > 0) parts.push(`${p.failed} failed`)
+          if (p.generated > 0) parts.push(t('advanced.rebuildGenerated', { count: p.generated }))
+          if (p.skipped > 0) parts.push(t('advanced.rebuildSkipped', { count: p.skipped }))
+          if (p.failed > 0) parts.push(t('advanced.rebuildFailedCount', { count: p.failed }))
           setRebuildStatus(parts.join(' \u2022 '))
         },
       })
-      const parts = [`${result.generated} generated`]
-      if (result.skipped > 0) parts.push(`${result.skipped} skipped`)
-      if (result.failed > 0) parts.push(`${result.failed} failed`)
-      setRebuildStatus(`Done — ${parts.join(', ')}`)
+      setRebuildStatus(t('advanced.rebuildDone', {
+        summary: formatRebuildParts(result.generated, result.skipped, result.failed),
+      }))
     } catch (err: any) {
-      setRebuildStatus(`Failed: ${err.message || 'Unknown error'}`)
+      setRebuildStatus(t('advanced.rebuildFailed', {
+        error: err.message || t('advanced.rebuildUnknownError'),
+      }))
     } finally {
       setRebuilding(false)
     }
@@ -2614,12 +2663,12 @@ function ImageOptimizationSettings() {
   return (
     <>
       <p className={styles.placeholder}>
-        Control the resolution of generated thumbnail tiers. Smaller values reduce bandwidth; larger values improve visual quality.
+        {t('advanced.imgOptHelper')}
       </p>
 
       <div className={styles.field}>
         <div className={styles.imgOptSliderHeader}>
-          <label className={styles.fieldLabel}>Small Tier</label>
+          <label className={styles.fieldLabel}>{t('advanced.smallTier')}</label>
           <span className={styles.imgOptSliderValue}>{smallSize}px</span>
         </div>
         <input
@@ -2630,13 +2679,13 @@ function ImageOptimizationSettings() {
           onChange={(e) => update({ smallSize: Number(e.target.value) })}
         />
         <span className={styles.placeholder} style={{ fontSize: 11 }}>
-          Cards, message avatars, and small UI elements. Default: 300px
+          {t('advanced.smallTierHint')}
         </span>
       </div>
 
       <div className={styles.field}>
         <div className={styles.imgOptSliderHeader}>
-          <label className={styles.fieldLabel}>Large Tier</label>
+          <label className={styles.fieldLabel}>{t('advanced.largeTier')}</label>
           <span className={styles.imgOptSliderValue}>{largeSize}px</span>
         </div>
         <input
@@ -2647,15 +2696,15 @@ function ImageOptimizationSettings() {
           onChange={(e) => update({ largeSize: Number(e.target.value) })}
         />
         <span className={styles.placeholder} style={{ fontSize: 11 }}>
-          Portrait panel, character editor, and profile views. Default: 700px
+          {t('advanced.largeTierHint')}
         </span>
       </div>
 
       <div className={styles.imgOptRebuild}>
         <div className={styles.field} style={{ flex: 1 }}>
-          <label className={styles.fieldLabel}>Rebuild Thumbnail Cache</label>
+          <label className={styles.fieldLabel}>{t('advanced.rebuildCache')}</label>
           <span className={styles.placeholder} style={{ fontSize: 11 }}>
-            Regenerate all thumbnails at the current tier sizes.
+            {t('advanced.rebuildCacheHint')}
           </span>
         </div>
         <button
@@ -2665,7 +2714,7 @@ function ImageOptimizationSettings() {
           disabled={rebuilding}
           onClick={handleRebuild}
         >
-          {rebuilding ? 'Rebuilding...' : 'Rebuild Thumbnails'}
+          {rebuilding ? t('advanced.rebuilding') : t('advanced.rebuildThumbnails')}
         </button>
       </div>
       {rebuilding && rebuildProgress && rebuildProgress.total > 0 && (
@@ -2683,6 +2732,7 @@ function ImageOptimizationSettings() {
 }
 
 function AdvancedSettings() {
+  const { t } = useTranslation('settings')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -2698,7 +2748,7 @@ function AdvancedSettings() {
       // Mark as loaded so auto-save doesn't fire on initial load
       setTimeout(() => { loadedRef.current = true }, 50)
     } catch (err: any) {
-      setError(err?.body?.error || err?.message || 'Failed to load chat memory settings')
+      setError(err?.body?.error || err?.message || t('advanced.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -2737,10 +2787,10 @@ function AdvancedSettings() {
       setError(null)
       try {
         await embeddingsApi.updateChatMemorySettings(cfg)
-        setSuccess('Settings saved')
+        setSuccess(t('advanced.saveSuccess'))
         setTimeout(() => setSuccess(null), 1500)
       } catch (err: any) {
-        setError(err?.body?.error || err?.message || 'Failed to save')
+        setError(err?.body?.error || err?.message || t('advanced.saveFailed'))
       } finally {
         setSaving(false)
       }
@@ -2750,17 +2800,17 @@ function AdvancedSettings() {
 
   return (
     <div className={styles.settingsSection}>
-      <h3 className={styles.sectionTitle}>Advanced</h3>
+      <h3 className={styles.sectionTitle}>{t('advanced.title')}</h3>
 
       {/* Image Optimization accordion */}
-      <CollapsibleSection title="Image Optimization" defaultExpanded={false}>
+      <CollapsibleSection title={t('advanced.imageOptimization')} defaultExpanded={false}>
         <ImageOptimizationSettings />
       </CollapsibleSection>
 
       {/* Long-Term Memory accordion */}
-      <CollapsibleSection title="Long-Term Chat Memory" defaultExpanded>
+      <CollapsibleSection title={t('advanced.longTermMemory')} defaultExpanded>
         {loading || !cfg ? (
-          <p className={styles.placeholder}>Loading memory settings...</p>
+          <p className={styles.placeholder}>{t('advanced.loadingMemory')}</p>
         ) : (
           <>
             {error && <p className={styles.errorText}>{error}</p>}
@@ -2769,13 +2819,13 @@ function AdvancedSettings() {
             <Toggle.Checkbox
               checked={cfg.autoWarmup}
               onChange={(checked) => update({ autoWarmup: checked })}
-              label="Warm Long-Term Chat Memory when opening a chat"
-              hint="Opt-in automatic warmup. Manual rebuilds from the chat input bar still work even when this is off."
+              label={t('advanced.warmup')}
+              hint={t('advanced.warmupHint')}
             />
 
             {/* Quick Mode / Manual toggle */}
             <div className={styles.field}>
-              <label className={styles.fieldLabel}>Memory Mode</label>
+              <label className={styles.fieldLabel}>{t('advanced.memoryMode')}</label>
               <div className={styles.segmented}>
                 {(['conservative', 'balanced', 'aggressive', null] as const).map((mode) => (
                   <button
@@ -2784,20 +2834,20 @@ function AdvancedSettings() {
                     className={clsx(styles.segmentedBtn, cfg.quickMode === mode && styles.segmentedBtnActive)}
                     onClick={() => update({ quickMode: mode })}
                   >
-                    {mode === null ? 'Manual' : mode.charAt(0).toUpperCase() + mode.slice(1)}
+                    {mode === null ? t('advanced.manual') : t(`advanced.${mode}`)}
                   </button>
                 ))}
               </div>
               <span className={styles.placeholder} style={{ marginTop: 2, fontSize: 11 }}>
-                Quick presets auto-configure chunking & exclusion. "Manual" unlocks all fields below.
+                {t('advanced.memoryModeHint')}
               </span>
             </div>
 
             {/* Section: Chunking */}
-            <CollapsibleSection title="Chunking" defaultExpanded={false}>
+            <CollapsibleSection title={t('advanced.chunking')} defaultExpanded={false}>
               <div className={styles.memoryGrid}>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Target Tokens</label>
+                  <label className={styles.fieldLabel}>{t('advanced.targetTokens')}</label>
                   <NumericInput
                     className={styles.numberInput}
                     min={200} max={2000}
@@ -2808,7 +2858,7 @@ function AdvancedSettings() {
                   />
                 </div>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Max Tokens</label>
+                  <label className={styles.fieldLabel}>{t('advanced.maxTokens')}</label>
                   <NumericInput
                     className={styles.numberInput}
                     min={400} max={4000}
@@ -2819,7 +2869,7 @@ function AdvancedSettings() {
                   />
                 </div>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Overlap Tokens</label>
+                  <label className={styles.fieldLabel}>{t('advanced.overlapTokens')}</label>
                   <NumericInput
                     className={styles.numberInput}
                     min={0} max={500}
@@ -2830,7 +2880,7 @@ function AdvancedSettings() {
                   />
                 </div>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Max Messages / Chunk</label>
+                  <label className={styles.fieldLabel}>{t('advanced.maxMessagesChunk')}</label>
                   <NumericInput
                     className={styles.numberInput}
                     min={0} max={100}
@@ -2838,10 +2888,10 @@ function AdvancedSettings() {
                     integer
                     onChange={(value) => update({ maxMessagesPerChunk: value ?? 0 })}
                   />
-                  <span className={styles.placeholder} style={{ fontSize: 11 }}>0 = unlimited</span>
+                  <span className={styles.placeholder} style={{ fontSize: 11 }}>{t('advanced.unlimited')}</span>
                 </div>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Time Gap Split (min)</label>
+                  <label className={styles.fieldLabel}>{t('advanced.timeGapSplit')}</label>
                   <NumericInput
                     className={styles.numberInput}
                     min={0} max={1440}
@@ -2849,22 +2899,22 @@ function AdvancedSettings() {
                     integer
                     onChange={(value) => update({ splitOnTimeGapMinutes: value ?? 0 })}
                   />
-                  <span className={styles.placeholder} style={{ fontSize: 11 }}>0 = disabled</span>
+                  <span className={styles.placeholder} style={{ fontSize: 11 }}>{t('advanced.disabled')}</span>
                 </div>
               </div>
 
               <Toggle.Checkbox
                 checked={cfg.splitOnSceneBreaks}
                 onChange={(checked) => update({ splitOnSceneBreaks: checked })}
-                label="Split on scene breaks (---, ***, ===)"
+                label={t('advanced.splitSceneBreaks')}
               />
             </CollapsibleSection>
 
             {/* Section: Retrieval */}
-            <CollapsibleSection title="Retrieval" defaultExpanded={false}>
+            <CollapsibleSection title={t('advanced.retrieval')} defaultExpanded={false}>
               <div className={styles.memoryGrid}>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Top-K Results</label>
+                  <label className={styles.fieldLabel}>{t('advanced.topK')}</label>
                   <NumericInput
                     className={styles.numberInput}
                     min={1}
@@ -2874,7 +2924,7 @@ function AdvancedSettings() {
                   />
                 </div>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Exclusion Window</label>
+                  <label className={styles.fieldLabel}>{t('advanced.exclusionWindow')}</label>
                   <NumericInput
                     className={styles.numberInput}
                     min={5} max={50}
@@ -2885,7 +2935,7 @@ function AdvancedSettings() {
                   />
                 </div>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Similarity Threshold</label>
+                  <label className={styles.fieldLabel}>{t('advanced.similarityThreshold')}</label>
                   <NumericInput
                     className={styles.numberInput}
                     min={0} max={2} step={0.05}
@@ -2893,29 +2943,29 @@ function AdvancedSettings() {
                     onChange={(value) => update({ similarityThreshold: Math.max(0, Math.min(2, value ?? 0)) })}
                   />
                   <span className={styles.placeholder} style={{ fontSize: 11 }}>
-                    0 = no filtering. Cosine distance can exceed 1, so useful cutoffs are not limited to 0–1.
+                    {t('advanced.similarityHint')}
                   </span>
                 </div>
               </div>
             </CollapsibleSection>
 
             {/* Section: Query */}
-            <CollapsibleSection title="Query" defaultExpanded={false}>
+            <CollapsibleSection title={t('advanced.querySection')} defaultExpanded={false}>
               <div className={styles.memoryGrid}>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Query Strategy</label>
+                  <label className={styles.fieldLabel}>{t('advanced.queryStrategy')}</label>
                   <select
                     className={styles.select}
                     value={cfg.queryStrategy}
                     onChange={(e) => update({ queryStrategy: e.target.value as ChatMemorySettings['queryStrategy'] })}
                   >
-                    <option value="recent_messages">Recent Messages</option>
-                    <option value="last_user_message">Last User Message</option>
-                    <option value="weighted_recent">Weighted Recent</option>
+                    <option value="recent_messages">{t('advanced.queryRecentMessages')}</option>
+                    <option value="last_user_message">{t('advanced.queryLastUserMessage')}</option>
+                    <option value="weighted_recent">{t('advanced.queryWeightedRecent')}</option>
                   </select>
                 </div>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Query Context Size</label>
+                  <label className={styles.fieldLabel}>{t('advanced.queryContextSize')}</label>
                   <NumericInput
                     className={styles.numberInput}
                     min={1} max={64}
@@ -2925,7 +2975,7 @@ function AdvancedSettings() {
                   />
                 </div>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Query Max Tokens</label>
+                  <label className={styles.fieldLabel}>{t('advanced.queryMaxTokens')}</label>
                   <NumericInput
                     className={styles.numberInput}
                     min={1000} max={32000}
@@ -2938,13 +2988,19 @@ function AdvancedSettings() {
             </CollapsibleSection>
 
             {/* Section: Formatting */}
-            <CollapsibleSection title="Formatting" defaultExpanded={false}>
+            <CollapsibleSection title={t('advanced.formattingSection')} defaultExpanded={false}>
               <span className={styles.placeholder} style={{ fontSize: 11, marginBottom: 4 }}>
-                Templates control how retrieved memories appear in the prompt. Available placeholders: {'{{memories}}'}, {'{{content}}'}, {'{{score}}'}, {'{{startIndex}}'}, {'{{endIndex}}'}.
+                {t('advanced.formattingHelper', {
+                  memories: '{{memories}}',
+                  content: '{{content}}',
+                  score: '{{score}}',
+                  startIndex: '{{startIndex}}',
+                  endIndex: '{{endIndex}}',
+                })}
               </span>
 
               <div className={styles.field}>
-                <label className={styles.fieldLabel}>Header Template</label>
+                <label className={styles.fieldLabel}>{t('advanced.headerTemplate')}</label>
                 <textarea
                   className={styles.textarea}
                   rows={2}
@@ -2955,7 +3011,7 @@ function AdvancedSettings() {
 
               <div className={styles.drawerRow}>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Chunk Template</label>
+                  <label className={styles.fieldLabel}>{t('advanced.chunkTemplate')}</label>
                   <input
                     className={styles.select}
                     value={cfg.chunkTemplate}
@@ -2963,7 +3019,7 @@ function AdvancedSettings() {
                   />
                 </div>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Chunk Separator</label>
+                  <label className={styles.fieldLabel}>{t('advanced.chunkSeparator')}</label>
                   <input
                     className={styles.select}
                     value={cfg.chunkSeparator}
@@ -2973,7 +3029,7 @@ function AdvancedSettings() {
               </div>
             </CollapsibleSection>
 
-            {saving && <p className={styles.placeholder} style={{ marginTop: 8, fontSize: 11 }}>Saving...</p>}
+            {saving && <p className={styles.placeholder} style={{ marginTop: 8, fontSize: 11 }}>{t('advanced.saving')}</p>}
           </>
         )}
       </CollapsibleSection>
@@ -2982,8 +3038,9 @@ function AdvancedSettings() {
 }
 
 function LumiHubSettings() {
+  const { t } = useTranslation('settings')
   const user = useStore((s) => s.user)
-  const defaultInstanceName = user?.name ? `${user.name}'s Lumiverse` : 'My Lumiverse'
+  const defaultInstanceName = user?.name ? `${user.name}'s Lumiverse` : t('lumihub.defaultInstance')
   const [lumihubUrl, setLumihubUrl] = useState('https://lumi.spot')
   const [instanceName, setInstanceName] = useState(defaultInstanceName)
   const [status, setStatus] = useState<{
@@ -3022,7 +3079,7 @@ function LumiHubSettings() {
 
   const handleLink = async () => {
     if (!lumihubUrl.trim()) {
-      setError('Enter your LumiHub URL')
+      setError(t('lumihub.errUrl'))
       return
     }
     setError(null)
@@ -3032,11 +3089,11 @@ function LumiHubSettings() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ lumihub_url: lumihubUrl.trim(), instance_name: instanceName.trim() || 'My Lumiverse', redirect_origin: window.location.origin }),
+        body: JSON.stringify({ lumihub_url: lumihubUrl.trim(), instance_name: instanceName.trim() || t('lumihub.defaultInstance'), redirect_origin: window.location.origin }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        setError((body as any).error || 'Failed to start linking')
+        setError((body as any).error || t('lumihub.errLinkFailed'))
         return
       }
       const data = await res.json() as { authorize_url: string }
@@ -3056,7 +3113,7 @@ function LumiHubSettings() {
       // Stop polling after 5 minutes
       setTimeout(() => { clearInterval(poll); setLinking(false) }, 5 * 60 * 1000)
     } catch (err: any) {
-      setError(err.message || 'Failed to connect to LumiHub')
+      setError(err.message || t('lumihub.errConnectFailed'))
       setLinking(false)
     }
   }
@@ -3068,7 +3125,7 @@ function LumiHubSettings() {
       setStatus({ linked: false })
       setLumihubUrl('')
     } catch {
-      setError('Failed to unlink')
+      setError(t('lumihub.errUnlinkFailed'))
     } finally {
       setUnlinking(false)
     }
@@ -3077,17 +3134,17 @@ function LumiHubSettings() {
   if (loading) {
     return (
       <div className={styles.settingsSection}>
-        <h3 className={styles.sectionTitle}>LumiHub</h3>
-        <span className={styles.helperText}>Loading...</span>
+        <h3 className={styles.sectionTitle}>{t('lumihub.title')}</h3>
+        <span className={styles.helperText}>{t('lumihub.loading')}</span>
       </div>
     )
   }
 
   return (
     <div className={styles.settingsSection}>
-      <h3 className={styles.sectionTitle}>LumiHub</h3>
+      <h3 className={styles.sectionTitle}>{t('lumihub.title')}</h3>
       <span className={styles.helperText}>
-        Link this Lumiverse instance to LumiHub to install characters directly from the web.
+        {t('lumihub.helper')}
       </span>
 
       {status?.linked ? (
@@ -3095,18 +3152,21 @@ function LumiHubSettings() {
           <div className={styles.lumihubStatusRow}>
             <span className={clsx(styles.lumihubDot, status.connected ? styles.lumihubDotOnline : styles.lumihubDotOffline)} />
             <span className={styles.lumihubStatusText}>
-              {status.connected ? 'Connected' : 'Disconnected'} — {status.instance_name}
+              {t('lumihub.statusLine', {
+                status: status.connected ? t('lumihub.connected') : t('lumihub.disconnected'),
+                name: status.instance_name,
+              })}
             </span>
           </div>
 
           <div className={styles.field}>
-            <span className={styles.fieldLabel}>LumiHub URL</span>
+            <span className={styles.fieldLabel}>{t('lumihub.url')}</span>
             <span className={styles.lumihubMeta}>{status.lumihub_url}</span>
           </div>
 
           {status.last_connected_at && (
             <div className={styles.field}>
-              <span className={styles.fieldLabel}>Last Connected</span>
+              <span className={styles.fieldLabel}>{t('lumihub.lastConnected')}</span>
               <span className={styles.lumihubMeta}>
                 {new Date(status.last_connected_at).toLocaleString()}
               </span>
@@ -3114,9 +3174,9 @@ function LumiHubSettings() {
           )}
 
           <div className={styles.lumihubDisclosure}>
-            <span className={styles.lumihubDisclosureTitle}>Manifest Sync</span>
+            <span className={styles.lumihubDisclosureTitle}>{t('lumihub.manifestTitle')}</span>
             <span className={styles.lumihubDisclosureText}>
-              A basic manifest of your installed characters (names and creators only) is synced to your LumiHub account to enable remote card updates. No chat data, messages, or personal content is ever shared. Lumiverse and LumiHub developers cannot access your data. Third-party LumiHub instances may have different privacy practices — exercise caution.
+              {t('lumihub.manifestText')}
             </span>
           </div>
 
@@ -3127,33 +3187,33 @@ function LumiHubSettings() {
             disabled={unlinking}
             loading={unlinking}
           >
-            {unlinking ? 'Unlinking...' : 'Unlink from LumiHub'}
+            {unlinking ? t('lumihub.unlinking') : t('lumihub.unlink')}
           </Button>
         </div>
       ) : (
         <div className={styles.lumihubCard}>
           <div className={styles.field}>
-            <span className={styles.fieldLabel}>LumiHub URL</span>
+            <span className={styles.fieldLabel}>{t('lumihub.url')}</span>
             <input
               className={styles.lumihubInput}
               type="text"
-              placeholder="https://lumi.spot"
+              placeholder={t('lumihub.urlPlaceholder')}
               value={lumihubUrl}
               onChange={(e) => setLumihubUrl(e.target.value)}
             />
           </div>
 
           <div className={styles.field}>
-            <span className={styles.fieldLabel}>Instance Name</span>
+            <span className={styles.fieldLabel}>{t('lumihub.instanceName')}</span>
             <input
               className={styles.lumihubInput}
               type="text"
-              placeholder="My Lumiverse"
+              placeholder={t('lumihub.instancePlaceholder')}
               value={instanceName}
               onChange={(e) => setInstanceName(e.target.value)}
             />
             <span className={styles.helperText}>
-              A label to identify this instance on LumiHub (e.g. &quot;Home PC&quot;, &quot;Laptop&quot;)
+              {t('lumihub.instanceHint')}
             </span>
           </div>
 
@@ -3162,7 +3222,7 @@ function LumiHubSettings() {
             onClick={handleLink}
             disabled={linking}
           >
-            {linking ? 'Waiting for approval...' : 'Link to LumiHub'}
+            {linking ? t('lumihub.waitingApproval') : t('lumihub.link')}
           </button>
         </div>
       )}

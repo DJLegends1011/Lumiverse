@@ -1,8 +1,10 @@
 import { useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { messagesApi } from '@/api/chats'
 import { generateApi, type GenerateRequest } from '@/api/generate'
 import { useStore } from '@/store'
 import { shouldForceLoomRuntimePreset } from '@/lib/loom/runtimeProfile'
+import i18n from '@/i18n'
 import type { Message } from '@/types/api'
 
 export interface SwipeActionResult {
@@ -20,6 +22,7 @@ export interface SwipeActionResult {
  * Used by SwipeControls (buttons) and gesture/keyboard hooks.
  */
 export default function useSwipeAction(message: Message, chatId: string): SwipeActionResult {
+  const { t: te } = useTranslation('errors')
   const messages = useStore((s) => s.messages)
   const isStreaming = useStore((s) => s.isStreaming)
   const beginStreaming = useStore((s) => s.beginStreaming)
@@ -63,10 +66,11 @@ export default function useSwipeAction(message: Message, chatId: string): SwipeA
       startStreaming(res.generationId, message.id)
     } catch (err: any) {
       if (regenerateNonceRef.current !== nonce) return
-      const msg = err?.body?.error || err?.message || 'Failed to regenerate'
+      const msg = err?.body?.error || err?.message || te('failedToRegenerate')
       setStreamingError(msg)
     }
   }, [
+    te,
     isStreaming,
     chatId,
     message.id,
@@ -150,7 +154,7 @@ export async function executeSwipe(message: Message, chatId: string, direction: 
         const res = await generateApi.regenerate(genOpts)
         startStreaming(res.generationId, message.id)
       } catch (err: any) {
-        const msg = err?.body?.error || err?.message || 'Failed to regenerate'
+        const msg = err?.body?.error || err?.message || i18n.t('errors.failedToRegenerate')
         setStreamingError(msg)
       }
     }

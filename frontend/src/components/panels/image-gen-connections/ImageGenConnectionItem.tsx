@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
+
 import { ImageIcon, Trash2, Edit3, Zap, Check, Star, Copy, MoreVertical, RefreshCw, Workflow } from 'lucide-react'
 import { imageGenConnectionsApi } from '@/api/image-gen-connections'
 import type { ComfyUICapabilities } from '@/api/image-gen'
@@ -17,8 +19,8 @@ const PROVIDER_COLORS: Record<string, string> = {
   novelai: '#8b5cf6',
 }
 
-function formatTimeUntil(resetAt: number | null) {
-  if (!resetAt) return 'Unknown'
+function formatTimeUntil(resetAt: number | null, unknownLabel: string) {
+  if (!resetAt) return unknownLabel
 
   const diffMs = Math.max(0, resetAt - Date.now())
   const totalMinutes = Math.floor(diffMs / 60000)
@@ -41,7 +43,10 @@ interface Props {
   onDelete: () => void
 }
 
-export default function ImageGenConnectionItem({ profile, isActive, providers, onSelect, onUpdate, onDuplicate, onDelete }: Props) {
+export default function ImageGenConnectionItem({
+ profile, isActive, providers, onSelect, onUpdate, onDuplicate, onDelete }: Props) {
+  const { t: tc } = useTranslation('common')
+  const { t } = useTranslation('panels')
   const [editing, setEditing] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
@@ -88,11 +93,11 @@ export default function ImageGenConnectionItem({ profile, isActive, providers, o
       const result = await imageGenConnectionsApi.test(profile.id)
       setTestResult({ success: result.success, message: result.message })
     } catch (err: any) {
-      setTestResult({ success: false, message: err.message || 'Connection failed' })
+      setTestResult({ success: false, message: err.message || t('connectionItem.connectionFailed') })
     } finally {
       setTesting(false)
     }
-  }, [profile.id])
+  }, [profile.id, t])
 
   const refreshComfyProfile = useCallback(async () => {
     try {
@@ -115,9 +120,9 @@ export default function ImageGenConnectionItem({ profile, isActive, providers, o
       setWorkflowConfig(configResponse.config)
       setWorkflowCapabilities(capabilities)
     } catch (err: any) {
-      setWorkflowError(err?.message || 'Failed to load ComfyUI workflow')
+      setWorkflowError(err?.message || t('connectionItem.loadComfyWorkflowFailed'))
     }
-  }, [isComfyUI, profile.id])
+  }, [isComfyUI, profile.id, t])
 
   const importComfyWorkflow = useCallback(async (workflow: unknown) => {
     const response = await imageGenConnectionsApi.importComfyUIWorkflow(profile.id, workflow)
@@ -183,7 +188,7 @@ export default function ImageGenConnectionItem({ profile, isActive, providers, o
           {isActive && <Check size={14} className={styles.activeCheck} />}
         </button>
         <div className={styles.itemActions}>
-          <button type="button" className={styles.actionBtn} onClick={() => setEditing(true)} title="Edit">
+          <button type="button" className={styles.actionBtn} onClick={() => setEditing(true)} title={tc('actions.edit')}>
             <Edit3 size={13} />
           </button>
           <button
@@ -193,7 +198,7 @@ export default function ImageGenConnectionItem({ profile, isActive, providers, o
               const rect = e.currentTarget.getBoundingClientRect()
               setMenuPos({ x: rect.right, y: rect.bottom + 4 })
             }}
-            title="More actions"
+            title={t('connectionItem.moreActions')}
           >
             <MoreVertical size={13} />
           </button>
@@ -201,11 +206,11 @@ export default function ImageGenConnectionItem({ profile, isActive, providers, o
             position={menuPos}
             onClose={() => setMenuPos(null)}
             items={[
-              { key: 'test', label: testing ? 'Testing...' : 'Test connection', icon: <Zap size={14} />, onClick: () => { setMenuPos(null); handleTest() }, disabled: testing },
-              ...(isComfyUI ? [{ key: 'workflow', label: 'ComfyUI workflow', icon: <Workflow size={14} />, onClick: openWorkflowEditor }] : []),
-              { key: 'duplicate', label: 'Duplicate', icon: <Copy size={14} />, onClick: () => { setMenuPos(null); onDuplicate() } },
+              { key: 'test', label: testing ? t('connectionItem.testing') : t('connectionItem.testConnection'), icon: <Zap size={14} />, onClick: () => { setMenuPos(null); handleTest() }, disabled: testing },
+              ...(isComfyUI ? [{ key: 'workflow', label: t('connectionItem.comfyWorkflow'), icon: <Workflow size={14} />, onClick: openWorkflowEditor }] : []),
+              { key: 'duplicate', label: t('connectionItem.duplicate'), icon: <Copy size={14} />, onClick: () => { setMenuPos(null); onDuplicate() } },
               { key: 'div', type: 'divider' as const },
-              { key: 'delete', label: 'Delete', icon: <Trash2 size={14} />, onClick: () => { setMenuPos(null); onDelete() }, danger: true },
+              { key: 'delete', label: t('connectionItem.delete'), icon: <Trash2 size={14} />, onClick: () => { setMenuPos(null); onDelete() }, danger: true },
             ] satisfies ContextMenuEntry[]}
           />
         </div>
@@ -218,7 +223,7 @@ export default function ImageGenConnectionItem({ profile, isActive, providers, o
       {showNanoGptUsage && nanoGptUsage?.dailyImages && (
         <div className={styles.creditsBar}>
           <div className={styles.creditCell}>
-            <span className={styles.creditLabel}>Images Left</span>
+            <span className={styles.creditLabel}>{t('connectionItem.imagesLeft')}</span>
             <span className={styles.creditValue}>
               {nanoGptUsage.limits.dailyImages !== null
                 ? `${nanoGptUsage.dailyImages.remaining} / ${nanoGptUsage.limits.dailyImages}`
@@ -226,8 +231,10 @@ export default function ImageGenConnectionItem({ profile, isActive, providers, o
             </span>
           </div>
           <div className={styles.creditCell}>
-            <span className={styles.creditLabel}>Resets In</span>
-            <span className={styles.creditValue}>{formatTimeUntil(nanoGptUsage.dailyImages.resetAt)}</span>
+            <span className={styles.creditLabel}>{t('connectionItem.resetsIn')}</span>
+            <span className={styles.creditValue}>
+              {formatTimeUntil(nanoGptUsage.dailyImages.resetAt, t('connectionItem.unknown'))}
+            </span>
           </div>
           <button type="button" className={styles.creditsRefresh} onClick={refreshNanoGptUsage} disabled={nanoGptUsageLoading}>
             {nanoGptUsageLoading ? <Spinner size={10} /> : <RefreshCw size={10} />}

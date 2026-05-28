@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import CharacterCard from './CharacterCard'
 import type { Character, CharacterSummary } from '@/types/api'
 import styles from './FavoritesSlider.module.css'
@@ -15,11 +16,13 @@ export default function FavoritesSlider({
   onOpen,
   onToggleFavorite,
 }: FavoritesSliderProps) {
+  const { t } = useTranslation('panels', { keyPrefix: 'characterToolbar' })
+
   if (characters.length === 0) return null
 
   return (
     <div className={styles.container}>
-      <div className={styles.label}>Favorites</div>
+      <div className={styles.label}>{t('favorites')}</div>
       <div className={styles.slider}>
         {characters.map((char) => (
           <div key={char.id} className={styles.slideItem}>

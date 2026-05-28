@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import {
   buildVisualMacroOptions,
   collectPromptMacroTokens,
@@ -17,28 +18,30 @@ function appendToken(prompt: string, token: string): string {
   return `${prompt}${needsComma ? ', ' : ' '}${token}`
 }
 
-function getGenerateLabel(visuals: VisualStudioModel): string {
-  if (visuals.generating) return 'Generating...'
-  if (visuals.acceptedImageUrl || visuals.candidateImageUrl) return 'Generate Again'
-  return 'Generate Portrait'
+function getGenerateLabel(t: ReturnType<typeof useTranslation<'dreamWeaver'>>['t'], visuals: VisualStudioModel): string {
+  if (visuals.generating) return t('visuals.prompts.generating')
+  if (visuals.acceptedImageUrl || visuals.candidateImageUrl) return t('visuals.prompts.generateAgain')
+  return t('visuals.prompts.generatePortrait')
 }
 
-function getPromptHint(visuals: VisualStudioModel): string {
+function getPromptHint(t: ReturnType<typeof useTranslation<'dreamWeaver'>>['t'], visuals: VisualStudioModel): string {
   switch (visuals.workspaceState) {
     case 'no_source':
-      return 'Choose a source before generating.'
+      return t('visuals.prompts.hintNoSource')
     case 'needs_workflow':
-      return 'Import a workflow before generating.'
+      return t('visuals.prompts.hintNeedsWorkflow')
     case 'needs_mapping':
-      return 'Map positive and negative prompt fields before generating.'
+      return t('visuals.prompts.hintNeedsMapping')
     case 'failed':
-      return 'Adjust the prompts or settings, then try again.'
+      return t('visuals.prompts.hintFailed')
     default:
-      return 'Positive and negative prompts stay inline so you can tune them without leaving the portrait view.'
+      return t('visuals.prompts.hintDefault')
   }
 }
 
 export function VisualPromptFields({ visuals }: VisualPromptFieldsProps) {
+  const { t } = useTranslation('dreamWeaver')
+  const { t: tc } = useTranslation('common')
   const asset = visuals.selectedAsset
   const macroOptions = buildVisualMacroOptions(visuals.draft)
 
@@ -48,7 +51,7 @@ export function VisualPromptFields({ visuals }: VisualPromptFieldsProps) {
     <section className={styles.promptArea}>
       <div className={styles.promptBlock}>
         <div className={styles.promptHeader}>
-          <span className={styles.promptLabel}>Positive Prompt</span>
+          <span className={styles.promptLabel}>{t('visuals.prompts.positive')}</span>
           <div className={styles.promptTools}>
             <button
               type="button"
@@ -56,7 +59,7 @@ export function VisualPromptFields({ visuals }: VisualPromptFieldsProps) {
               onClick={visuals.onSuggestTags}
               disabled={visuals.tagSuggestionLoading || !visuals.draft}
             >
-              {visuals.tagSuggestionLoading ? 'Suggesting...' : 'Suggest Tags'}
+              {visuals.tagSuggestionLoading ? t('visuals.prompts.suggesting') : t('visuals.prompts.suggestTags')}
             </button>
             {macroOptions.length > 0 && (
               <div className={styles.tokenRow}>
@@ -82,18 +85,18 @@ export function VisualPromptFields({ visuals }: VisualPromptFieldsProps) {
         {(visuals.pendingTagSuggestion || visuals.tagSuggestionError) && (
           <div className={styles.reviewSheet}>
             <div className={styles.reviewHeader}>
-              <span className={styles.reviewLabel}>Suggested Tags</span>
-              <span className={styles.reviewHint}>Replaces the previous suggested tag block only</span>
+              <span className={styles.reviewLabel}>{t('visuals.prompts.suggestedTags')}</span>
+              <span className={styles.reviewHint}>{t('visuals.prompts.suggestedTagsHint')}</span>
             </div>
             {visuals.pendingTagSuggestion ? (
               <>
-                <div className={styles.reviewSectionLabel}>Positive</div>
+                <div className={styles.reviewSectionLabel}>{t('visuals.prompts.positiveSection')}</div>
                 <div className={styles.reviewPreview}>{visuals.pendingTagSuggestion}</div>
               </>
             ) : null}
             {visuals.pendingNegativeTagSuggestion ? (
               <>
-                <div className={styles.reviewSectionLabel}>Negative</div>
+                <div className={styles.reviewSectionLabel}>{t('visuals.prompts.negativeSection')}</div>
                 <div className={styles.reviewPreview}>{visuals.pendingNegativeTagSuggestion}</div>
               </>
             ) : null}
@@ -107,7 +110,7 @@ export function VisualPromptFields({ visuals }: VisualPromptFieldsProps) {
                 onClick={visuals.onAcceptSuggestedTags}
                 disabled={!visuals.pendingTagSuggestion}
               >
-                Apply Tags
+                {t('visuals.prompts.applyTags')}
               </button>
               <button
                 type="button"
@@ -115,14 +118,14 @@ export function VisualPromptFields({ visuals }: VisualPromptFieldsProps) {
                 onClick={visuals.onRegenerateSuggestedTags}
                 disabled={visuals.tagSuggestionLoading}
               >
-                Regenerate
+                {t('visuals.prompts.regenerate')}
               </button>
               <button
                 type="button"
                 className={styles.reviewSecondary}
                 onClick={visuals.onCancelSuggestedTags}
               >
-                Cancel
+                {tc('actions.cancel')}
               </button>
             </div>
           </div>
@@ -137,13 +140,13 @@ export function VisualPromptFields({ visuals }: VisualPromptFieldsProps) {
               macro_tokens: collectPromptMacroTokens(event.target.value),
             })
           }
-          placeholder="Prompt details, macro tokens, and portrait direction..."
+          placeholder={t('visuals.prompts.positivePlaceholder')}
         />
       </div>
 
       <div className={styles.promptBlock}>
         <div className={styles.promptHeader}>
-          <span className={styles.promptLabel}>Negative Prompt</span>
+          <span className={styles.promptLabel}>{t('visuals.prompts.negative')}</span>
         </div>
         <textarea
           className={styles.textarea}
@@ -154,19 +157,19 @@ export function VisualPromptFields({ visuals }: VisualPromptFieldsProps) {
               negative_prompt: event.target.value,
             })
           }
-          placeholder="What to avoid in the result..."
+          placeholder={t('visuals.prompts.negativePlaceholder')}
         />
       </div>
 
       <div className={styles.generateRow}>
-        <p className={styles.generateHint}>{getPromptHint(visuals)}</p>
+        <p className={styles.generateHint}>{getPromptHint(t, visuals)}</p>
         <button
           type="button"
           className={styles.generateButton}
           onClick={() => visuals.onGenerate()}
           disabled={!visuals.canGenerate || visuals.generating}
         >
-          {getGenerateLabel(visuals)}
+          {getGenerateLabel(t, visuals)}
         </button>
       </div>
     </section>

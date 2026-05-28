@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FormField, TextInput, Select, Button } from '@/components/shared/FormComponents'
 import ModelCombobox from '../connection-manager/ModelCombobox'
 import { Toggle } from '@/components/shared/Toggle'
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export default function ImageGenConnectionForm({ providers, profile, onSave, onCancel }: Props) {
+  const { t } = useTranslation('panels')
   const [name, setName] = useState(profile?.name || '')
   const [provider, setProvider] = useState(profile?.provider || providers[0]?.id || 'google_gemini')
   const [apiKey, setApiKey] = useState('')
@@ -114,14 +116,14 @@ export default function ImageGenConnectionForm({ providers, profile, onSave, onC
       if (activeConnectionId) {
         try {
           await imageGenConnectionsApi.setApiKey(activeConnectionId, returnedApiKey)
-          if (!cancelled) setByopStatus('Signed in with Pollinations. API key saved automatically.')
+          if (!cancelled) setByopStatus(t('connectionForm.pollinationsSaved'))
         } catch {
           if (!cancelled) {
-            setByopStatus('Pollinations sign-in succeeded, but auto-save failed. Click Save to persist manually.')
+            setByopStatus(t('connectionForm.pollinationsAutoSaveFailed'))
           }
         }
       } else if (!cancelled) {
-        setByopStatus('Signed in with Pollinations. API key captured. Click Create to save this connection.')
+        setByopStatus(t('connectionForm.pollinationsCaptured'))
       }
 
       clearRedirectArtifacts()
@@ -131,7 +133,7 @@ export default function ImageGenConnectionForm({ providers, profile, onSave, onC
     return () => {
       cancelled = true
     }
-  }, [isPollinations, profile?.id])
+  }, [isPollinations, profile?.id, t])
 
   const handlePollinationsSignIn = useCallback(async () => {
     setByopStatus(null)
@@ -148,11 +150,11 @@ export default function ImageGenConnectionForm({ providers, profile, onSave, onC
       )
       window.location.href = result.auth_url
     } catch (err: any) {
-      const msg = String(err?.message || 'Failed to start Pollinations sign-in')
+      const msg = String(err?.message || t('connectionForm.pollinationsStartFailed'))
       setByopStatus(msg)
       setByopLoading(false)
     }
-  }, [model, profile?.id])
+  }, [model, profile?.id, t])
 
   const handleSubmit = useCallback(() => {
     if (!name.trim()) return
@@ -168,16 +170,16 @@ export default function ImageGenConnectionForm({ providers, profile, onSave, onC
 
   return (
     <div className={styles.form}>
-      <FormField label="Name" required>
-        <TextInput value={name} onChange={setName} placeholder="Connection name" autoFocus={!profile} />
+      <FormField label={t('connectionForm.name')} required>
+        <TextInput value={name} onChange={setName} placeholder={t('connectionForm.connectionName')} autoFocus={!profile} />
       </FormField>
 
-      <FormField label="Provider">
+      <FormField label={t('connectionForm.provider')}>
         <Select value={provider} onChange={setProvider} options={providerOptions} />
       </FormField>
 
       {isPollinations && (
-        <FormField label="Pollinations BYOP" hint="Use Sign in with Pollinations to fetch a BYOP key automatically, or paste a key manually below.">
+        <FormField label={t('connectionForm.pollinationsByop')} hint={t('connectionForm.pollinationsByopHint')}>
           <div className={styles.byopRow}>
             <Button
               variant="secondary"
@@ -185,23 +187,23 @@ export default function ImageGenConnectionForm({ providers, profile, onSave, onC
               onClick={handlePollinationsSignIn}
               disabled={byopLoading}
             >
-              {byopLoading ? 'Redirecting...' : 'Sign in with Pollinations'}
+              {byopLoading ? t('connectionForm.redirecting') : t('connectionForm.signInWithPollinations')}
             </Button>
             {byopStatus && <span className={styles.byopStatus}>{byopStatus}</span>}
           </div>
         </FormField>
       )}
 
-      <FormField label="API Key" hint={profile?.has_api_key ? 'Key is set. Enter a new value to replace it.' : undefined}>
+      <FormField label={t('connectionForm.apiKey')} hint={profile?.has_api_key ? t('connectionForm.keyAlreadySet') : undefined}>
         <TextInput
           value={apiKey}
           onChange={setApiKey}
-          placeholder={profile?.has_api_key ? '••••••••' : 'Enter API key'}
+          placeholder={profile?.has_api_key ? '••••••••' : t('connectionForm.enterApiKey')}
           type="password"
         />
       </FormField>
 
-      <FormField label="API URL" hint="Leave empty for default provider URL">
+      <FormField label={t('connectionForm.apiUrl')} hint={t('connectionForm.defaultApiUrlHint')}>
         <TextInput
           value={apiUrl}
           onChange={setApiUrl}
@@ -209,7 +211,7 @@ export default function ImageGenConnectionForm({ providers, profile, onSave, onC
         />
       </FormField>
 
-      <FormField label="Model" hint={isDynamicModelList ? 'Refresh uses the current form values, even before the connection is saved.' : undefined}>
+      <FormField label={t('connectionForm.model')} hint={isDynamicModelList ? t('connectionForm.modelHint') : undefined}>
         <ModelCombobox
           value={model}
           onChange={setModel}
@@ -219,20 +221,20 @@ export default function ImageGenConnectionForm({ providers, profile, onSave, onC
           onRefresh={isDynamicModelList ? fetchModels : undefined}
           autoRefreshOnFocus={isDynamicModelList}
           refreshKey={`${provider}:${apiUrl}`}
-          placeholder="Select model..."
-          emptyMessage={isDynamicModelList ? 'No models found. Refresh, or enter one manually.' : 'No models for this provider.'}
+          placeholder={t('imageGenConnectionForm.selectModel')}
+          emptyMessage={isDynamicModelList ? t('imageGenConnectionForm.noModelsDynamic') : t('imageGenConnectionForm.noModelsStatic')}
           appearance="standard"
         />
       </FormField>
 
       <FormField label="">
-        <Toggle.Checkbox checked={isDefault} onChange={setIsDefault} label="Set as default image gen connection" />
+        <Toggle.Checkbox checked={isDefault} onChange={setIsDefault} label={t('imageGenConnectionForm.setAsDefault')} />
       </FormField>
 
       <div className={styles.formActions}>
-        <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+        <Button variant="ghost" size="sm" onClick={onCancel}>{t('connectionForm.cancel')}</Button>
         <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!name.trim()}>
-          {profile ? 'Save' : 'Create'}
+          {profile ? t('connectionForm.save') : t('connectionForm.create')}
         </Button>
       </div>
     </div>

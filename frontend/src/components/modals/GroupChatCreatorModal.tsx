@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { X, Search, Check } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { CloseButton } from '@/components/shared/CloseButton'
@@ -24,6 +25,10 @@ interface GreetingOption {
 }
 
 export default function GroupChatCreatorModal() {
+  const { t } = useTranslation('modals', { keyPrefix: 'groupChatCreator' })
+  const { t: tg } = useTranslation('modals', { keyPrefix: 'greetingPicker' })
+  const { t: tc } = useTranslation('common')
+
   const navigate = useNavigate()
   const closeModal = useStore((s) => s.closeModal)
   const modalProps = useStore((s) => s.modalProps) as { initialCharacterIds?: string[] } | null
@@ -96,7 +101,7 @@ export default function GroupChatCreatorModal() {
           characterId: char.id,
           characterName: char.name,
           greetingIndex: 0,
-          label: 'Default Greeting',
+          label: t('defaultGreeting'),
           content: char.first_mes,
         })
       }
@@ -107,7 +112,7 @@ export default function GroupChatCreatorModal() {
               characterId: char.id,
               characterName: char.name,
               greetingIndex: i + 1,
-              label: `Greeting #${i + 2}`,
+              label: tg('greetingNumber', { number: i + 2 }),
               content: g,
             })
           }
@@ -115,7 +120,7 @@ export default function GroupChatCreatorModal() {
       }
     }
     return options
-  }, [selectedCharacters])
+  }, [selectedCharacters, t, tg])
 
   // Auto-select first greeting when entering step 2
   useEffect(() => {
@@ -195,13 +200,13 @@ export default function GroupChatCreatorModal() {
     else if (step === 'settings') setStep('greeting')
   }
 
-  const stepLabel = step === 'characters' ? 'Step 1 of 3' : step === 'greeting' ? 'Step 2 of 3' : 'Step 3 of 3'
+  const stepLabel = step === 'characters' ? t('step1of3') : step === 'greeting' ? t('step2of3') : t('step3of3')
   const stepTitle =
     step === 'characters'
-      ? 'Select Characters'
+      ? t('selectCharacters')
       : step === 'greeting'
-        ? 'Choose Opening Greeting'
-        : 'Group Settings'
+        ? t('chooseGreeting')
+        : t('groupSettings')
 
   return (
     <ModalShell isOpen={true} onClose={closeModal} maxWidth="clamp(340px, 94vw, min(760px, var(--lumiverse-content-max-width, 760px)))" className={styles.modal}>
@@ -250,7 +255,7 @@ export default function GroupChatCreatorModal() {
                     className={styles.searchInput}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search characters..."
+                    placeholder={t('searchPlaceholder')}
                   />
                 </div>
 
@@ -281,7 +286,7 @@ export default function GroupChatCreatorModal() {
                     )
                   })}
                   {filteredCharacters.length === 0 && (
-                    <div className={styles.emptyState}>No characters found.</div>
+                    <div className={styles.emptyState}>{t('noCharactersFound')}</div>
                   )}
                 </div>
                 <Pagination
@@ -297,9 +302,7 @@ export default function GroupChatCreatorModal() {
             {step === 'greeting' && (
               <div className={styles.greetingList}>
                 {greetingOptions.length === 0 && (
-                  <div className={styles.emptyState}>
-                    None of the selected characters have greetings defined.
-                  </div>
+                  <div className={styles.emptyState}>{t('noGreetings')}</div>
                 )}
                 {greetingOptions.map((opt, i) => {
                   const isActive =
@@ -336,34 +339,34 @@ export default function GroupChatCreatorModal() {
             {step === 'settings' && (
               <div className={styles.settingsSection}>
                 <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>Group Name</label>
+                  <label className={styles.fieldLabel}>{t('groupName')}</label>
                   <input
                     type="text"
                     className={styles.fieldInput}
                     value={groupName}
                     onChange={(e) => setGroupName(e.target.value)}
-                    placeholder="Enter group name..."
+                    placeholder={t('groupNamePlaceholder')}
                   />
                 </div>
 
                 <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>Character Card Macros</label>
+                  <label className={styles.fieldLabel}>{t('characterCardMacros')}</label>
                   <select
                     className={styles.fieldInput}
                     value={groupCardMode}
                     onChange={(e) => setGroupCardMode(e.target.value as GroupCardMode)}
                   >
-                    <option value="swap">Swap to active character card</option>
-                    <option value="merge_ignore_muted">Merge all unmuted member cards</option>
-                    <option value="merge">Merge all member cards</option>
+                    <option value="swap">{t('cardModeSwap')}</option>
+                    <option value="merge_ignore_muted">{t('cardModeMergeUnmuted')}</option>
+                    <option value="merge">{t('cardModeMerge')}</option>
                   </select>
                   <div style={{ fontSize: 'calc(11px * var(--lumiverse-font-scale, 1))', color: 'var(--lumiverse-text-dim)', lineHeight: 1.45 }}>
-                    Controls how character-card macros like {'{{description}}'}, {'{{personality}}'}, and {'{{scenario}}'} resolve during generation.
+                    {t('cardMacrosHint')}
                   </div>
                 </div>
 
                 <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>Group Scenario</label>
+                  <label className={styles.fieldLabel}>{t('groupScenario')}</label>
                   <select
                     className={styles.fieldInput}
                     value={scenarioMode === 'member' ? `member:${scenarioMemberId}` : scenarioMode}
@@ -381,20 +384,20 @@ export default function GroupChatCreatorModal() {
                       }
                     }}
                   >
-                    <option value="individual">Use individual scenarios</option>
+                    <option value="individual">{t('scenarioIndividual')}</option>
                     {selectedCharacters.map((char) => (
                       <option key={char.id} value={`member:${char.id}`}>
-                        Use {char.name}'s scenario
+                        {t('scenarioFromMemberNamed', { name: char.name })}
                       </option>
                     ))}
-                    <option value="custom">Custom scenario</option>
+                    <option value="custom">{t('scenarioCustom')}</option>
                   </select>
                   {scenarioMode === 'custom' && (
                     <textarea
                       className={styles.fieldInput}
                       value={scenarioCustom}
                       onChange={(e) => setScenarioCustom(e.target.value)}
-                      placeholder="Enter a shared scenario for the group..."
+                      placeholder={t('scenarioPlaceholder')}
                       rows={4}
                       style={{ resize: 'vertical', marginTop: 8 }}
                     />
@@ -402,7 +405,7 @@ export default function GroupChatCreatorModal() {
                 </div>
 
                 <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>Talkativeness per Character</label>
+                  <label className={styles.fieldLabel}>{t('talkativeness')}</label>
                   {selectedCharacters.map((char) => (
                     <div key={char.id} className={styles.talkSlider}>
                       {char.avatar_path || char.image_id ? (
@@ -446,14 +449,14 @@ export default function GroupChatCreatorModal() {
               variant="ghost"
               onClick={step === 'characters' ? closeModal : handleBack}
             >
-              {step === 'characters' ? 'Cancel' : 'Back'}
+              {step === 'characters' ? tc('actions.cancel') : t('back')}
             </Button>
             <Button
               variant="primary"
               onClick={handleNext}
               disabled={!canProceed || creating}
             >
-              {step === 'settings' ? (creating ? 'Creating...' : 'Create Group Chat') : 'Next'}
+              {step === 'settings' ? (creating ? t('creating') : t('createGroupChat')) : t('next')}
             </Button>
           </div>
     </ModalShell>

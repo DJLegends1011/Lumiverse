@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { connectionsApi } from '@/api/connections'
 import { useStore } from '@/store'
 import ConfirmationModal from '@/components/shared/ConfirmationModal'
@@ -18,6 +19,7 @@ const FALLBACK_PROVIDERS = [
 ]
 
 export default function ConnectionManager() {
+  const { t } = useTranslation('panels')
   const profiles = useStore((s) => s.profiles)
   const setProfiles = useStore((s) => s.setProfiles)
   const addProfile = useStore((s) => s.addProfile)
@@ -140,7 +142,7 @@ export default function ConnectionManager() {
   }, [deleteTarget, removeProfile])
 
   if (loading) {
-    return <div className={styles.loading}>Loading connections...</div>
+    return <div className={styles.loading}>{t('connectionManager.loading')}</div>
   }
 
   return (
@@ -148,7 +150,7 @@ export default function ConnectionManager() {
       {!creating && (
         <button type="button" className={styles.createBtn} onClick={() => setCreating(true)}>
           <Plus size={14} />
-          <span>New Connection</span>
+          <span>{t('connectionManager.newConnection')}</span>
         </button>
       )}
 
@@ -178,17 +180,17 @@ export default function ConnectionManager() {
           />
         ))}
         {profiles.length === 0 && !creating && (
-          <div className={styles.empty}>No connections configured. Add one to start chatting.</div>
+          <div className={styles.empty}>{t('connectionManager.empty')}</div>
         )}
       </div>
 
       {deleteTarget && (
         <ConfirmationModal
-          title="Delete Connection"
-          message={`Delete "${deleteTarget.name}"? This cannot be undone.`}
+          title={t('connectionManager.deleteTitle')}
+          message={t('connectionManager.deleteMessage', { name: deleteTarget.name })}
           isOpen={true}
           variant="danger"
-          confirmText="Delete"
+          confirmText={t('connectionManager.deleteConfirm')}
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
         />

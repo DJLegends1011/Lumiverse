@@ -1,4 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
+
 import { Bookmark, Check, Pencil, Trash2, X } from 'lucide-react'
 import clsx from 'clsx'
 import { useStore } from '@/store'
@@ -17,15 +20,16 @@ function swatchForEntry(entry: SavedTheme): string {
   return 'var(--lumiverse-primary)'
 }
 
-function attributionFor(entry: SavedTheme): string {
-  if (entry.kind === 'config') return 'JSON theme'
+function attributionFor(entry: SavedTheme, t: TFunction<'panels'>): string {
+  if (entry.kind === 'config') return t('themePanel.savedThemes.jsonTheme')
   const pack = entry.pack
   const parts: string[] = []
   const compCount = Object.keys(pack.components).length
-  if (compCount > 0) parts.push(`${compCount} component${compCount === 1 ? '' : 's'}`)
-  if (pack.assets.length > 0) parts.push(`${pack.assets.length} asset${pack.assets.length === 1 ? '' : 's'}`)
-  if (pack.globalCSS.trim()) parts.push('global CSS')
-  return parts.length > 0 ? `Bundle · ${parts.join(', ')}` : 'Bundle'
+  if (compCount > 0) parts.push(t('themePanel.savedThemes.component', { count: compCount }))
+  if (pack.assets.length > 0) parts.push(t('themePanel.savedThemes.asset', { count: pack.assets.length }))
+  if (pack.globalCSS.trim()) parts.push(t('themePanel.savedThemes.globalCss'))
+  if (parts.length > 0) return t('themePanel.savedThemes.bundleAttribution', { parts: parts.join(', ') })
+  return t('themePanel.savedThemes.bundle')
 }
 
 interface SavedThemeCardProps {
@@ -37,11 +41,13 @@ interface SavedThemeCardProps {
 }
 
 function SavedThemeCard({ entry, isActive, onApply, onRename, onDelete }: SavedThemeCardProps) {
+  const { t } = useTranslation('panels')
+  const { t: tc } = useTranslation('common')
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(entry.name)
 
   const swatch = useMemo(() => swatchForEntry(entry), [entry])
-  const attribution = useMemo(() => attributionFor(entry), [entry])
+  const attribution = useMemo(() => attributionFor(entry, t), [entry, t])
 
   const commitRename = useCallback(() => {
     const trimmed = draft.trim()
@@ -100,7 +106,7 @@ function SavedThemeCard({ entry, isActive, onApply, onRename, onDelete }: SavedT
               type="button"
               className={styles.iconBtn}
               onClick={commitRename}
-              title="Save name"
+              title={t('themePanel.savedThemes.saveName')}
             >
               <Check size={12} />
             </button>
@@ -108,7 +114,7 @@ function SavedThemeCard({ entry, isActive, onApply, onRename, onDelete }: SavedT
               type="button"
               className={styles.iconBtn}
               onClick={cancelRename}
-              title="Cancel"
+              title={tc('actions.cancel')}
             >
               <X size={12} />
             </button>
@@ -119,7 +125,7 @@ function SavedThemeCard({ entry, isActive, onApply, onRename, onDelete }: SavedT
               type="button"
               className={styles.iconBtn}
               onClick={() => setEditing(true)}
-              title="Rename"
+              title={t('themePanel.savedThemes.rename')}
             >
               <Pencil size={12} />
             </button>
@@ -127,7 +133,7 @@ function SavedThemeCard({ entry, isActive, onApply, onRename, onDelete }: SavedT
               type="button"
               className={clsx(styles.iconBtn, styles.deleteBtn)}
               onClick={onDelete}
-              title="Delete saved theme"
+              title={t('themePanel.savedThemes.deleteSavedTheme')}
             >
               <Trash2 size={12} />
             </button>
@@ -139,6 +145,8 @@ function SavedThemeCard({ entry, isActive, onApply, onRename, onDelete }: SavedT
 }
 
 export default function SavedThemes() {
+  const { t } = useTranslation('panels')
+
   const savedThemes = useStore((s) => s.savedThemes)
   const applySavedTheme = useStore((s) => s.applySavedTheme)
   const renameSavedTheme = useStore((s) => s.renameSavedTheme)
@@ -151,12 +159,12 @@ export default function SavedThemes() {
 
   const handleDelete = (entry: SavedTheme) => {
     openModal('confirm', {
-      title: 'Delete saved theme',
-      message: `Remove "${entry.name}" from My Themes? ${
-        entry.kind === 'pack' ? 'Bundled assets will be cleaned up unless this theme is currently active.' : 'This cannot be undone.'
-      }`,
+      title: t('themePanel.savedThemes.deleteTitle'),
+      message: entry.kind === 'pack'
+        ? t('themePanel.savedThemes.deleteMessagePack', { name: entry.name })
+        : t('themePanel.savedThemes.deleteMessageConfig', { name: entry.name }),
       variant: 'danger',
-      confirmText: 'Delete',
+      confirmText: t('themePanel.savedThemes.deleteConfirm'),
       onConfirm: () => {
         void deleteSavedTheme(entry.id)
       },
@@ -167,7 +175,7 @@ export default function SavedThemes() {
     <section className={styles.section}>
       <div className={styles.header}>
         <span className={styles.headerIcon}><Bookmark size={12} /></span>
-        <h4 className={styles.headerLabel}>My Themes</h4>
+        <h4 className={styles.headerLabel}>{t('themePanel.savedThemes.myThemes')}</h4>
       </div>
       <div className={styles.list}>
         {savedThemes.map((entry) => {

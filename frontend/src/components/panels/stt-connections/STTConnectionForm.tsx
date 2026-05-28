@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { sttConnectionsApi } from '@/api/stt-connections'
 import { FormField, TextInput, Select, Button } from '@/components/shared/FormComponents'
 import { Toggle } from '@/components/shared/Toggle'
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export default function STTConnectionForm({ providers, profile, onSave, onCancel }: Props) {
+  const { t } = useTranslation('panels')
   const [name, setName] = useState(profile?.name || '')
   const [provider, setProvider] = useState(profile?.provider || providers[0]?.id || 'openai')
   const [apiKey, setApiKey] = useState('')
@@ -86,26 +88,26 @@ export default function STTConnectionForm({ providers, profile, onSave, onCancel
 
   return (
     <div className={styles.form}>
-      <FormField label="Name" required>
-        <TextInput value={name} onChange={setName} placeholder="Connection name" autoFocus={!profile} />
+      <FormField label={t('sttConnectionForm.name')} required>
+        <TextInput value={name} onChange={setName} placeholder={t('sttConnectionForm.connectionName')} autoFocus={!profile} />
       </FormField>
 
-      <FormField label="Provider">
+      <FormField label={t('sttConnectionForm.provider')}>
         <Select value={provider} onChange={setProvider} options={providerOptions} />
       </FormField>
 
       {capabilities?.apiKeyRequired && (
-        <FormField label="API Key" hint={profile?.has_api_key ? 'Key is set. Enter a new value to replace it.' : undefined}>
+        <FormField label={t('sttConnectionForm.apiKey')} hint={profile?.has_api_key ? t('sttConnectionForm.keySetHint') : undefined}>
           <TextInput
             value={apiKey}
             onChange={setApiKey}
-            placeholder={profile?.has_api_key ? '••••••••' : 'Enter API key'}
+            placeholder={profile?.has_api_key ? '••••••••' : t('sttConnectionForm.enterApiKey')}
             type="password"
           />
         </FormField>
       )}
 
-      <FormField label="API URL" hint="Leave empty for default provider URL">
+      <FormField label={t('sttConnectionForm.apiUrl')} hint={t('sttConnectionForm.apiUrlHint')}>
         <TextInput
           value={apiUrl}
           onChange={setApiUrl}
@@ -113,7 +115,7 @@ export default function STTConnectionForm({ providers, profile, onSave, onCancel
         />
       </FormField>
 
-      <FormField label="Model" hint="Refresh uses the current form values, even before the connection is saved.">
+      <FormField label={t('sttConnectionForm.model')} hint={t('sttConnectionForm.modelHint')}>
         <ModelCombobox
           value={model}
           onChange={setModel}
@@ -124,19 +126,19 @@ export default function STTConnectionForm({ providers, profile, onSave, onCancel
           autoRefreshOnFocus
           refreshKey={`${provider}:${profile?.id || ''}`}
           appearance="standard"
-          placeholder="gpt-4o-transcribe"
-          emptyMessage="No transcription models found. Enter one manually."
+          placeholder={t('sttConnectionForm.modelPlaceholder')}
+          emptyMessage={t('sttConnectionForm.noModels')}
         />
       </FormField>
 
       <FormField label="">
-        <Toggle.Checkbox checked={isDefault} onChange={setIsDefault} label="Set as default STT connection" />
+        <Toggle.Checkbox checked={isDefault} onChange={setIsDefault} label={t('sttConnectionForm.setDefault')} />
       </FormField>
 
       <div className={styles.formActions}>
-        <Button variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+        <Button variant="ghost" size="sm" onClick={onCancel}>{t('sttConnectionForm.cancel')}</Button>
         <Button variant="primary" size="sm" onClick={handleSubmit} disabled={!name.trim()}>
-          {profile ? 'Save' : 'Create'}
+          {profile ? t('sttConnectionForm.save') : t('sttConnectionForm.create')}
         </Button>
       </div>
     </div>
