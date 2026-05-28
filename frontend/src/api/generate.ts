@@ -153,8 +153,9 @@ export interface DryRunResponse {
     chunksAvailable: number
     chunksPending: number
     injectionMethod: 'macro' | 'fallback' | 'disabled'
+    retrievalMode?: 'vector' | 'recency' | 'empty' | 'disabled'
     retrievedChunks: Array<{
-      score: number
+      score: number | null
       tokenEstimate: number
       messageRange: [number, number]
       preview: string

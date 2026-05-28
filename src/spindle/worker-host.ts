@@ -7998,6 +7998,7 @@ export class WorkerHost {
         settingsSource: memoryResult.settingsSource,
         chunksAvailable: memoryResult.chunksAvailable,
         chunksPending: memoryResult.chunksPending,
+        retrievalMode: memoryResult.retrievalMode,
       };
 
       this.postToWorker({ type: "response", requestId, result });
@@ -8790,6 +8791,7 @@ export class WorkerHost {
         settingsSource: memoryResult.settingsSource,
         chunksAvailable: memoryResult.chunksAvailable,
         chunksPending: memoryResult.chunksPending,
+        retrievalMode: memoryResult.retrievalMode,
       };
       this.postToWorker({ type: "response", requestId, result });
     } catch (err: any) {

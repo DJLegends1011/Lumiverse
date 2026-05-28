@@ -457,6 +457,7 @@ When an interceptor returns `breakdown: [{ messageIndex, name? }]`, the host tur
 | `chunksAvailable` | `number` | Total chunks in the vector store. |
 | `chunksPending` | `number` | Chunks awaiting vectorization. |
 | `injectionMethod` | `string` | How memories were injected: `"macro"`, `"fallback"`, or `"disabled"`. |
+| `retrievalMode` | `string?` | How chunks were retrieved: `"vector"` (real vector/hybrid search) or `"recency"` (fallback, e.g. the query embedding failed). `retrievedChunks[].score` is `null` for recency/keyword-only hits. |
 | `queryPreview` | `string` | Truncated query text used for vector search. |
 | `settingsSource` | `string` | Whether settings came from `"global"` or `"per_chat"` overrides. |
 

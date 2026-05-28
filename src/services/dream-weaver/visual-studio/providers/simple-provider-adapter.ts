@@ -45,10 +45,12 @@ function buildProviderSpecificParameters(
       return {
         aspectRatio: asset.aspect_ratio,
       };
+    case "sdapi":
     case "swarmui": {
-      // SwarmUI exposes width/height as first-class schema params, so the user
-      // can tune them directly through ProviderParamRenderer. Prefer those
-      // overrides, falling back to the asset's canonical dimensions.
+      // SwarmUI and the SD WebUI API (sdapi) both expose width/height as
+      // first-class schema params, so the user can tune them directly through
+      // ProviderParamRenderer. Prefer those overrides, falling back to the
+      // asset's canonical dimensions.
       const stateParams = (asset.provider_state?.params ?? {}) as Record<string, unknown>;
       const stateWidth = stateParams.width != null ? Number(stateParams.width) : NaN;
       const stateHeight = stateParams.height != null ? Number(stateParams.height) : NaN;

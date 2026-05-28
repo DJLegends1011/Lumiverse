@@ -2906,6 +2906,7 @@ export async function assemblePrompt(
     })),
     queryPreview: memoryResult.queryPreview,
     settingsSource: memoryResult.settingsSource,
+    retrievalMode: memoryResult.retrievalMode,
   };
   const databankStats: DatabankStats = {
     enabled: activeDatabankIds.length > 0,
@@ -4150,7 +4151,7 @@ export async function getActivatedWorldInfoForChat(
  */
 
 export interface MemoryRetrievalResult {
-  chunks: Array<{ content: string; score: number; metadata: any }>;
+  chunks: Array<{ content: string; score: number | null; metadata: any }>;
   formatted: string;
   count: number;
   enabled: boolean;
@@ -4158,6 +4159,8 @@ export interface MemoryRetrievalResult {
   settingsSource: "global" | "per_chat";
   chunksAvailable: number;
   chunksPending: number;
+  /** How chunks were retrieved (vector search vs. recency fallback). */
+  retrievalMode?: "vector" | "recency" | "empty" | "disabled";
 }
 
 async function buildQueryText(
@@ -4209,7 +4212,7 @@ async function buildQueryText(
 }
 
 function formatMemoryOutput(
-  chunks: Array<{ content: string; score: number; metadata: any }>,
+  chunks: Array<{ content: string; score: number | null; metadata: any }>,
   settings: import("./embeddings.service").ChatMemorySettings,
 ): string {
   if (chunks.length === 0) return "";
@@ -4217,7 +4220,7 @@ function formatMemoryOutput(
   const renderedChunks = chunks.map((c) => {
     let rendered = settings.chunkTemplate;
     rendered = rendered.replace(/\{\{content\}\}/g, c.content);
-    rendered = rendered.replace(/\{\{score\}\}/g, c.score.toFixed(4));
+    rendered = rendered.replace(/\{\{score\}\}/g, c.score != null ? c.score.toFixed(4) : "n/a");
     const meta = c.metadata ?? {};
     rendered = rendered.replace(
       /\{\{startIndex\}\}/g,
@@ -4380,6 +4383,7 @@ export async function collectChatVectorMemory(
         settingsSource: result.settingsSource,
         chunksAvailable: result.chunksAvailable,
         chunksPending: result.chunksPending,
+        retrievalMode: result.retrievalMode,
       };
     }
   }
@@ -4393,6 +4397,7 @@ export async function collectChatVectorMemory(
     settingsSource: result.settingsSource,
     chunksAvailable: result.chunksAvailable,
     chunksPending: result.chunksPending,
+    retrievalMode: result.retrievalMode,
   };
 }
 

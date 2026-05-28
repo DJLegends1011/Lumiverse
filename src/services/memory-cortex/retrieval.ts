@@ -452,7 +452,10 @@ async function searchChatChunksScoped(
   return filtered.map((h: any) => ({
     chunkId: h.chunk_id,
     content: h.content,
-    distance: h.score, // LanceDB returns distance as score
+    // LanceDB returns distance as score. Cortex uses pure-vector search (no
+    // FTS leg), so score is always a real distance here; coerce defensively
+    // since searchChatChunks returns null for keyword-only hits elsewhere.
+    distance: h.score ?? 1,
   }));
 }
 

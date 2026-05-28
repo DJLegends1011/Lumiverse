@@ -229,8 +229,12 @@ export interface MemoryStats {
   chunksAvailable: number;
   chunksPending: number;
   injectionMethod: "macro" | "fallback" | "disabled";
+  /** How chunks were retrieved: real vector/hybrid search vs. the recency
+   *  fallback (e.g. when the query embedding failed). null score = a
+   *  keyword-only or recency hit with no vector distance. */
+  retrievalMode?: "vector" | "recency" | "empty" | "disabled";
   retrievedChunks: Array<{
-    score: number;
+    score: number | null;
     tokenEstimate: number;
     messageRange: [number, number];
     preview: string;

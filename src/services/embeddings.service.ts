@@ -2546,6 +2546,52 @@ function looksLikePhysicalBatchLimit(err: Error): boolean {
 }
 
 /**
+ * Next (shorter) length to retry an over-budget query embed at, or null when
+ * we've hit the floor and should give up. Halving mirrors
+ * embedWithAdaptiveBatching's backoff; the floor stops us from spinning on a
+ * backend that rejects everything.
+ */
+export function nextQueryEmbedLength(currentLen: number, minChars: number): number | null {
+  if (currentLen <= minChars) return null;
+  const next = Math.max(minChars, Math.floor(currentLen / 2));
+  return next < currentLen ? next : null;
+}
+
+/**
+ * Embed a single retrieval query, shrinking it on retryable "input too large"
+ * errors instead of letting the caller collapse to a recency fallback.
+ * Token-limited embedding backends (llama.cpp `n_ubatch`, 512-token BERT
+ * models) reject oversized inputs with 413/500 — and a multi-message LTCM
+ * query easily exceeds that. We keep the most-recent tail (consistent with how
+ * the query is built) and halve until the backend accepts it or we hit the
+ * floor, at which point the original error propagates.
+ */
+export async function embedQueryAdaptive(
+  userId: string,
+  text: string,
+  options?: { signal?: AbortSignal; minChars?: number },
+): Promise<number[]> {
+  const minChars = Math.max(64, options?.minChars ?? 512);
+  let current = text;
+  for (;;) {
+    try {
+      const [vec] = await cachedEmbedTexts(userId, [current], { signal: options?.signal });
+      return vec ?? [];
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      // Never swallow a genuine cancellation by retrying a smaller input.
+      if (options?.signal?.aborted || /abort/i.test(e.message)) throw e;
+      const nextLen = isRetryableBatchError(e) ? nextQueryEmbedLength(current.length, minChars) : null;
+      if (nextLen == null) throw e;
+      console.warn(
+        `[embeddings] Query embed of ${current.length} chars failed (${e.message}); retrying truncated to ${nextLen} chars`,
+      );
+      current = current.slice(-nextLen);
+    }
+  }
+}
+
+/**
  * Embed a list of items with automatic batch-halving on transient errors.
  *
  * For llama.cpp-style backends where the server's `n_ubatch` caps per-request
@@ -3655,7 +3701,7 @@ export async function searchChatChunks(
   allowedChunkIds?: Set<string>,
   signal?: AbortSignal,
   options?: { skipVectorFetch?: boolean },
-): Promise<Array<{ chunk_id: string; score: number; content: string; metadata: any }>> {
+): Promise<Array<{ chunk_id: string; score: number | null; content: string; metadata: any }>> {
   if (signal?.aborted) return [];
   const table = await getTableIfExists(EMBEDDINGS_TABLE);
   if (!table) return [];
@@ -3758,7 +3804,7 @@ export async function searchChatChunks(
   }
 
   // Parse rows and collect metadata
-  type ParsedRow = { chunkId: string; score: number; content: string; metadata: any; rowVector: number[] | null };
+  type ParsedRow = { chunkId: string; score: number | null; content: string; metadata: any; rowVector: number[] | null };
   const parsed: Array<{ chunkId: string; meta: any; row: any }> = [];
   const needMessageIdLookup: string[] = [];
 
@@ -3818,7 +3864,11 @@ export async function searchChatChunks(
 
     candidates.push({
       chunkId,
-      score: typeof row._distance === "number" ? row._distance : 0,
+      // FTS-only (keyword) hits carry no vector `_distance`. Use null, not 0:
+      // in cosine-distance space 0 means "identical", so a 0 here would make a
+      // keyword hit masquerade as a perfect match and sail past the
+      // similarity-distance filter downstream.
+      score: typeof row._distance === "number" ? row._distance : null,
       content: clipOversizedChunkContent(String(row.content || ""), chunkId),
       metadata: meta,
       rowVector,
@@ -3950,7 +4000,7 @@ function clipOversizedChunkContent(content: string, chunkId: string): string {
  *   0.7 is a good default for chat memory.
  */
 function mmrSelect(
-  candidates: Array<{ chunkId: string; score: number; content: string; metadata: any; rowVector: number[] | null }>,
+  candidates: Array<{ chunkId: string; score: number | null; content: string; metadata: any; rowVector: number[] | null }>,
   queryVector: number[],
   k: number,
   lambda = 0.7,
@@ -3970,8 +4020,10 @@ function mmrSelect(
 
     for (const idx of remaining) {
       const candidate = withVectors[idx];
-      // Relevance: higher similarity to query = better (invert cosine distance)
-      const relevance = 1 - candidate.score;
+      // Relevance: higher similarity to query = better (invert cosine
+      // distance). A keyword-only hit (score === null) has no vector distance,
+      // so it contributes no relevance and is selected on diversity alone.
+      const relevance = candidate.score == null ? 0 : 1 - candidate.score;
 
       // Diversity: max similarity to any already-selected chunk
       let maxSimToSelected = 0;

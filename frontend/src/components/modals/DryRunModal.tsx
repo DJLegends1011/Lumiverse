@@ -529,6 +529,20 @@ export default function DryRunModal() {
                         <span className={styles.breakdownLabel}>{t('memory.injectionMethod')}</span>
                         <span className={styles.breakdownTokens}>{memoryStats.injectionMethod}</span>
                       </div>
+                      {memoryStats.retrievalMode && (
+                        <div className={styles.breakdownEntry}>
+                          <span className={styles.breakdownLabel}>Retrieval mode</span>
+                          <span
+                            className={styles.breakdownTokens}
+                            style={memoryStats.retrievalMode === 'recency' ? { color: '#ffab00' } : undefined}
+                            title={memoryStats.retrievalMode === 'recency'
+                              ? 'Vector search was unavailable (e.g. the query embedding failed); chunks were chosen by recency and have no similarity score.'
+                              : undefined}
+                          >
+                            {memoryStats.retrievalMode === 'recency' ? 'recency fallback' : memoryStats.retrievalMode}
+                          </span>
+                        </div>
+                      )}
                       <div className={styles.breakdownEntry}>
                         <span className={styles.breakdownLabel}>{t('memory.chunksAvailable')}</span>
                         <span className={styles.breakdownTokens}>{memoryStats.chunksAvailable}</span>
@@ -559,7 +573,7 @@ export default function DryRunModal() {
                           {memoryStats.retrievedChunks.map((chunk, i) => (
                             <div key={i} className={styles.breakdownEntry} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4, paddingLeft: 8 }}>
                               <span className={styles.breakdownLabel}>
-                                {t('memory.chunkLine', { index: i + 1, score: chunk.score.toFixed(4), tokens: chunk.tokenEstimate })}
+                                {t('memory.chunkLine', { index: i + 1, score: chunk.score != null ? chunk.score.toFixed(4) : 'n/a', tokens: chunk.tokenEstimate })}
                               </span>
                               <ChunkPreview text={chunk.preview} />
                             </div>
