@@ -2370,6 +2370,25 @@ export async function startGeneration(
         messages = cached.messages;
         inlineTools = cached.tools;
 
+        // Per-swipe seed: a regenerate/swipe excludes the whole target message,
+        // so the assembled prompt is byte-identical to the previous swipe. With
+        // a user-pinned seed (advancedSettings.seed >= 0) that means a
+        // seed-honoring backend returns byte-identical tokens every swipe. Offset
+        // the seed by the swipe slot so each swipe is reproducible-but-distinct
+        // while the first (normal) generation keeps the exact pinned seed. Modulo
+        // the int32 ceiling so a seed pinned near the max can't overflow the
+        // range some backends validate (the wrap keeps slots distinct).
+        if (
+          (genType === "regenerate" || genType === "swipe") &&
+          typeof mergedParams.seed === "number" &&
+          mergedParams.seed >= 0 &&
+          typeof lifecycle.targetSwipeIdx === "number"
+        ) {
+          const MAX_SEED = 2147483647; // int32 max — widely accepted ceiling
+          mergedParams.seed =
+            (mergedParams.seed + lifecycle.targetSwipeIdx) % MAX_SEED;
+        }
+
         // Resolve preset name for breakdown display
         const presetId = input.preset_id || connection.preset_id;
         if (presetId) {

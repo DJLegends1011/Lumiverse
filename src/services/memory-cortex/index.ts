@@ -190,6 +190,16 @@ const EMPTY_CORTEX_RESULT: CortexResult = {
 interface CachedCortexEntry {
   result: CortexResult;
   queriedAt: number;
+  /**
+   * The message IDs that were excluded from retrieval when this result was
+   * computed. The warm cache is keyed by chatId only, so a result warmed by a
+   * generation that excluded message A can be read back by a later generation
+   * that is regenerating message B. Recording the exclude set lets the reader
+   * reject an entry that did NOT exclude the message it is now regenerating,
+   * preventing the regen target's own chunk from being re-injected as a
+   * "memory" (the duplicate-swipe / self-contamination leak).
+   */
+  excludeMessageIds: string[];
 }
 
 const cortexResultCache = new Map<string, CachedCortexEntry>();
@@ -426,12 +436,32 @@ function buildCortexQueryKey(query: CortexQuery, config: MemoryCortexConfig): st
  * Read the most recent cortex result from the warm cache.
  * Returns null if no cached result exists or if it has expired.
  * This is a synchronous, non-blocking call — safe to use in the generation hot path.
+ *
+ * When `requireExcludedMessageId` is provided (regenerate/swipe), the cached
+ * entry is only returned if that message was excluded when the entry was
+ * warmed. Otherwise the entry could contain a chunk for the message being
+ * regenerated and re-inject the prior swipe's text as a "memory". On a reject
+ * the caller falls through to exclusion-aware vector retrieval, so correctness
+ * is preserved at the cost of one cold retrieval in the (rare) cross-message
+ * regen case. Normal sends pass nothing here and keep the fast warm-cache read.
  */
-export function getCachedCortexResult(chatId: string): CortexResult | null {
+export function getCachedCortexResult(
+  chatId: string,
+  requireExcludedMessageId?: string,
+): CortexResult | null {
   const entry = cortexResultCache.get(chatId);
   if (!entry) return null;
   if (Date.now() - entry.queriedAt > CACHE_TTL_MS) {
     cortexResultCache.delete(chatId);
+    return null;
+  }
+  if (
+    requireExcludedMessageId &&
+    !entry.excludeMessageIds.includes(requireExcludedMessageId)
+  ) {
+    // Stale-context entry: it was warmed without excluding the message we are
+    // now regenerating, so it may contain that message's own chunk. Treat as a
+    // miss and let the caller fall back to an exclusion-aware retrieval.
     return null;
   }
   return entry.result;
@@ -848,8 +878,14 @@ export async function queryCortex(
 
     // Auto-populate warm cache for non-blocking reads in future generations.
     // Only genuine completions (success or "no memories") reach here — timeouts
-    // are returned early above without touching the cache.
-    cortexResultCache.set(query.chatId, { result, queriedAt: Date.now() });
+    // are returned early above without touching the cache. Record the exclude
+    // set so a later regen of a message this query did NOT exclude is served a
+    // miss instead of a result that could contain that message's own chunk.
+    cortexResultCache.set(query.chatId, {
+      result,
+      queriedAt: Date.now(),
+      excludeMessageIds: [...(query.excludeMessageIds ?? [])],
+    });
 
     return result;
   })();

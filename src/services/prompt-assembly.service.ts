@@ -1630,8 +1630,21 @@ export async function assemblePrompt(
   let memoryResult: Awaited<ReturnType<typeof collectChatVectorMemory>>;
 
   if (cortexConfig.enabled) {
-    // Fast path: warm cache from a previous generation (synchronous, no I/O)
-    cortexResult = memoryCortex.getCachedCortexResult(ctx.chatId);
+    // Fast path: warm cache from a previous generation (synchronous, no I/O).
+    // On regenerate/swipe the excluded message has real content we must not
+    // re-inject, so require the cached entry to have been warmed with that
+    // message excluded; otherwise fall through to exclusion-aware retrieval.
+    // Normal/continue sends exclude only an empty staged message, so they read
+    // the warm cache ungated to avoid a needless cold retrieval.
+    const requireExcludedMessageId =
+      (ctx.generationType === "regenerate" || ctx.generationType === "swipe") &&
+      ctx.excludeMessageId
+        ? ctx.excludeMessageId
+        : undefined;
+    cortexResult = memoryCortex.getCachedCortexResult(
+      ctx.chatId,
+      requireExcludedMessageId,
+    );
 
     if (cortexResult && cortexResult.memories.length > 0) {
       memoryResult = formatCortexForAssembly(
