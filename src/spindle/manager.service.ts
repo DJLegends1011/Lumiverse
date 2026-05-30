@@ -400,6 +400,9 @@ function resolveStaticModuleSpecifier(raw: string): string | null {
     matchedAny = true;
     rest = rest.slice(m[0].length).replace(/^\s+/, "");
     if (!rest) break;
+    // `import(spec, { with: … })` — the specifier is complete; the trailing
+    // comma introduces the (static) import-attributes object, not part of it.
+    if (rest[0] === ",") break;
     if (rest[0] !== "+") return null; // any non-`+` operator/token ⇒ dynamic
     rest = rest.slice(1).replace(/^\s+/, "");
     if (!rest) return null; // dangling `+`
@@ -408,7 +411,21 @@ function resolveStaticModuleSpecifier(raw: string): string | null {
 }
 
 function addDynamicModuleHits(source: ScannableSource, hits: Set<string>): void {
-  for (const match of matchOutsideIgnored(source, /\b(?:require|import)\s*\(([^;\n]{1,300})\)/)) {
+  // Only the BARE dynamic-import operator `import(…)` and the global
+  // `require(…)` are real module-load surfaces. Member calls (`x.require(…)`,
+  // `ns.import(…)`) and shorthand method definitions (`require(name) { … }`)
+  // are unrelated: extensions routinely ship a scripting API whose methods are
+  // literally named `require`/`import` (e.g. RisuAI-compat layers). The
+  // negative lookbehind `(?<![.\w$])` drops member access and identifier-
+  // prefixed names; the trailing-`{` check below drops method definitions.
+  // No coverage is lost — a constant dangerous specifier on ANY receiver is
+  // still caught by DANGEROUS_BACKEND_CHECKS, and a dynamic `globalThis.require`
+  // is caught at runtime by guardRequire (a real override, unlike `import()`).
+  for (const match of matchOutsideIgnored(source, /(?<![.\w$])(?:require|import)\s*\(([^;\n]{1,300})\)/)) {
+    if (match.index !== undefined) {
+      const tail = source.text.slice(match.index + match[0].length);
+      if (/^\s*\{/.test(tail)) continue; // `require(name) { … }` — a definition
+    }
     const resolved = resolveStaticModuleSpecifier(match[1]);
     if (resolved === null) {
       // Specifier is not a provable constant — fail closed. We cannot tell

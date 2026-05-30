@@ -139,6 +139,31 @@ describe("detectDangerousBackendCapabilities", () => {
     }
   });
 
+  test("does not flag methods named require/import (member calls + definitions)", () => {
+    // Extensions ship scripting APIs whose methods are literally named
+    // `require`/`import` (e.g. RisuAI-compat layers). These are NOT the global
+    // require / dynamic-import operator and must not trip the fail-closed gate,
+    // even with a fully dynamic argument. Regression guard for the LumiRealm
+    // false positive (its bundle is all `scriptNs.require(n)` style calls).
+    const safe = [
+      "const mod = await scriptNs.require(n);",
+      "const lib = await ctx.scriptNS.require(entry.name);",
+      "const o = { async require(name) { return name; } };",
+      "obj?.require(dynamicName);",
+      "function require(name) { return name; }",
+      'await import("./data.json", { with: { type: "json" } });', // import attributes
+    ];
+    for (const code of safe) {
+      expect(detectDangerousBackendCapabilities(code)).toEqual([]);
+    }
+
+    // …but a constant dangerous specifier on a member receiver is still caught
+    // by the literal module checks (independent of the dynamic-call heuristic).
+    expect(detectDangerousBackendCapabilities('globalThis.require("node:fs");')).toContain(
+      "filesystem module access",
+    );
+  });
+
   test("allows provably-constant non-dangerous dynamic imports", () => {
     // Legitimate extensions load their own bundled modules with literal or
     // interpolation-free specifiers — these must not be flagged.
