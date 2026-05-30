@@ -14,7 +14,11 @@ WORKDIR /app/frontend
 # Install dependencies first (cache layer)
 COPY frontend/package.json frontend/bun.lock* ./
 COPY frontend/scripts/postinstall-bindings.cjs ./scripts/
-RUN bun install --frozen-lockfile 2>/dev/null || bun install
+# Fail loudly if the lockfile is missing or out of sync. Do NOT fall back to a
+# non-frozen `bun install` — that silently re-resolves caret ranges and lets the
+# dependency tree drift away from what was tested (see the kysely/better-auth
+# DEFAULT_MIGRATION_LOCK_TABLE startup crash). The lockfile is committed.
+RUN bun install --frozen-lockfile
 
 # FRONTEND_REFRESH: cache-busting marker for the Vite build layer below. Mirrors
 # the CA_REFRESH pattern in the runtime stage — bump (or pass via --build-arg)
@@ -36,7 +40,9 @@ FROM oven/bun:canary-slim AS backend-deps
 WORKDIR /app
 
 COPY package.json bun.lock* ./
-RUN bun install --production --frozen-lockfile 2>/dev/null || bun install --production
+# Fail loudly if the lockfile is missing or out of sync — no silent re-resolve.
+# (See the frontend stage above for the rationale.) The lockfile is committed.
+RUN bun install --production --frozen-lockfile
 
 # ---------------------------------------------------------------------------
 # Stage 3: Runtime
